@@ -5,6 +5,7 @@
 pub mod aggregate;
 pub mod checklist;
 pub mod config;
+pub mod frames;
 pub mod image;
 pub mod job;
 pub mod journal;

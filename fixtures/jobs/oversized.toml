@@ -1,0 +1,13 @@
+# The candidate's header claims 60 megapixels; it must be refused before decoding.
+[job]
+use_case = "source-fidelity"
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "fixtures/images/claims-60mp.png" }
+
+[[job.images]]
+id = "source"
+role = "source"
+source = { path = "fixtures/images/source-64x48.png" }

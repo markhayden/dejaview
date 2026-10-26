@@ -8,7 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::aggregate::{self, Row, Verdict};
 use crate::checklist::{self, ChecklistItem};
 use crate::config::Config;
-use crate::image::{self, CanonicalImage};
+use crate::image::{self, CanonicalImage, DecodeBounds};
 use crate::job::Job;
 use crate::journal::Journal;
 use crate::obligations::{self, Instance};
@@ -134,10 +134,11 @@ async fn drive(
     state: &mut RunState,
 ) -> Result<Verdict> {
     // Resolve.
+    let bounds = DecodeBounds::default();
     state.images = job
         .images
         .iter()
-        .map(|spec| image::load(spec, job_base))
+        .map(|spec| image::load(spec, job_base, &bounds))
         .collect::<Result<Vec<_>>>()?;
     state.instances = obligations::walking_slice_instances(job);
     state.checklist = checklist::build(&state.instances);

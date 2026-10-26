@@ -1,0 +1,13 @@
+# The candidate carries EXIF orientation 6; decoded upright it is 48x64.
+[job]
+use_case = "source-fidelity"
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "fixtures/images/exif-rotated-64x48.png" }
+
+[[job.images]]
+id = "source"
+role = "source"
+source = { path = "fixtures/images/source-64x48.png" }

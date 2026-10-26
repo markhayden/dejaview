@@ -58,29 +58,7 @@ pub struct Opinion {
     pub reason: String,
 }
 
-/// A location as a tagged record with nullable fields, so it survives every provider's strict
-/// mode unchanged. Which fields must be non-null depends on `kind` (semantic validation, 1.6a).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
-pub struct Location {
-    pub frame: String,
-    pub kind: LocationKind,
-    pub bbox: Option<[f64; 4]>,
-    pub polygon: Option<Vec<[f64; 2]>>,
-    pub yaw: Option<f64>,
-    pub pitch: Option<f64>,
-    pub fov: Option<f64>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum LocationKind {
-    Bbox,
-    Polygon,
-    View,
-    WholeImage,
-    Absent,
-}
+pub use crate::frames::{Location, LocationKind};
 
 /// The `submit_verdict` tool as offered to the provider. Hand-written for the walking slice;
 /// generated from the types with `schemars` in task 1.6a.

@@ -1132,6 +1132,7 @@ fn execute_call(
     let mut ctx = DejaviewContext {
         run_id: state.run_id.clone(),
         call_id: call_id.clone(),
+        run_dir: Some(state.run_dir.clone()),
         ..Default::default()
     };
     for arg in &manifest.image_args {

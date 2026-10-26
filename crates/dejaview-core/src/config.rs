@@ -131,8 +131,17 @@ pub struct ToolsConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PackConfig {
-    pub package: String,
-    pub version: String,
+    /// The provisioned bundle, by package and version (`dejaview tools setup` installs it).
+    #[serde(default)]
+    pub package: Option<String>,
+    #[serde(default)]
+    pub version: Option<String>,
+    /// An executable to run as the pack's MCP server instead of a provisioned bundle, with its
+    /// arguments; for tests and local development.
+    #[serde(default)]
+    pub command: Option<PathBuf>,
+    #[serde(default)]
+    pub args: Vec<String>,
     /// Extra environment variables passed through to the pack. Credential names are refused.
     #[serde(default)]
     pub env: Vec<String>,
@@ -358,6 +367,14 @@ impl Config {
             ));
         }
         for (name, pack) in &self.tools.packs {
+            match (&pack.command, &pack.package, &pack.version) {
+                (Some(_), None, None) | (None, Some(_), Some(_)) => {}
+                _ => {
+                    return Err(Error::Config(format!(
+                        "[tools.packs.{name}]: give either `command` or both `package` and `version`"
+                    )));
+                }
+            }
             for var in &pack.env {
                 if is_credential_name(var) {
                     return Err(Error::Config(format!(

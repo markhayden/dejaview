@@ -65,5 +65,5 @@ behind the `testkit` feature, and a dev-dependency anywhere.
 | Run state machine: tool turns, final turn (`refuse`), terminal error classes, repairs, retries, cost ledger, artifacts, cancellation, report rebuild and prune, decision cache, isolation and the environment allowlist | done (1.7a to 1.12) | M1 |
 | Provider adapters, catalog, profiles | pending | M2 |
 | Evaluation sets, runner, metrics, gates, viewer | pending | M3 |
-| Built-in tools, MCP client | pending | M4 |
+| Built-in tools, MCP client | MCP client lifecycle done (1.13); built-ins, pagination, concurrency pending | M4 |
 | Python tool pack | pending | M5 |

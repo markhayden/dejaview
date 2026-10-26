@@ -1138,8 +1138,8 @@ enabled = ["view", "align", "regions", "classes"]
 order = ["align", "regions", "view", "classes"]
 
 [tools.packs.python]
-package = "dejaview-tools"
-version = "0.1.0"
+package = "dejaview-tools"              # a provisioned bundle, by package and version, or instead:
+version = "0.1.0"                       # command = "./server", args = []  (an executable to run, for tests)
 env = ["DEJAVIEW_MODEL_DIR"]            # extra variables passed through, credential names refused
 startup_timeout_s = 120
 shared = false

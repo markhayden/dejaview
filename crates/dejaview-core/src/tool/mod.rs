@@ -29,6 +29,9 @@ pub struct DejaviewContext {
     /// Hints from the rules for this tool, as declared in `accepts_hints`.
     #[serde(default)]
     pub hints: serde_json::Value,
+    /// The run directory, for transports that spawn a process there; never sent to a tool.
+    #[serde(skip)]
+    pub run_dir: Option<std::path::PathBuf>,
 }
 
 /// How a tool reaches an image's canonical pixels: a lossless PNG by path or inline.

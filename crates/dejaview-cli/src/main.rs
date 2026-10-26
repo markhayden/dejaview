@@ -448,7 +448,17 @@ fn tools_list(args: &ToolsListArgs) -> i32 {
             return EXIT_USAGE;
         }
     };
-    let known = known_manifests();
+    let mut known = known_manifests();
+    let packs = match connect_packs(&config) {
+        Ok(p) => p,
+        Err(message) => {
+            eprintln!("dejaview: {message}");
+            return EXIT_USAGE;
+        }
+    };
+    for pack in &packs {
+        known.extend(pack.manifests().iter().cloned());
+    }
     let mut listed = Vec::new();
     for name in &config.tools.enabled {
         match known.iter().find(|m| &m.name == name) {
@@ -491,9 +501,50 @@ fn tools_list(args: &ToolsListArgs) -> i32 {
 
 /// The tools available to this build, then narrowed to the config's enabled list.
 fn build_tools(args: &CheckArgs, config: &Config) -> Result<ToolRegistry, String> {
-    let available: Vec<Box<dyn Tool>> = available_tools(args)?;
+    // Packs first; a built-in or scripted tool of the same name yields to the pack's.
+    let mut available: Vec<Box<dyn Tool>> = Vec::new();
+    for pack in connect_packs(config)? {
+        available.extend(pack.tools());
+    }
+    for tool in available_tools(args)? {
+        if !available
+            .iter()
+            .any(|t| t.manifest().name == tool.manifest().name)
+        {
+            available.push(tool);
+        }
+    }
     ToolRegistry::new(available, &config.tools.enabled, &config.tools.order)
         .map_err(|e| e.to_string())
+}
+
+/// Connects every pack the config runs by `command`; provisioned bundles arrive in task 1.14.
+fn connect_packs(
+    config: &Config,
+) -> Result<Vec<std::sync::Arc<dejaview_tools::mcp::Pack>>, String> {
+    use dejaview_tools::mcp::{Pack, Spawn, Timeouts};
+    use std::time::Duration;
+    let mut packs = Vec::new();
+    for (name, pack) in &config.tools.packs {
+        let Some(command) = &pack.command else {
+            continue;
+        };
+        let spawn = Spawn {
+            command: command.clone(),
+            args: pack.args.clone(),
+            declared_env: pack.env.clone(),
+            cwd: None,
+        };
+        let timeouts = Timeouts {
+            startup: Duration::from_secs(pack.startup_timeout_s),
+            call: Duration::from_secs(config.budget.tool_timeout_s),
+            shutdown_grace: Duration::from_secs(5),
+        };
+        packs.push(
+            Pack::connect(name, spawn, timeouts, std::env::vars()).map_err(|e| e.to_string())?,
+        );
+    }
+    Ok(packs)
 }
 
 #[cfg(feature = "testkit")]

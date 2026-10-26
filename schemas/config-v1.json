@@ -129,6 +129,21 @@
     "PackConfig": {
       "additionalProperties": false,
       "properties": {
+        "args": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "command": {
+          "default": null,
+          "description": "An executable to run as the pack's MCP server instead of a provisioned bundle, with its\narguments; for tests and local development.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "env": {
           "default": [],
           "description": "Extra environment variables passed through to the pack. Credential names are refused.",
@@ -138,7 +153,12 @@
           "type": "array"
         },
         "package": {
-          "type": "string"
+          "default": null,
+          "description": "The provisioned bundle, by package and version (`dejaview tools setup` installs it).",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "shared": {
           "default": false,
@@ -151,13 +171,13 @@
           "type": "integer"
         },
         "version": {
-          "type": "string"
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
-      "required": [
-        "package",
-        "version"
-      ],
       "type": "object"
     },
     "PolicyConfig": {

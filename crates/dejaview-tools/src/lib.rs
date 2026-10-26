@@ -1,5 +1,7 @@
 //! Built-in deterministic tools, the MCP client, provisioning and evaluation projections.
 
+pub mod mcp;
+
 /// Errors this crate produces. Every public fallible function returns this type.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

@@ -1,6 +1,8 @@
-//! Test support shared by every crate: the scripted fake provider, the fake tool and the fake MCP
-//! server. A normal dependency of the `dejaview` binary only behind its `testkit` feature.
+//! Test support shared by every crate: the scripted fake provider, the fake tool, and the fake MCP
+//! server (the `dejaview-testkit-mcp` binary, located by `mcp_server::path`). A normal dependency
+//! of the `dejaview` binary only behind its `testkit` feature.
 
+pub mod mcp_server;
 pub mod provider;
 pub mod tool;
 

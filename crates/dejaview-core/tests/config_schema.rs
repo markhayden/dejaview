@@ -12,7 +12,10 @@ fn every_key_in_the_spec_example_parses() {
     let text = std::fs::read_to_string(root().join("fixtures/config/full.toml")).unwrap();
     let env = |name: &str| (name == "DEJAVIEW_TEST_ACCOUNT").then(|| "acct".to_string());
     let config = Config::parse(&text, &[], &env).unwrap();
-    assert_eq!(config.tools.packs["python"].package, "dejaview-tools");
+    assert_eq!(
+        config.tools.packs["python"].package.as_deref(),
+        Some("dejaview-tools")
+    );
     assert_eq!(config.rules.as_ref().unwrap().base, "source-fidelity");
     assert_eq!(config.images.max_long_edge, Some(1568));
     assert_eq!(config.provider.controls["effort"].as_str(), Some("high"));

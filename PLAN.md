@@ -106,7 +106,9 @@ branches `mN/<task>` merged into the milestone branch when two tasks are in flig
 a later milestone never starts before the earlier milestone merges; owner labelling happens
 outside git and may overlap. A milestone merges into `main` with a merge commit (no squash) after
 the owner's review and the checkpoint checklist passes. Nothing is pushed by the agent; the owner
-pushes.
+pushes. The owner's preference (2026-10-26): branches stay on the owner's machine and `main` is
+pushed only at tagged checkpoints, so the public repository shows reviewed, working states; CI is
+run locally with `just ci-local` before any push.
 
 **Commits.** Conventional Commits with a scope. Every commit on a milestone branch leaves
 `just check` green, which runs `cargo fmt --all -- --check`, `cargo clippy --workspace
@@ -117,7 +119,8 @@ spec, plan, README and docs are updated in the same commit as the change they de
 Attribution lines follow the repository's conventions. Secrets, private images and
 `docs/brief.md` never enter a commit.
 
-**Checkpoints and tags.** When a milestone's checkpoint checklist passes and the owner approves,
+**Checkpoints and tags.** Every later checkpoint also requires `just ci-local` green. When a
+milestone's checkpoint checklist passes and the owner approves,
 the merge commit on `main` is tagged `mN` (annotated, with the checklist and the versions of
 external artifacts: evalsets repository commit, model artifact hashes, published package
 versions). Intermediate tags `mN.k` mark task groups on the milestone branch.
@@ -189,8 +192,9 @@ values are allowed anywhere. `.gitignore` for `target/`, `eval-out/`, `dejaview-
 
 **Verification.** `just hooks && scripts/test-hooks.sh`; draft PR with CI.
 
-**Dependencies.** 0.1. **Files.** `.github/workflows/ci.yml`, `scripts/pre-commit`,
-`scripts/test-hooks.sh`, `fixtures/synthetic-secrets/`, `.gitignore`. **Size.** S.
+**Dependencies.** 0.1. **Files.** `.github/workflows/ci.yml`, `scripts/hooks/pre-commit`,
+`scripts/scan-secrets.sh`, `scripts/test-hooks.sh`, `scripts/test-checks.sh`,
+`fixtures/synthetic-secrets/`, `.gitignore`. **Size.** S.
 
 ### Task 0.3: Docs skeleton, review checklist and README sections
 
@@ -223,7 +227,8 @@ Generators and licence are deferred to 3.2a. Blank entries name the task they bl
 **Dependencies.** None. **Files.** `docs/owner-decisions.md`. **Size.** S; owner time.
 
 ### Checkpoint M0
-- [ ] `just check` and CI green; hooks installed; README accurate; owner decisions recorded.
+- [ ] `just check` green locally and on a fresh clone; `just ci-local` (the GitHub workflow run in
+      Docker with act) green; hooks installed; README accurate; owner decisions recorded.
 - [ ] Owner review; merge; tag `m0`.
 
 ## Milestone M1: Skeleton
@@ -1044,7 +1049,8 @@ stating these are development sets.
 plus candidate dependencies, on synthetic pairs with known transforms, unrelated pairs,
 low-texture pairs and degenerate transforms; tolerances (translation within 0.5 px at 2048 width,
 rotation within 0.1°, inlier fraction reported); failure fixtures; equirectangular rotation
-estimation scoped the same way on the prototype's stored views (reuse approval from 0.4).
+estimation scoped the same way on newly generated or CC-licensed panoramas (owner decision 11:
+nothing from the prototype is reused).
 
 **Acceptance.** ADR 0014 with measured tolerances and the chosen approach; failure fixtures
 committed.
@@ -1157,13 +1163,18 @@ paired flips; spend under cap.
 
 ### Task 4.6: Segmenter artifact and MODEL.md
 
-**Description.** Publish the prototype's EoMT-L ADE20K ONNX export as a release asset with
-`tools/python/MODEL.md` (URL, SHA-256, licences and provenance, preprocessing version,
-onnxruntime version and execution provider, parity tolerance, golden views). M4 exit prerequisite.
+**Description.** Export a segmenter from publicly licensed upstream weights (candidate EoMT-L
+ADE20K; licence check first, alternative by ADR if it fails) with this project's own export
+script, publish it as a release asset, and write `tools/python/MODEL.md` (upstream source and
+licences, export procedure and versions, URL, SHA-256, preprocessing version, onnxruntime version
+and execution provider, parity tolerance, golden inputs generated here). Nothing from the
+prototype is reused (owner decision 11). M4 exit prerequisite.
 
-**Acceptance.** `MODEL.md` complete; the asset downloads and matches its hash.
+**Acceptance.** `MODEL.md` complete; the export script is committed and reproduces the artifact
+hash; the asset downloads and matches.
 
-**Dependencies.** 0.4. **Files.** `tools/python/MODEL.md`. **Size.** S.
+**Dependencies.** 0.4. **Files.** `tools/python/MODEL.md`, `tools/python/scripts/export_segmenter.py`.
+**Size.** M.
 
 ### Checkpoint M4
 - [ ] `docs/tools.md` explains writing a tool with `view` as the worked example; `MODEL.md`
@@ -1199,9 +1210,9 @@ parity test against stored golden outputs within the documented tolerance.
 image, the prototype's decision tables stripped to high-recall pointers; manifest with
 `requires = ["align"]`.
 
-**Acceptance.** On synthetic pairs with planted changes (new, or the prototype's if approved),
-every planted region is found with IoU above 0.3 and at most `max_regions` are returned; the
-manifest passes all three adapters' wire transformations.
+**Acceptance.** On newly generated synthetic pairs with planted changes, every planted region is
+found with IoU above 0.3 and at most `max_regions` are returned; the manifest passes all three
+adapters' wire transformations.
 
 **Dependencies.** 5.3. **Files.** `tools/python/src/dejaview_tools/regions.py`. **Size.** M.
 
@@ -1340,6 +1351,6 @@ begins before the earlier milestone merges.
 ## Open questions
 
 1. Generators and licence for public sets (3.2a, ADR 0013).
-2. Whether the prototype's synthetic integrity fixtures are licence-clean for 5.4a.
-3. Whether M6 is funded in this release; until it passes, admission is provisional and `regions`
-   stays out of arm D.
+2. Decided 2026-10-26: nothing from the prototype is reused (owner decision 11); 5.4a uses new
+   synthetic pairs and 4.6 exports its own segmenter.
+3. Decided 2026-10-26: M6 is funded.

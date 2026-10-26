@@ -6,7 +6,7 @@ Date: 2026-10-25. Status: accepted.
 
 The brief asks for a small CLI or binary, configured by a file, usable from any project. Targets
 agreed in the interview: CLI on macOS and Linux, CI, a sidecar or HTTP server inside the owner's
-AWS and Modal image-generation service, and later a hosted service on existing infrastructure.
+own image-generation pipelines, and later a hosted service on existing infrastructure.
 Nothing runs in a browser except a static report viewer. The ML tools stay Python regardless.
 
 ## Decision
@@ -35,4 +35,5 @@ compilation stays painless.
   objects, and a deliberately short dependency list.
 - The core takes an injected HTTP client and tool transport, so it runs under any thin shell and
   tests never touch the network. WASM remains possible but is not planned.
-- Built-in pixel tools use the `image` crate; the prototype's perspective projection is ported.
+- Built-in pixel tools use the `image` crate; the equirectangular perspective projection is
+  implemented here (nothing from the private prototype is reused, owner decision 2026-10-26).

@@ -1,7 +1,7 @@
 # build and run outputs
 /target/
-/eval-out/
-/dejaview-out/
+eval-out/
+dejaview-out/
 *.local.toml
 .venv/
 __pycache__/
@@ -10,3 +10,6 @@ __pycache__/
 # never commit secrets or private material
 .env
 *.key
+
+# the private starting brief: untracked in every clone, not only via .git/info/exclude
+docs/brief.md

@@ -1,0 +1,48 @@
+[workspace]
+resolver = "3"
+members = [
+  "crates/dejaview-core",
+  "crates/dejaview-providers",
+  "crates/dejaview-tools",
+  "crates/dejaview-eval",
+  "crates/dejaview-testkit",
+  "crates/dejaview-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+repository = "https://github.com/markhayden/dejaview"
+rust-version = "1.99"
+
+# The dependency list from SPEC.md "Tech stack". Entries no crate uses yet are declared here so a
+# later task adds one line to its crate manifest and nothing else; anything outside this list
+# needs an ADR. Versions are the crates.io releases current on 2026-10-26; entries no crate uses yet
+# are not in Cargo.lock until first use.
+[workspace.dependencies]
+dejaview-core = { path = "crates/dejaview-core", version = "0.1.0" }
+dejaview-providers = { path = "crates/dejaview-providers", version = "0.1.0" }
+dejaview-tools = { path = "crates/dejaview-tools", version = "0.1.0" }
+dejaview-eval = { path = "crates/dejaview-eval", version = "0.1.0" }
+dejaview-testkit = { path = "crates/dejaview-testkit", version = "0.1.0" }
+
+clap = { version = "4.6", features = ["derive"] }
+thiserror = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "1.1"
+schemars = "1.2"
+jsonschema = { version = "0.60", default-features = false }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+sha2 = "0.11"
+tracing = "0.1"
+tokio = { version = "1.54", features = ["rt-multi-thread", "macros", "process", "io-util", "time", "sync"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls-tls", "json"] }
+
+[workspace.lints.clippy]
+all = "warn"
+unwrap_used = "warn"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"

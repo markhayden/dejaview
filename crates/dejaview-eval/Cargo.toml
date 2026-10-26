@@ -1,0 +1,17 @@
+[package]
+name = "dejaview-eval"
+description = "dejaview evaluation sets, matrix runner, metrics and gates"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+dejaview-core = { workspace = true }
+dejaview-providers = { workspace = true }
+dejaview-tools = { workspace = true }
+
+[lints]
+workspace = true

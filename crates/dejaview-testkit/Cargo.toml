@@ -1,0 +1,15 @@
+[package]
+name = "dejaview-testkit"
+description = "dejaview test support: scripted fake provider, fake tool, fake MCP server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+dejaview-core = { workspace = true }
+
+[lints]
+workspace = true

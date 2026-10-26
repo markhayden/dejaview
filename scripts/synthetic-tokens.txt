@@ -1,0 +1,8 @@
+# Exact synthetic credential values that tests and documentation may contain. Nothing else that
+# matches a credential shape is allowed anywhere in the repository, whatever the file or path.
+# Each value matches its provider's full credential shape so the allowlist path is exercised.
+sk-ant-api03-SYNTHETIC-dejaview-fixture-000000000000
+AIzaSYNTHETICdejaviewfixture00000000000
+sk-proj-SYNTHETIC-dejaview-fixture-0000000000000
+AKIASYNTHETICFIXTURE
+ghp_SYNTHETICdejaviewfixture000000000000

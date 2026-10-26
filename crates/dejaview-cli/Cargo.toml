@@ -1,0 +1,31 @@
+[package]
+name = "dejaview"
+description = "Agentic harness for evaluating the integrity of images"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+build = "build.rs"
+
+[[bin]]
+name = "dejaview"
+path = "src/main.rs"
+
+[features]
+default = []
+# Enables the scripted fake provider and the `--provider-script` flag for tests and debugging.
+# Never enabled in release builds.
+testkit = ["dep:dejaview-testkit"]
+
+[dependencies]
+dejaview-core = { workspace = true }
+dejaview-providers = { workspace = true }
+dejaview-tools = { workspace = true }
+dejaview-eval = { workspace = true }
+dejaview-testkit = { workspace = true, optional = true }
+clap = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

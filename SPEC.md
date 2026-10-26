@@ -13,8 +13,8 @@ Items 7 to 17 were positions taken on the reviewers' questions for the owner. Th
 7, 8, 9 and 13 on 2026-10-25 and approved draft 5 for planning; the rest stand as stated.
 
 1. dejaview is self-contained. It ships its own tools; no consumer's existing tooling shapes it.
-2. Consumers are the owner's own pipelines first (an AWS and Modal image-generation service,
-   Bakin), then anyone who installs the binary, then a hosted service on existing infrastructure.
+2. Consumers are the owner's own image-generation pipelines first, then anyone who installs the
+   binary, then a hosted service on existing infrastructure.
 3. Nothing needs to run in a browser except a static report viewer.
 4. Backwards compatibility is not a goal before 1.0. Schemas, config, rules and reports carry
    versions so old reports stay readable, but no shims are kept for old shapes.
@@ -1099,10 +1099,12 @@ missing artifact is `error: resolve`. The lock digest is recorded in tool proven
 cache key. The pack's CI builds the bundle, installs it into a clean directory, and verifies the
 executable runs and the installed dependency versions match the lock.
 
-The segmenter is the prototype's licence-clean EoMT-L ADE20K ONNX export. Before M5 begins,
-`tools/python/MODEL.md` records the artifact URL and SHA-256, licence and provenance of weights
-and code, preprocessing version, onnxruntime version and execution provider, and the parity
-tolerance against stored outputs. No test or run downloads anything.
+The segmenter is an ONNX export made by this project from publicly licensed upstream weights
+(candidate: EoMT-L ADE20K, MIT code and weights on a DINOv2 backbone under Apache-2.0); nothing
+from the private prototype is reused (owner decision, 2026-10-26). Before M5 begins,
+`tools/python/MODEL.md` records the upstream source and licences, the export procedure, the
+artifact URL and SHA-256, preprocessing version, onnxruntime version and execution provider, and
+the parity tolerance against stored outputs. No test or run downloads anything.
 
 ## Config
 

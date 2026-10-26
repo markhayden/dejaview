@@ -1,0 +1,66 @@
+name: ci
+
+on:
+  push:
+    branches: ["main", "m*"]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  rust:
+    name: just check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # rustup reads the exact version pinned in rust-toolchain.toml and installs clippy and rustfmt.
+      # GitHub's runner image ships rustup; the act image used by `just ci-local` does not, so
+      # install it when missing.
+      - name: Install Rust toolchain from rust-toolchain.toml
+        run: |
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustup show active-toolchain || rustup toolchain install
+      # Cache is a GitHub-only optimisation; act cannot run this Node action under emulation.
+      - uses: Swatinem/rust-cache@v2
+        if: ${{ !env.ACT }}
+      - name: Install pinned helper tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.59.0,cargo-deny@0.20.2
+      - name: Check scripts are executable and the brief is excluded
+        run: |
+          test -x scripts/check-crate-graph.sh
+          test -x scripts/scan-secrets.sh
+          git check-ignore -q docs/brief.md
+          test -z "$(git ls-files docs/brief.md)"
+      - run: just check
+      - run: just deny-advisories
+
+  python:
+    name: python tool pack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The pack arrives in M1 task 1.14; until then every later step is skipped. (hashFiles is
+      # only valid in step-level conditions, so the detection is a step.)
+      - id: pack
+        name: Detect the Python tool pack
+        run: |
+          if [ -f tools/python/pyproject.toml ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; fi
+      - if: steps.pack.outputs.present == 'true'
+        uses: astral-sh/setup-uv@v6
+      - if: steps.pack.outputs.present == 'true'
+        run: uv sync --frozen
+        working-directory: tools/python
+      - if: steps.pack.outputs.present == 'true'
+        run: uv run --frozen --offline --no-sync ruff check . && uv run --frozen --offline --no-sync ruff format --check .
+        working-directory: tools/python
+      - if: steps.pack.outputs.present == 'true'
+        run: uv run --frozen --offline --no-sync pytest
+        working-directory: tools/python

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Pre-commit hook: credential scan of every staged blob first (cheap and the gate that matters),
+# then formatting, then clippy in both feature configurations. Install with `just hooks`.
+# DEJAVIEW_HOOK_SKIP_CARGO=1 skips the cargo steps; scripts/test-hooks.sh uses it to test the
+# scan path end to end in a scratch repository.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+# Scan the staged contents of added, copied, modified and renamed files, as blobs, so binary files
+# and deletion-only commits are handled correctly (a diff-based scan sees neither).
+scan_input="$(mktemp)"
+trap 'rm -f "$scan_input"' EXIT
+git diff --cached --name-only -z --diff-filter=ACMR \
+  | while IFS= read -r -d '' f; do git show ":$f"; printf '\n'; done > "$scan_input"
+if ! scripts/scan-secrets.sh < "$scan_input"; then
+  echo "pre-commit: staged content contains a credential-shaped value; refusing to commit" >&2
+  exit 1
+fi
+
+if [ "${DEJAVIEW_HOOK_SKIP_CARGO:-0}" = "1" ]; then
+  exit 0
+fi
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --workspace --all-targets --features dejaview/testkit -- -D warnings

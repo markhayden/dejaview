@@ -8,7 +8,7 @@ tag.
 - [ ] Initial documentation commit on `main` (SPEC, PLAN, todo, ADRs, reviews, .gitignore; brief excluded)
 
 ## M0 Scaffold
-- [ ] 0.1 Workspace, crate skeletons, tool bootstrap, crate-graph check
+- [x] 0.1 Workspace, crate skeletons, tool bootstrap, crate-graph check
 - [ ] 0.2 CI, lint, pre-commit hook, ignore rules
 - [ ] 0.3 Docs skeleton, review checklist, README sections
 - [ ] 0.4 Owner readiness document

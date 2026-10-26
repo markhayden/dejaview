@@ -1,0 +1,15 @@
+[package]
+name = "dejaview-tools"
+description = "dejaview built-in tools and MCP client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+dejaview-core = { workspace = true }
+
+[lints]
+workspace = true

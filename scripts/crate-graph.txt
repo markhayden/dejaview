@@ -1,0 +1,19 @@
+# Allowed workspace dependency edges: "<from> -> <to>" per line.
+# "prod" edges are normal or build dependencies; "dev" edges are dev-dependencies.
+# The crate-graph check (scripts/check-crate-graph.sh) fails on any edge not listed here.
+prod dejaview -> dejaview-core
+prod dejaview -> dejaview-providers
+prod dejaview -> dejaview-tools
+prod dejaview -> dejaview-eval
+prod dejaview -> dejaview-testkit
+prod dejaview-providers -> dejaview-core
+prod dejaview-tools -> dejaview-core
+prod dejaview-eval -> dejaview-core
+prod dejaview-eval -> dejaview-providers
+prod dejaview-eval -> dejaview-tools
+prod dejaview-testkit -> dejaview-core
+dev dejaview-core -> dejaview-testkit
+dev dejaview-providers -> dejaview-testkit
+dev dejaview-tools -> dejaview-testkit
+dev dejaview-eval -> dejaview-testkit
+dev dejaview -> dejaview-testkit

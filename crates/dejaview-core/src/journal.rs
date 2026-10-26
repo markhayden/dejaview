@@ -1,31 +1,33 @@
 //! The append-only run journal: one JSON object per line, fsynced per event, written from the
 //! first event so a failure at any step leaves a durable record. Artifacts an event references are
-//! written first (see `artifacts`).
+//! written first (see `artifacts`). `read` turns a journal, complete or partial, back into events.
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-use crate::Result;
+use crate::events::Event;
+use crate::{Error, Result};
 
 /// A run journal under `<run dir>/journal.jsonl`.
 pub struct Journal {
     file: File,
     path: PathBuf,
     seq: u64,
-    last_event: Option<String>,
+    last_event: Option<&'static str>,
     fail_at: Option<u64>,
 }
 
-#[derive(Serialize)]
-struct Line<'a> {
-    seq: u64,
-    unix_ms: u128,
-    event: &'a str,
-    data: serde_json::Value,
+/// One journal line.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Line {
+    pub seq: u64,
+    pub unix_ms: u64,
+    #[serde(flatten)]
+    pub event: Event,
 }
 
 impl Journal {
@@ -52,12 +54,12 @@ impl Journal {
     }
 
     /// The last event appended: the state a run reached.
-    pub fn last_event(&self) -> Option<&str> {
-        self.last_event.as_deref()
+    pub fn last_event(&self) -> Option<&'static str> {
+        self.last_event
     }
 
     /// Appends one event and flushes it to disk.
-    pub fn append(&mut self, event: &str, data: serde_json::Value) -> Result<()> {
+    pub fn append(&mut self, event: &Event) -> Result<()> {
         if self.fail_at == Some(self.seq) {
             return Err(std::io::Error::other(format!(
                 "injected journal fault at seq {}",
@@ -67,21 +69,45 @@ impl Journal {
         }
         let unix_ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_millis())
+            .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
         let line = Line {
             seq: self.seq,
             unix_ms,
-            event,
-            data,
+            event: event.clone(),
         };
         let mut text = serde_json::to_string(&line)?;
         text.push('\n');
         self.file.write_all(text.as_bytes())?;
         self.file.sync_data()?;
         self.seq += 1;
-        self.last_event = Some(event.to_string());
+        self.last_event = Some(event.name());
         Ok(())
+    }
+
+    /// Reads a journal. A torn final line (the process died mid-write) is dropped; any other
+    /// malformed line is an error.
+    pub fn read(path: &Path) -> Result<Vec<Line>> {
+        let text = std::fs::read_to_string(path)?;
+        let raw: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
+        let mut lines = Vec::with_capacity(raw.len());
+        for (i, l) in raw.iter().enumerate() {
+            match serde_json::from_str::<Line>(l) {
+                Ok(line) => lines.push(line),
+                Err(e) if i + 1 == raw.len() => {
+                    let _ = e;
+                    break;
+                }
+                Err(e) => {
+                    return Err(Error::Io(std::io::Error::other(format!(
+                        "{}:{}: malformed journal line: {e}",
+                        path.display(),
+                        i + 1
+                    ))));
+                }
+            }
+        }
+        Ok(lines)
     }
 
     pub fn path(&self) -> &Path {
@@ -101,31 +127,48 @@ impl Journal {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::aggregate::Verdict;
+    use crate::events::{Prepared, VerdictReached};
 
     #[test]
-    fn appends_numbered_lines_in_order() {
+    fn appends_numbered_lines_in_order_and_reads_them_back() {
         let dir = std::env::temp_dir().join(format!("dejaview-journal-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("tempdir");
         let mut j = Journal::create(&dir).expect("create");
-        j.append("resolved", serde_json::json!({"images": 2}))
-            .expect("append");
-        j.append("verdict", serde_json::json!({"verdict": "pass"}))
-            .expect("append");
+        j.append(&Event::Prepared(Prepared {
+            prep_version: "canonical".into(),
+            images: 2,
+        }))
+        .expect("append");
+        j.append(&Event::Verdict(VerdictReached {
+            verdict: Verdict::Pass,
+        }))
+        .expect("append");
+        assert_eq!(j.last_event(), Some("verdict"));
         let text = std::fs::read_to_string(j.path()).expect("read");
-        let lines: Vec<serde_json::Value> = text
+        let raw: Vec<serde_json::Value> = text
             .lines()
             .map(|l| serde_json::from_str(l).expect("json"))
             .collect();
+        assert_eq!(raw[0]["seq"], 0);
+        assert_eq!(raw[0]["event"], "prepared");
+        assert_eq!(raw[1]["data"]["verdict"], "pass");
+        let lines = Journal::read(j.path()).expect("read back");
         assert_eq!(lines.len(), 2);
-        assert_eq!(lines[0]["seq"], 0);
-        assert_eq!(lines[0]["event"], "resolved");
-        assert_eq!(lines[1]["seq"], 1);
-        assert_eq!(lines[1]["data"]["verdict"], "pass");
+        assert!(matches!(lines[1].event, Event::Verdict(_)));
         assert!(
             Journal::create(&dir).is_err(),
             "a second journal in the same run dir is refused"
         );
+        // A torn final line is dropped.
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(j.path())
+            .expect("open")
+            .write_all(b"{\"seq\":2,\"unix_ms\":1,\"event\":\"err")
+            .expect("write");
+        assert_eq!(Journal::read(j.path()).expect("tolerant").len(), 2);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

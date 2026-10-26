@@ -1,6 +1,8 @@
 //! The `dejaview` binary: argument parsing and wiring only. All behaviour lives in the library
 //! crates.
 
+mod report;
+
 use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand};
@@ -37,6 +39,8 @@ enum Command {
     Rules(RulesArgs),
     /// Inspect tools.
     Tools(ToolsArgs),
+    /// Rebuild a report from a decision directory, or prune old decisions.
+    Report(report::ReportArgs),
 }
 
 #[derive(clap::Args)]
@@ -143,6 +147,7 @@ fn main() {
         Some(Command::Tools(ToolsArgs {
             command: ToolsCommand::List(args),
         })) => tools_list(&args),
+        Some(Command::Report(args)) => report::run(&args),
     };
     std::process::exit(code);
 }

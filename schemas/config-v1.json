@@ -313,6 +313,13 @@
         "write": true
       }
     },
+    "config_version": {
+      "default": 1,
+      "description": "The config schema version (`CONFIG_VERSION`); absent means the current one.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
     "images": {
       "$ref": "#/$defs/ImagesConfig",
       "default": {

@@ -9,6 +9,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use image::{DynamicImage, ImageDecoder, ImageReader, metadata::Orientation};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -32,7 +33,8 @@ impl Default for DecodeBounds {
 }
 
 /// A loaded job image.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CanonicalImage {
     pub id: String,
     pub role: Role,
@@ -51,6 +53,7 @@ pub struct CanonicalImage {
     pub warnings: Vec<String>,
     /// The canonical pixels, shared with tools; not serialised.
     #[serde(skip)]
+    #[schemars(skip)]
     pub pixels: Option<Arc<image::RgbImage>>,
 }
 

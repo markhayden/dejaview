@@ -1,5 +1,6 @@
 # The manifest example from SPEC.md "Manifest", with the schema tables inline.
 [tool]
+manifest_version = 1
 name = "regions"
 version = "1.0.0"
 purpose = "Finds regions that changed between an aligned pair, with high recall."

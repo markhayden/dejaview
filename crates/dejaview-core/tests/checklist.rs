@@ -67,6 +67,7 @@ fn region(id: &str, frame: &str, b: [f64; 4]) -> Region {
 
 fn envelope(regions: Vec<Region>) -> Envelope {
     Envelope {
+        envelope_version: 1,
         status: Status::Ok,
         summary: "regions".into(),
         measurements: vec![],

@@ -10,6 +10,10 @@ use crate::{Error, Result};
 
 pub const ENVELOPE_VERSION: u32 = 1;
 
+fn d_envelope_version() -> u32 {
+    ENVELOPE_VERSION
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Status {
@@ -79,6 +83,9 @@ pub struct Provenance {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Envelope {
+    /// The envelope schema version (`ENVELOPE_VERSION`); absent means the current one.
+    #[serde(default = "d_envelope_version")]
+    pub envelope_version: u32,
     pub status: Status,
     pub summary: String,
     #[serde(default)]
@@ -96,6 +103,12 @@ impl Envelope {
     /// Checks every bound in the manifest. A breach is `error: tool`.
     pub fn check_bounds(&self, bounds: &Bounds) -> Result<()> {
         let tool = &self.provenance.tool;
+        if self.envelope_version != ENVELOPE_VERSION {
+            return Err(Error::Tool(format!(
+                "{tool}: envelope_version must be {ENVELOPE_VERSION}, got {}",
+                self.envelope_version
+            )));
+        }
         let over = |what: &str, got: u64, max: u64| -> Result<()> {
             if got > max {
                 Err(Error::Tool(format!(
@@ -200,6 +213,7 @@ mod tests {
 
     fn envelope() -> Envelope {
         Envelope {
+            envelope_version: 1,
             status: Status::Ok,
             summary: "two regions".into(),
             measurements: vec![],

@@ -16,9 +16,16 @@ use crate::{Error, Result};
 
 pub const CONFIG_VERSION: u32 = 1;
 
+fn d_config_version() -> u32 {
+    CONFIG_VERSION
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    /// The config schema version (`CONFIG_VERSION`); absent means the current one.
+    #[serde(default = "d_config_version")]
+    pub config_version: u32,
     pub provider: ProviderConfig,
     #[serde(default)]
     pub images: ImagesConfig,
@@ -332,6 +339,12 @@ impl Config {
     }
 
     fn validate(&self) -> Result<()> {
+        if self.config_version != CONFIG_VERSION {
+            return Err(Error::Config(format!(
+                "config_version must be {CONFIG_VERSION}, got {}",
+                self.config_version
+            )));
+        }
         if !self.privacy.cloud_calls {
             return Err(Error::Config(
                 "[privacy] cloud_calls must be true: dejaview sends images and text to the configured \

@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{Error, Result};
@@ -41,7 +42,7 @@ pub struct ImageSpec {
 }
 
 /// What an image is for. Exactly one candidate; at most one source; any number of references.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Role {
     Candidate,
@@ -58,7 +59,7 @@ pub enum ImageSource {
 }
 
 /// The image's projection. Detection rules arrive in task 1.2; `flat` is the default.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Projection {
     #[default]
@@ -186,14 +187,16 @@ impl Job {
 }
 
 /// The job as written into a report.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct JobSummary {
     pub use_case: String,
     pub brief: Option<String>,
     pub images: Vec<ImageSummary>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ImageSummary {
     pub id: String,
     pub role: Role,

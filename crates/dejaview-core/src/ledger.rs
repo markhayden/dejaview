@@ -12,6 +12,7 @@
 
 use std::sync::Mutex;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::config::Config;
@@ -19,7 +20,8 @@ use crate::provider::Usage;
 use crate::{Error, Result};
 
 /// The shape of a request for bounding its cost.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct RequestShape {
     pub input_tokens: u64,
     pub output_tokens: u64,
@@ -82,7 +84,8 @@ pub struct PlanInput {
 }
 
 /// One planned request of the envelope.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct PlannedRequest {
     pub kind: String,
     pub shape: RequestShape,
@@ -92,7 +95,8 @@ pub struct PlannedRequest {
 }
 
 /// The decision envelope.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Envelope {
     pub usd: f64,
     pub decision_runs: u32,

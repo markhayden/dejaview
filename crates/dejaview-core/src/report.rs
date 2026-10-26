@@ -1,28 +1,48 @@
-//! The report (SPEC "Report and journal"): one JSON document per decision, holding every run in
-//! full. Derived from the runs' journals at the end; `schemas/report-v1.json`, rebuild from a
-//! partial journal and prune arrive in task 1.10b.
+//! The report (SPEC "Report and journal"): one JSON document per decision, derived from the
+//! decision header (`decision.json`, written when the decision starts) and the runs' journals. The
+//! same derivation serves the end of a run and `dejaview report rebuild` on a partial journal, so
+//! the journal is the one record. `schemas/report-v1.json` is generated from these types.
 
-use std::path::Path;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::Result;
 use crate::aggregate::{Confidence, Disposition, Row, Verdict};
 use crate::artifacts::ArtifactRef;
 use crate::checklist::Checklist;
 use crate::config::PolicyConfig;
-use crate::decision::Decision;
+use crate::decision::{self, Decision, DecisionItem, RunSummary};
+use crate::events::Event;
 use crate::frames::Location;
 use crate::image::CanonicalImage;
 use crate::job::JobSummary;
+use crate::journal::{Journal, Line};
+use crate::ledger::Envelope;
 use crate::obligations::Instance;
+use crate::provider::{StopReason, Usage};
 use crate::run::RulesSummary;
+use crate::{Error, Result};
 
 pub const REPORT_VERSION: u32 = 1;
+/// The decision header's file name under the decision directory.
+pub const HEADER_FILE: &str = "decision.json";
+/// The report's file name under the decision directory.
+pub const REPORT_FILE: &str = "report.json";
 
-/// The decision-level report.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Report {
+/// Terminal states of a run as the report names them.
+pub const TERMINAL_VERDICT: &str = "verdict";
+pub const TERMINAL_ERROR: &str = "error";
+pub const TERMINAL_CANCELLED: &str = "cancelled";
+/// The journal ends before any terminal event (the process died or is still running).
+pub const TERMINAL_INCOMPLETE: &str = "incomplete";
+
+/// What the report needs that no run journal carries; written before the first run.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DecisionHeader {
     pub report_version: u32,
     pub harness_version: String,
     pub use_case: String,
@@ -30,13 +50,51 @@ pub struct Report {
     pub job: JobSummary,
     /// The config as resolved, with every expanded secret redacted.
     pub config: serde_json::Value,
-    /// The rules as merged (base, profile, versions, obligations with provenance, warnings).
+    /// The rules as merged; `None` when they did not resolve.
     pub rules: Option<RulesSummary>,
     pub prompt_version: String,
     pub provider: String,
     /// Enabled tools as `name@version`, in prompt order.
     pub tools: Vec<String>,
-    /// How many runs the decision asked for, and the runs themselves, in order.
+    pub decision_runs: u32,
+    pub policy: PolicyConfig,
+    pub cap_usd: f64,
+    /// The planned decision envelope; `None` when it could not be planned.
+    pub envelope: Option<Envelope>,
+}
+
+impl DecisionHeader {
+    pub fn write(&self, dir: &Path) -> Result<()> {
+        std::fs::write(dir.join(HEADER_FILE), serde_json::to_string_pretty(self)?)?;
+        Ok(())
+    }
+
+    pub fn read(dir: &Path) -> Result<DecisionHeader> {
+        let path = dir.join(HEADER_FILE);
+        let text = std::fs::read_to_string(&path).map_err(|e| {
+            Error::Io(std::io::Error::new(
+                e.kind(),
+                format!("{}: {e}", path.display()),
+            ))
+        })?;
+        Ok(serde_json::from_str(&text)?)
+    }
+}
+
+/// The decision-level report.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Report {
+    pub report_version: u32,
+    pub harness_version: String,
+    pub use_case: String,
+    pub job: JobSummary,
+    pub config: serde_json::Value,
+    pub rules: Option<RulesSummary>,
+    pub prompt_version: String,
+    pub provider: String,
+    pub tools: Vec<String>,
+    /// How many runs the decision asked for, and the runs found, in order.
     pub decision_runs: u32,
     pub runs: Vec<RunReport>,
     pub decision: Decision,
@@ -48,28 +106,36 @@ pub struct Report {
     pub cost: CostSummary,
 }
 
-/// Money for the decision (SPEC "Cost ledger").
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+/// Money for the decision (SPEC "Cost ledger"), derived from the journals.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
 pub struct CostSummary {
-    /// The planned envelope, `None` when the rules did not resolve.
-    pub envelope: Option<crate::ledger::Envelope>,
+    /// The planned envelope, `None` when it could not be planned.
+    pub envelope: Option<Envelope>,
     pub cap_usd: f64,
+    /// Settled usage plus every failed attempt charged at its bound.
     pub spent_usd: f64,
+    /// What the envelope gave back.
     pub released_usd: f64,
+    /// Spend beyond the envelope (bounds are estimates).
     pub overrun_usd: f64,
     /// Billable attempts made.
     pub attempts: u32,
 }
 
 /// One run's report.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct RunReport {
     pub run: u32,
+    /// `verdict`, `error`, `cancelled` or `incomplete`.
+    pub terminal: String,
     pub images: Vec<CanonicalImage>,
     /// Every image the model saw, by frame id: the job images as sent and every image a tool
     /// returned.
-    pub images_sent: std::collections::BTreeMap<String, ArtifactRef>,
+    pub images_sent: BTreeMap<String, ArtifactRef>,
     pub instances: Vec<InstanceEntry>,
+    /// The checklist as it stood at the end (static items plus every evidence item added).
     pub checklist: Checklist,
     pub turns: Vec<TurnEntry>,
     pub tool_calls: Vec<ToolCallEntry>,
@@ -80,31 +146,35 @@ pub struct RunReport {
     pub error: Option<ErrorEntry>,
 }
 
-/// One model turn.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// One model turn: a request, and its response if one came back.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct TurnEntry {
     pub turn: u32,
-    pub stop_reason: crate::provider::StopReason,
-    pub tool_calls: Vec<String>,
-    pub usage: crate::provider::Usage,
-    pub provider_request_id: Option<String>,
     /// The output allowance of the request (raised to `repair_output_tokens` on a reissue).
     pub max_output_tokens: u32,
-    /// Billable attempts the request took (1 plus transport retries).
-    pub attempts: u32,
-    /// The bound of one attempt at catalog prices, and what the turn came to (settled usage plus
-    /// every failed attempt charged at its bound).
+    /// The bound of one attempt at catalog prices.
     pub bound_usd: f64,
-    pub cost_usd: f64,
-    /// Whether the response entered provider history (false for an excluded turn).
-    pub entered_history: bool,
-    /// The model-visible request and response bodies, redacted and bounded.
+    /// The model-visible request body, redacted and bounded.
     pub request: ArtifactRef,
-    pub response: ArtifactRef,
+    /// `None` while no response came back.
+    pub stop_reason: Option<StopReason>,
+    pub tool_calls: Vec<String>,
+    pub usage: Usage,
+    pub provider_request_id: Option<String>,
+    /// Billable attempts (1 plus transport retries).
+    pub attempts: u32,
+    /// Settled usage plus every failed attempt charged at its bound.
+    pub cost_usd: f64,
+    /// Whether the response entered provider history (false for an excluded or unanswered turn).
+    pub entered_history: bool,
+    /// The model-visible response body, redacted and bounded.
+    pub response: Option<ArtifactRef>,
 }
 
 /// One repair (SPEC "Repair protocol").
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct RepairEntry {
     /// `rejected` (the response stayed in history, error results answered it) or `reissue` (the
     /// response was excluded and the request sent again).
@@ -115,8 +185,9 @@ pub struct RepairEntry {
     pub after_turn: u32,
 }
 
-/// One tool call as the harness handled it.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// One executed or argument-rejected tool call as the harness handled it.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ToolCallEntry {
     pub id: String,
     pub provider_call_id: String,
@@ -131,14 +202,16 @@ pub struct ToolCallEntry {
     pub envelope: Option<ArtifactRef>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct InstanceEntry {
     pub id: String,
-    #[serde(flatten)]
     pub instance: Instance,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// A dispositioned checklist item with its aggregation row.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ItemRow {
     pub id: String,
     pub disposition: Disposition,
@@ -149,17 +222,318 @@ pub struct ItemRow {
     pub row: Row,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct ErrorEntry {
     pub class: String,
     pub message: String,
 }
 
+impl RunReport {
+    /// Derives a run's report from its journal, complete or partial.
+    pub fn from_lines(run: u32, lines: &[Line]) -> RunReport {
+        let mut r = RunReport {
+            run,
+            terminal: TERMINAL_INCOMPLETE.into(),
+            images: Vec::new(),
+            images_sent: BTreeMap::new(),
+            instances: Vec::new(),
+            checklist: Checklist::default(),
+            turns: Vec::new(),
+            tool_calls: Vec::new(),
+            repairs: Vec::new(),
+            items: Vec::new(),
+            verdict: None,
+            error: None,
+        };
+        for line in lines {
+            match &line.event {
+                Event::Resolved(e) => {
+                    r.images = e.images.clone();
+                    r.images_sent = e.images_sent.clone();
+                    r.instances = e
+                        .instances
+                        .iter()
+                        .map(|i| InstanceEntry {
+                            id: i.id(),
+                            instance: i.clone(),
+                        })
+                        .collect();
+                    r.checklist = e.checklist.clone();
+                }
+                Event::Prepared(_) | Event::Reserved(_) => {}
+                Event::TurnSent(e) => r.turns.push(TurnEntry {
+                    turn: e.turn,
+                    max_output_tokens: e.max_output_tokens,
+                    bound_usd: e.bound_usd,
+                    request: e.request.clone(),
+                    stop_reason: None,
+                    tool_calls: Vec::new(),
+                    usage: Usage::default(),
+                    provider_request_id: None,
+                    attempts: 1,
+                    cost_usd: 0.0,
+                    entered_history: false,
+                    response: None,
+                }),
+                Event::Retry(e) => {
+                    if let Some(t) = r.turns.iter_mut().find(|t| t.turn == e.turn) {
+                        t.attempts += 1;
+                        t.cost_usd += e.charged_usd;
+                    }
+                }
+                Event::TurnReceived(e) => {
+                    if let Some(t) = r.turns.iter_mut().find(|t| t.turn == e.turn) {
+                        t.stop_reason = Some(e.stop_reason.clone());
+                        t.tool_calls = e.tool_calls.clone();
+                        t.usage = e.usage;
+                        t.provider_request_id = e.provider_request_id.clone();
+                        t.attempts = e.attempts;
+                        t.cost_usd = e.cost_usd;
+                        t.entered_history = true;
+                        t.response = Some(e.response.clone());
+                    }
+                }
+                Event::TurnExcluded(e) => {
+                    if let Some(t) = r.turns.iter_mut().find(|t| t.turn == e.turn) {
+                        t.entered_history = false;
+                    }
+                }
+                Event::ToolCalled(e) => {
+                    let Some(id) = &e.call_id else { continue };
+                    match r.tool_calls.iter_mut().find(|c| &c.id == id) {
+                        Some(c) => {
+                            if e.invalid_args.is_some() {
+                                c.invalid_args = e.invalid_args.clone();
+                            }
+                            if e.status.is_some() {
+                                c.status = e.status;
+                            }
+                            if let Some(d) = e.duration_ms {
+                                c.duration_ms = d;
+                            }
+                        }
+                        None => r.tool_calls.push(ToolCallEntry {
+                            id: id.clone(),
+                            provider_call_id: e.provider_call_id.clone(),
+                            tool: e.tool.clone(),
+                            arguments: e.arguments.clone().unwrap_or(serde_json::Value::Null),
+                            status: e.status,
+                            invalid_args: e.invalid_args.clone(),
+                            duration_ms: e.duration_ms.unwrap_or(0),
+                            added_items: Vec::new(),
+                            dropped: Vec::new(),
+                            envelope: None,
+                        }),
+                    }
+                }
+                Event::ToolReturned(e) => {
+                    if let Some(c) = r.tool_calls.iter_mut().find(|c| c.id == e.call_id) {
+                        c.status = Some(e.status);
+                        c.duration_ms = e.duration_ms;
+                        c.added_items = e.added.clone();
+                        c.envelope = Some(e.envelope.clone());
+                    }
+                    r.checklist = e.checklist.clone();
+                    for img in &e.images {
+                        if let Some(a) = &img.artifact {
+                            r.images_sent.insert(img.frame.clone(), a.clone());
+                        }
+                    }
+                }
+                Event::EvidenceDropped(e) => {
+                    if let Some(c) = r.tool_calls.iter_mut().find(|c| c.id == e.call_id) {
+                        c.dropped.push(e.region_id.clone());
+                    }
+                }
+                Event::Repair(e) => r.repairs.push(RepairEntry {
+                    form: e.form.clone(),
+                    reason: e.reason.clone(),
+                    after_turn: e.after_turn,
+                }),
+                Event::Submission(e) => r.items = e.items.clone(),
+                Event::Verdict(e) => {
+                    r.verdict = Some(e.verdict);
+                    r.terminal = TERMINAL_VERDICT.into();
+                }
+                Event::Error(e) => {
+                    r.error = Some(ErrorEntry {
+                        class: e.class.clone(),
+                        message: e.message.clone(),
+                    });
+                    r.terminal = TERMINAL_ERROR.into();
+                }
+                Event::Cancelled(e) => {
+                    r.error = Some(ErrorEntry {
+                        class: e.class.clone(),
+                        message: e.message.clone(),
+                    });
+                    r.terminal = TERMINAL_CANCELLED.into();
+                }
+            }
+        }
+        if r.terminal == TERMINAL_INCOMPLETE {
+            r.error = Some(ErrorEntry {
+                class: TERMINAL_INCOMPLETE.into(),
+                message: match lines.last() {
+                    Some(l) => format!("the journal ends after `{}`", l.event.name()),
+                    None => "the journal is empty".into(),
+                },
+            });
+        }
+        r
+    }
+
+    /// What the decision table needs from this run.
+    pub fn summary(&self) -> RunSummary {
+        RunSummary {
+            verdict: self.verdict,
+            items: self
+                .items
+                .iter()
+                .map(|row| {
+                    let entry = self.checklist.get(&row.id);
+                    DecisionItem {
+                        id: row.id.clone(),
+                        disposition: row.disposition,
+                        confidence: row.confidence,
+                        allowed_by: row.allowed_by.clone(),
+                        root_image: entry.and_then(|c| c.root_image.clone()),
+                        instance_ids: entry.map(|c| c.instance_ids.clone()).unwrap_or_default(),
+                        root_location: entry.and_then(|c| c.root_location.clone()),
+                    }
+                })
+                .collect(),
+        }
+    }
+}
+
 impl Report {
+    /// Derives the report from a decision directory: the header plus every run journal present,
+    /// complete or partial. Missing runs make the decision an error.
+    pub fn rebuild(dir: &Path) -> Result<Report> {
+        let header = DecisionHeader::read(dir)?;
+        let mut runs = Vec::new();
+        let mut envelope: Option<Envelope> = header.envelope.clone();
+        for n in 1..=header.decision_runs {
+            let path = dir.join(format!("run-{n}")).join("journal.jsonl");
+            if !path.exists() {
+                break;
+            }
+            let lines = Journal::read(&path)?;
+            if envelope.is_none() {
+                envelope = lines.iter().find_map(|l| match &l.event {
+                    Event::Reserved(r) => Some(r.envelope.clone()),
+                    _ => None,
+                });
+            }
+            runs.push(RunReport::from_lines(n, &lines));
+        }
+        let summaries: Vec<RunSummary> = runs.iter().map(RunReport::summary).collect();
+        let decision = if (runs.len() as u32) < header.decision_runs {
+            Decision {
+                verdict: None,
+                error: true,
+                agree: None,
+                disagreements: Vec::new(),
+            }
+        } else {
+            match summaries.as_slice() {
+                [one] => decision::single(one),
+                [a, b] => decision::combine(a, b),
+                _ => Decision {
+                    verdict: None,
+                    error: true,
+                    agree: None,
+                    disagreements: Vec::new(),
+                },
+            }
+        };
+        let exit_code = decision::exit_code(decision.verdict, &header.policy);
+        let spent_usd: f64 = runs
+            .iter()
+            .flat_map(|r| r.turns.iter())
+            .map(|t| t.cost_usd)
+            .sum();
+        let attempts: u32 = runs
+            .iter()
+            .flat_map(|r| r.turns.iter())
+            .map(|t| t.attempts)
+            .sum();
+        let envelope_usd = envelope.as_ref().map(|e| e.usd).unwrap_or(0.0);
+        let cost = CostSummary {
+            envelope,
+            cap_usd: header.cap_usd,
+            spent_usd,
+            released_usd: (envelope_usd - spent_usd).max(0.0),
+            overrun_usd: (spent_usd - envelope_usd).max(0.0),
+            attempts,
+        };
+        Ok(Report {
+            report_version: header.report_version,
+            harness_version: header.harness_version,
+            use_case: header.use_case,
+            job: header.job,
+            config: header.config,
+            rules: header.rules,
+            prompt_version: header.prompt_version,
+            provider: header.provider,
+            tools: header.tools,
+            decision_runs: header.decision_runs,
+            runs,
+            verdict: decision.verdict,
+            decision,
+            policy: header.policy,
+            exit_code,
+            cost,
+        })
+    }
+
     /// Writes `report.json` into the decision directory.
     pub fn write(&self, dir: &Path) -> Result<()> {
-        let text = serde_json::to_string_pretty(self)?;
-        std::fs::write(dir.join("report.json"), text)?;
+        std::fs::write(dir.join(REPORT_FILE), serde_json::to_string_pretty(self)?)?;
         Ok(())
     }
+
+    /// Reads a written `report.json`.
+    pub fn read(dir: &Path) -> Result<Report> {
+        Ok(serde_json::from_str(&std::fs::read_to_string(
+            dir.join(REPORT_FILE),
+        )?)?)
+    }
+
+    /// The JSON Schema of the report (`schemas/report-v1.json`).
+    pub fn json_schema() -> serde_json::Value {
+        serde_json::to_value(schemars::schema_for!(Report)).unwrap_or_default()
+    }
+}
+
+/// Removes decision directories under `out_dir` whose age is at least `older_than`. Age comes
+/// from the directory name (`decision-<unix ms>-<pid>`), falling back to the modification time.
+/// Returns what was removed.
+pub fn prune(out_dir: &Path, older_than: Duration, now: SystemTime) -> Result<Vec<PathBuf>> {
+    let mut removed = Vec::new();
+    for entry in std::fs::read_dir(out_dir)? {
+        let path = entry?.path();
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if !path.is_dir() || !name.starts_with("decision-") {
+            continue;
+        }
+        let started = name
+            .split('-')
+            .nth(1)
+            .and_then(|ms| ms.parse::<u64>().ok())
+            .map(|ms| UNIX_EPOCH + Duration::from_millis(ms))
+            .or_else(|| std::fs::metadata(&path).and_then(|m| m.modified()).ok());
+        let Some(started) = started else { continue };
+        let age = now.duration_since(started).unwrap_or(Duration::ZERO);
+        if age >= older_than {
+            std::fs::remove_dir_all(&path)?;
+            removed.push(path);
+        }
+    }
+    removed.sort();
+    Ok(removed)
 }

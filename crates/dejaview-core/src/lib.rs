@@ -7,6 +7,7 @@ pub mod artifacts;
 pub mod checklist;
 pub mod config;
 pub mod decision;
+pub mod events;
 pub mod frames;
 pub mod image;
 pub mod job;

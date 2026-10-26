@@ -29,7 +29,7 @@ tag.
 - [x] 1.8 Repair protocol and retries
 - [x] 1.9 Cost ledger
 - [x] 1.10a Journal and artifact durability
-- [ ] 1.10b Report, schema, rebuild, prune
+- [x] 1.10b Report, schema, rebuild, prune
 - [ ] 1.11 Cache at the decision boundary
 - [ ] 1.12 Isolation, environment filter, exit codes
 - [ ] 1.13 Minimal MCP client against a fake server

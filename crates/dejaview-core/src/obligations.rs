@@ -7,13 +7,14 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::job::{Job, Role};
 use crate::{Error, Result};
 
 /// What an obligation does in aggregation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Kind {
     MustHold,
@@ -29,7 +30,7 @@ impl Kind {
 }
 
 /// One obligation as written in a rules file or a job's `[[job.requirements]]`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Obligation {
     pub id: String,
@@ -74,7 +75,7 @@ impl Obligation {
 }
 
 /// The `[rules]` header of a rules file.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RulesHeader {
     pub use_case: String,
@@ -90,7 +91,7 @@ pub struct RulesHeader {
 }
 
 /// A rules file.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RulesFile {
     pub rules: RulesHeader,
@@ -98,6 +99,7 @@ pub struct RulesFile {
     pub obligations: Vec<Obligation>,
     /// Evidence hints per tool, injected into tool calls by the harness.
     #[serde(default)]
+    #[schemars(with = "BTreeMap<String, serde_json::Value>")]
     pub hints: BTreeMap<String, toml::Table>,
 }
 
@@ -138,7 +140,7 @@ pub fn shipped(name: &str) -> Option<&'static str> {
 }
 
 /// An obligation after merge, with where it came from.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct MergedObligation {
     #[serde(flatten)]
     pub obligation: Obligation,
@@ -450,7 +452,7 @@ fn role_name(role: Role) -> &'static str {
 }
 
 /// One obligation resolved to one target image: `SF2@candidate`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Instance {
     pub obligation_id: String,
     pub target: String,

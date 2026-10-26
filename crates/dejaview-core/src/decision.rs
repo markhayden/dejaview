@@ -2,6 +2,7 @@
 //! machine over the same resolved job, combined by the spec's table (SPEC "Decisions and runs"),
 //! and the consumer policy that maps the raw verdict to an exit code.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::aggregate::{Confidence, Disposition, Verdict};
@@ -42,7 +43,8 @@ impl DecisionItem {
 }
 
 /// The combined result.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Decision {
     /// The combined verdict, `None` when the decision is an error.
     pub verdict: Option<Verdict>,

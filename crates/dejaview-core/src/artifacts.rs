@@ -7,6 +7,7 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -20,7 +21,8 @@ pub const MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
 pub const REDACTED: &str = "[redacted]";
 
 /// A reference to a stored artifact, as journal events and the report carry it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ArtifactRef {
     /// SHA-256 of the stored bytes; the file name under `artifacts/`.
     pub sha256: String,

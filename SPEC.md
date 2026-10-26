@@ -619,8 +619,13 @@ written and fsynced before the event is appended. Artifacts in `artifacts/` by c
 
 SIGINT or SIGTERM during a run appends `cancelled` with the state reached and exits 3.
 
-The **report** (`report.json`, `report_version` pinned) is derived from the journal at the end,
-or by `dejaview report rebuild` from a partial journal: the job as resolved (ids, roles, labels,
+A decision directory (`decision-<unix ms>-<pid>/`) holds `decision.json` (the header: everything
+the report needs that no run journal carries, including the planned envelope; written before the
+first run), one `run-<n>/` per run with its journal, artifacts and frames, and `report.json`.
+
+The **report** (`report.json`, `report_version` pinned) is derived from the header and the
+journals at the end, or by `dejaview report rebuild` from a partial journal, whose terminal status
+is then `incomplete`: the job as resolved (ids, roles, labels,
 hashes, dimensions, projection, prepared sizes); merged obligations with provenance and instances;
 checklist with its growth and drops; every turn (stop reason, usage, cost, provider request id,
 artifact hashes, whether it entered provider history); every tool call (id, tool, version,
@@ -1109,6 +1114,8 @@ the parity tolerance against stored outputs. No test or run downloads anything.
 ## Config
 
 ```toml
+config_version = 1                      # optional; the current schema version when absent
+
 [provider]
 profile = "anthropic"
 model = "claude-opus-5-5"

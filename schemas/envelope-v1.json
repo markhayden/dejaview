@@ -306,6 +306,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "envelope_version": {
+      "default": 1,
+      "description": "The envelope schema version (`ENVELOPE_VERSION`); absent means the current one.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
     "images": {
       "default": [],
       "items": {

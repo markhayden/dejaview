@@ -3,6 +3,7 @@
 //! present regions, bound by evidence kind and root image. Every verdict-bearing item depends on at
 //! least one mandatory instance; nothing shown to the model lacks an owner.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::frames::{Location, Registry};
@@ -13,7 +14,8 @@ use crate::tool::manifest::Manifest;
 use crate::{Error, Result};
 
 /// One checklist item with its code-owned fields.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ChecklistItem {
     /// `chk:ob:<obligation>@<target>`, `chk:ref:<image>` or `chk:ev:<call>:<n>`.
     pub id: String,
@@ -48,7 +50,8 @@ pub struct Ingest {
 /// IoU above which two evidence items on the same root image cross-reference each other.
 pub const OVERLAP_IOU: f64 = 0.7;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Checklist {
     pub items: Vec<ChecklistItem>,
 }

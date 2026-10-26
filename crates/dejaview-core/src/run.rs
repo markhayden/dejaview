@@ -1,19 +1,21 @@
 //! The run state machine (SPEC "Run state machine"): resolve, prepare, reserve, tool turns, the
 //! final turn, aggregate, record. A decision is one or two independent runs combined (`decision`).
-//! Task 1.7a: tool turns with batch validation, the call budget, result ingestion. Task 1.7b: the
-//! final turn's refuse mechanism and every terminal error class. Task 1.8: both repair forms and
-//! transport retries. Task 1.9: the cost ledger. Task 1.10a: artifacts and cancellation. Task
-//! 1.11: cache.
+//! Every step is journaled as a typed event (`events`); the report is derived from the journal
+//! (`report::Report::rebuild`), so what the run holds in memory is only what the loop needs.
+//! Task 1.11 adds the cache at the decision boundary.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+use schemars::JsonSchema;
+
 use crate::aggregate::{self, Verdict};
 use crate::artifacts::{ArtifactRef, ArtifactStore};
 use crate::checklist::Checklist;
 use crate::config::Config;
-use crate::decision::{self, Decision, DecisionItem, RunSummary};
+use crate::decision::Decision;
+use crate::events::{self, Event};
 use crate::frames::Registry;
 use crate::image::{self, CanonicalImage};
 use crate::job::Job;
@@ -25,10 +27,7 @@ use crate::provider::{
     TurnRequest, TurnResponse,
 };
 use crate::render;
-use crate::report::{
-    CostSummary, ErrorEntry, InstanceEntry, ItemRow, REPORT_VERSION, RepairEntry, Report,
-    RunReport, ToolCallEntry, TurnEntry,
-};
+use crate::report::{DecisionHeader, ItemRow, REPORT_VERSION, Report};
 use crate::retry;
 use crate::submission::{self, ValidationContext};
 use crate::tool::{
@@ -125,10 +124,10 @@ impl Cancel {
     }
 }
 
-/// Runs one decision (`budget.decision_runs` independent runs) and writes its report under
-/// `out_dir/<decision dir>/`, with each run's journal under `run-<n>/`. The decision envelope is
-/// reserved against a per-job ledger capped at `budget.spend_cap_usd` and, when given, the
-/// services' shared ledger (the evaluation's).
+/// Runs one decision (`budget.decision_runs` independent runs) under `out_dir/<decision dir>/`:
+/// the header first, each run's journal under `run-<n>/`, then the report derived from them. The
+/// decision envelope is reserved against a per-job ledger capped at `budget.spend_cap_usd` and,
+/// when given, the services' shared ledger (the evaluation's).
 pub async fn check(
     config: &Config,
     job: &Job,
@@ -140,6 +139,9 @@ pub async fn check(
     let provider = services.provider;
     let tools = services.tools;
     let shared = services.shared_ledger;
+    if !(1..=2).contains(&config.budget.decision_runs) {
+        return Err(Error::Config("decision_runs must be 1 or 2".into()));
+    }
     let dir = new_decision_dir(out_dir)?;
     let prepared = resolve_rules(config, job, job_base, tools);
     let job_ledger = CapLedger::new(config.budget.spend_cap_usd);
@@ -150,6 +152,26 @@ pub async fn check(
         ))),
         (Err(_), _) => None,
     };
+    DecisionHeader {
+        report_version: REPORT_VERSION,
+        harness_version: harness_version.to_string(),
+        use_case: job.use_case.clone(),
+        job: job.summary(),
+        config: config.redacted_json(),
+        rules: prepared.as_ref().ok().map(|p| p.summary.clone()),
+        prompt_version: render::PROMPT_VERSION.to_string(),
+        provider: provider.id().to_string(),
+        tools: tools
+            .manifests()
+            .map(|m| format!("{}@{}", m.name, m.version))
+            .collect(),
+        decision_runs: config.budget.decision_runs,
+        policy: config.policy.clone(),
+        cap_usd: config.budget.spend_cap_usd,
+        envelope: envelope.as_ref().and_then(|e| e.as_ref().ok().cloned()),
+    }
+    .write(&dir)?;
+
     let mut money = Money {
         envelope: &envelope,
         pricing: provider.pricing(),
@@ -158,90 +180,37 @@ pub async fn check(
         account: None,
     };
 
-    let mut runs: Vec<RunReport> = Vec::new();
-    let mut summaries: Vec<RunSummary> = Vec::new();
-    let mut first_error: Option<String> = None;
     for n in 1..=config.budget.decision_runs {
         let run_dir = dir.join(format!("run-{n}"));
         std::fs::create_dir(&run_dir)?;
-        let (report, summary, error) = run_once(
+        run_once(
             config, job, job_base, services, &prepared, &run_dir, n, &mut money,
         )
         .await?;
-        if first_error.is_none() {
-            first_error = error;
-        }
-        runs.push(report);
-        summaries.push(summary);
     }
-    let attempts = runs
-        .iter()
-        .flat_map(|r| r.turns.iter())
-        .map(|t| t.attempts)
-        .sum();
-    let cost = match money.account.take() {
-        Some(account) => {
-            let closing = account.close();
-            job_ledger.settle(closing.envelope_usd, closing.spent_usd);
-            if let Some(s) = shared {
-                s.settle(closing.envelope_usd, closing.spent_usd);
-            }
-            CostSummary {
-                envelope: envelope.as_ref().and_then(|e| e.as_ref().ok().cloned()),
-                cap_usd: config.budget.spend_cap_usd,
-                spent_usd: closing.spent_usd,
-                released_usd: closing.released_usd,
-                overrun_usd: closing.overrun_usd,
-                attempts,
-            }
+    if let Some(account) = money.account.take() {
+        let closing = account.close();
+        job_ledger.settle(closing.envelope_usd, closing.spent_usd);
+        if let Some(s) = shared {
+            s.settle(closing.envelope_usd, closing.spent_usd);
         }
-        None => CostSummary {
-            envelope: envelope.as_ref().and_then(|e| e.as_ref().ok().cloned()),
-            cap_usd: config.budget.spend_cap_usd,
-            attempts,
-            ..CostSummary::default()
-        },
-    };
+    }
 
-    let decision = match summaries.as_slice() {
-        [one] => decision::single(one),
-        [a, b] => decision::combine(a, b),
-        _ => return Err(Error::Config("decision_runs must be 1 or 2".into())),
-    };
-    let exit_code = decision::exit_code(decision.verdict, &config.policy);
-    let rules_summary = prepared.as_ref().ok().map(|p| p.summary.clone());
-    let report = Report {
-        report_version: REPORT_VERSION,
-        harness_version: harness_version.to_string(),
-        use_case: job.use_case.clone(),
-        job: job.summary(),
-        config: config.redacted_json(),
-        rules: rules_summary,
-        prompt_version: render::PROMPT_VERSION.to_string(),
-        provider: provider.id().to_string(),
-        tools: tools
-            .manifests()
-            .map(|m| format!("{}@{}", m.name, m.version))
-            .collect(),
-        decision_runs: config.budget.decision_runs,
-        runs,
-        decision: decision.clone(),
-        verdict: decision.verdict,
-        policy: config.policy.clone(),
-        exit_code,
-        cost,
-    };
+    let report = Report::rebuild(&dir)?;
     report.write(&dir)?;
     Ok(Outcome {
         dir,
-        decision,
-        error: first_error,
-        exit_code,
+        error: report
+            .runs
+            .iter()
+            .find_map(|r| r.error.as_ref().map(|e| e.message.clone())),
+        exit_code: report.exit_code,
+        decision: report.decision,
     })
 }
 
-/// One run of the state machine. Never fails for run-level reasons: those become the run's error
-/// entry; only I/O on the journal propagates.
+/// One run of the state machine, recorded in its journal. Never fails for run-level reasons:
+/// those become the run's terminal event; only I/O on the journal propagates.
 #[allow(clippy::too_many_arguments)]
 async fn run_once(
     config: &Config,
@@ -252,7 +221,7 @@ async fn run_once(
     run_dir: &Path,
     n: u32,
     money: &mut Money<'_>,
-) -> Result<(RunReport, RunSummary, Option<String>)> {
+) -> Result<()> {
     let mut journal = Journal::create(run_dir)?;
     if let Some(seq) = services.fail_journal_at
         && n == 1
@@ -276,70 +245,22 @@ async fn run_once(
         }
         Err(e) => Err(Error::Config(e.to_string())),
     };
-    let (verdict, error) = match result {
-        Ok(v) => {
-            journal.append("verdict", serde_json::json!({ "verdict": v }))?;
-            (Some(v), None)
-        }
+    match result {
+        Ok(verdict) => journal.append(&Event::Verdict(events::VerdictReached { verdict })),
         Err(e) => {
             // A cancellation ends the journal in `cancelled` with the state reached.
-            let event = if matches!(e, Error::Cancelled(_)) {
-                "cancelled"
-            } else {
-                "error"
+            let terminal = events::Terminal {
+                class: e.class().into(),
+                message: e.to_string(),
+                state: journal.last_event().map(str::to_string),
             };
-            let state_reached = journal.last_event().map(str::to_string);
-            journal.append(
-                event,
-                serde_json::json!({ "class": e.class(), "message": e.to_string(), "state": state_reached }),
-            )?;
-            (None, Some(e))
+            journal.append(&if matches!(e, Error::Cancelled(_)) {
+                Event::Cancelled(terminal)
+            } else {
+                Event::Error(terminal)
+            })
         }
-    };
-    let error_text = error.as_ref().map(ToString::to_string);
-    let report = RunReport {
-        run: n,
-        images: state.images.clone(),
-        images_sent: state.images_sent.clone(),
-        instances: state
-            .instances
-            .iter()
-            .map(|i| InstanceEntry {
-                id: i.id(),
-                instance: i.clone(),
-            })
-            .collect(),
-        checklist: state.checklist.clone(),
-        turns: state.turns.clone(),
-        tool_calls: state.tool_calls.clone(),
-        repairs: state.repairs.clone(),
-        items: state.items.clone(),
-        verdict,
-        error: error.map(|e| ErrorEntry {
-            class: e.class().into(),
-            message: e.to_string(),
-        }),
-    };
-    let summary = RunSummary {
-        verdict,
-        items: state
-            .items
-            .iter()
-            .map(|row| {
-                let entry = state.checklist.get(&row.id);
-                DecisionItem {
-                    id: row.id.clone(),
-                    disposition: row.disposition,
-                    confidence: row.confidence,
-                    allowed_by: row.allowed_by.clone(),
-                    root_image: entry.and_then(|c| c.root_image.clone()),
-                    instance_ids: entry.map(|c| c.instance_ids.clone()).unwrap_or_default(),
-                    root_location: entry.and_then(|c| c.root_location.clone()),
-                }
-            })
-            .collect(),
-    };
-    Ok((report, summary, error_text))
+    }
 }
 
 /// The decision's money: the planned envelope, the ledgers it is reserved against, and the
@@ -422,6 +343,7 @@ fn shape_of(request: &TurnRequest<'_>) -> RequestShape {
     }
 }
 
+/// What the loop needs between steps; everything reportable goes to the journal.
 struct RunState {
     run_dir: PathBuf,
     run_id: String,
@@ -433,11 +355,10 @@ struct RunState {
     registry: Registry,
     /// Lossless pixels per frame id, written under the run directory for tools.
     frame_files: BTreeMap<String, PathBuf>,
-    turns: Vec<TurnEntry>,
-    tool_calls: Vec<ToolCallEntry>,
     completed_calls: Vec<String>,
-    repairs: Vec<RepairEntry>,
-    items: Vec<ItemRow>,
+    /// Requests sent so far; the next turn's number is one more.
+    turns: u32,
+    repairs_used: u32,
     next_call: u32,
 }
 
@@ -453,11 +374,9 @@ impl RunState {
             checklist: Checklist::default(),
             registry: Registry::new(),
             frame_files: BTreeMap::new(),
-            turns: Vec::new(),
-            tool_calls: Vec::new(),
             completed_calls: Vec::new(),
-            repairs: Vec::new(),
-            items: Vec::new(),
+            turns: 0,
+            repairs_used: 0,
             next_call: 1,
         })
     }
@@ -518,6 +437,21 @@ fn sanitise(id: &str) -> String {
         .collect()
 }
 
+/// A call the model made that the harness did not execute (call budget, final turn).
+fn not_executed(call: &ToolCall, reason: &str) -> Event {
+    Event::ToolCalled(events::ToolCalled {
+        call_id: None,
+        provider_call_id: call.id.clone(),
+        tool: call.name.clone(),
+        arguments: None,
+        executed: false,
+        reason: Some(reason.into()),
+        invalid_args: None,
+        status: None,
+        duration_ms: None,
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn drive(
     config: &Config,
@@ -550,20 +484,18 @@ async fn drive(
     for id in &ids {
         state.record_image_sent(&format!("raw:{id}"))?;
     }
-    journal.append(
-        "resolved",
-        serde_json::json!({
-            "images": state.images.iter().map(|i| serde_json::json!({"id": i.id, "role": i.role, "sha256": i.sha256, "canonical_sha256": i.canonical_sha256, "width": i.width, "height": i.height, "projection": i.projection, "warnings": i.warnings, "artifact": state.images_sent.get(&format!("raw:{}", i.id))})).collect::<Vec<_>>(),
-            "instances": state.instances.iter().map(Instance::id).collect::<Vec<_>>(),
-            "checklist": state.checklist.ids().collect::<Vec<_>>(),
-            "tools": tools.manifests().map(|m| m.name.clone()).collect::<Vec<_>>(),
-        }),
-    )?;
+    journal.append(&Event::Resolved(events::Resolved {
+        images: state.images.clone(),
+        images_sent: state.images_sent.clone(),
+        instances: state.instances.clone(),
+        checklist: state.checklist.clone(),
+        tools: tools.manifests().map(|m| m.name.clone()).collect(),
+    }))?;
     // Prepare is a stub until task 2.3; the event exists so the journal's shape is final.
-    journal.append(
-        "prepared",
-        serde_json::json!({ "prep_version": "canonical", "images": state.images.len() }),
-    )?;
+    journal.append(&Event::Prepared(events::Prepared {
+        prep_version: "canonical".into(),
+        images: state.images.len(),
+    }))?;
 
     // Reserve: the decision envelope, once per decision, before any request.
     let envelope = match money.envelope {
@@ -586,16 +518,11 @@ async fn drive(
         }
         money.account = Some(Account::new(envelope.usd));
     }
-    journal.append(
-        "reserved",
-        serde_json::json!({
-            "envelope_usd": envelope.usd,
-            "cap_usd": config.budget.spend_cap_usd,
-            "shared_cap_usd": money.shared.map(Ledger::cap),
-            "requests_per_run": envelope.requests.len(),
-            "attempts": envelope.attempts,
-        }),
-    )?;
+    journal.append(&Event::Reserved(events::Reserved {
+        envelope: envelope.clone(),
+        cap_usd: config.budget.spend_cap_usd,
+        shared_cap_usd: money.shared.map(Ledger::cap),
+    }))?;
     let Some(account) = money.account.as_mut() else {
         return Err(Error::Budget("the envelope was not reserved".into()));
     };
@@ -729,10 +656,7 @@ async fn drive(
                         })
                         .collect();
                     for c in calls {
-                        journal.append(
-                            "tool_called",
-                            serde_json::json!({ "tool": c.name, "provider_call_id": c.id, "executed": false, "reason": "call budget" }),
-                        )?;
+                        journal.append(&not_executed(c, "call budget"))?;
                     }
                     history.push(Message {
                         role: MessageRole::User,
@@ -807,10 +731,7 @@ async fn drive(
             Class::Batch(calls) | Class::MixedCalls(calls) => {
                 history.push(assistant_message(&response.text, &response.tool_calls));
                 for c in calls {
-                    journal.append(
-                        "tool_called",
-                        serde_json::json!({ "tool": c.name, "provider_call_id": c.id, "executed": false, "reason": "final_turn" }),
-                    )?;
+                    journal.append(&not_executed(c, "final_turn"))?;
                 }
                 if !take_repair(config, state, journal, "rejected", "stray_call")? {
                     return Err(Error::NoSubmission(format!(
@@ -861,38 +782,33 @@ fn take_repair(
     form: &str,
     reason: &str,
 ) -> Result<bool> {
-    if state.repairs.len() as u32 >= config.budget.repairs {
+    if state.repairs_used >= config.budget.repairs {
         return Ok(false);
     }
-    let entry = RepairEntry {
+    state.repairs_used += 1;
+    journal.append(&Event::Repair(events::Repair {
         form: form.into(),
         reason: reason.into(),
-        after_turn: state.turns.len() as u32,
-    };
-    journal.append(
-        "repair",
-        serde_json::json!({ "form": entry.form, "reason": entry.reason, "after_turn": entry.after_turn, "repairs_used": state.repairs.len() + 1 }),
-    )?;
-    state.repairs.push(entry);
+        after_turn: state.turns,
+        repairs_used: state.repairs_used,
+    }))?;
     Ok(true)
 }
 
-/// Journals a non-replayable response and marks its turn as never having entered provider history.
+/// Journals a non-replayable response; it never enters provider history.
 fn exclude(
     journal: &mut Journal,
-    state: &mut RunState,
+    state: &RunState,
     response: &TurnResponse,
     reason: Excluded,
 ) -> Result<()> {
-    let turn = state.turns.len() as u32;
-    journal.append(
-        "turn_excluded",
-        serde_json::json!({ "turn": turn, "stop_reason": response.stop_reason, "reason": reason.name(), "text_blocks": response.text.len(), "tool_calls": response.tool_calls.len() }),
-    )?;
-    if let Some(entry) = state.turns.last_mut() {
-        entry.entered_history = false;
-    }
-    Ok(())
+    journal.append(&Event::TurnExcluded(events::TurnExcluded {
+        turn: state.turns,
+        stop_reason: response.stop_reason.clone(),
+        reason: reason.name().into(),
+        text_blocks: response.text.len(),
+        tool_calls: response.tool_calls.len(),
+    }))
 }
 
 /// The repair message for a replayable response that was rejected: one error result per call, in
@@ -1003,7 +919,7 @@ fn assistant_message(text: &[String], calls: &[ToolCall]) -> Message {
     }
 }
 
-/// Sends one request with transport retries, journaling the attempt and the response.
+/// Sends one request with transport retries, journaling the request, every retry and the response.
 #[allow(clippy::too_many_arguments)]
 async fn send_turn(
     config: &Config,
@@ -1018,7 +934,7 @@ async fn send_turn(
     account: &mut Account,
     cancel: Option<&Cancel>,
 ) -> Result<TurnResponse> {
-    let turn = state.turns.len() as u32 + 1;
+    let turn = state.turns + 1;
     if let Some(c) = cancel
         && c.is_cancelled()
     {
@@ -1041,20 +957,29 @@ async fn send_turn(
             "tools": request.tools,
             "max_output_tokens": request.max_output_tokens,
         }))?)?;
-    journal.append(
-        "turn_sent",
-        serde_json::json!({ "turn": turn, "tools": definitions.iter().map(|t| t.name.clone()).collect::<Vec<_>>(), "history_messages": history.len(), "max_output_tokens": max_output_tokens, "bound_usd": bound_usd, "request": request_ref }),
-    )?;
+    journal.append(&Event::TurnSent(events::TurnSent {
+        turn,
+        tools: definitions.iter().map(|t| t.name.clone()).collect(),
+        history_messages: history.len(),
+        max_output_tokens,
+        bound_usd,
+        request: request_ref,
+    }))?;
+    state.turns = turn;
     // A failed attempt's usage is unknown: its hold is charged at the bound.
     let mut charged_usd = 0.0;
     let mut on_retry = |a: &retry::Attempt| -> Result<()> {
         let hold = account.hold(bound_usd);
         account.charge(hold);
         charged_usd += bound_usd;
-        journal.append(
-            "retry",
-            serde_json::json!({ "turn": turn, "attempt": a.attempt, "status": a.status, "delay_ms": a.delay.as_millis() as u64, "error": a.message, "charged_usd": bound_usd }),
-        )
+        journal.append(&Event::Retry(events::Retry {
+            turn,
+            attempt: a.attempt,
+            status: a.status,
+            delay_ms: a.delay.as_millis() as u64,
+            error: a.message.clone(),
+            charged_usd: bound_usd,
+        }))
     };
     let backoff = retry::Backoff::default();
     let mut jitter = rand::random::<f64>;
@@ -1080,36 +1005,19 @@ async fn send_turn(
     let hold = account.hold(bound_usd);
     let settled_usd = pricing.cost(&response.usage);
     account.settle(hold, settled_usd);
-    let cost_usd = settled_usd + charged_usd;
     let response_ref = state
         .artifacts
         .put_body(&serde_json::to_string(&response)?)?;
-    journal.append(
-        "turn_received",
-        serde_json::json!({
-            "turn": turn,
-            "stop_reason": response.stop_reason,
-            "tool_calls": response.tool_calls.iter().map(|c| c.name.clone()).collect::<Vec<_>>(),
-            "usage": response.usage,
-            "attempts": sent.attempts,
-            "cost_usd": cost_usd,
-            "response": response_ref,
-        }),
-    )?;
-    state.turns.push(TurnEntry {
+    journal.append(&Event::TurnReceived(events::TurnReceived {
         turn,
         stop_reason: response.stop_reason.clone(),
         tool_calls: response.tool_calls.iter().map(|c| c.name.clone()).collect(),
         usage: response.usage,
         provider_request_id: response.provider_request_id.clone(),
-        max_output_tokens,
         attempts: sent.attempts,
-        bound_usd,
-        cost_usd,
-        entered_history: true,
-        request: request_ref,
+        cost_usd: settled_usd + charged_usd,
         response: response_ref,
-    });
+    }))?;
     Ok(response)
 }
 
@@ -1125,29 +1033,23 @@ fn execute_call(
 ) -> Result<ContentBlock> {
     let call_id = state.next_call_id();
     let started = Instant::now();
-    let mut entry = ToolCallEntry {
-        id: call_id.clone(),
-        provider_call_id: call.id.clone(),
-        tool: call.name.clone(),
-        arguments: call.arguments.clone(),
-        status: None,
-        invalid_args: None,
-        duration_ms: 0,
-        added_items: vec![],
-        dropped: vec![],
-        envelope: None,
-    };
+    let mut status: Option<Status> = None;
 
     // Model-side mistakes become error results, never operational failures.
     macro_rules! reject {
         ($message:expr) => {{
             let message: String = $message;
-            entry.invalid_args = Some(message.clone());
-            journal.append(
-                "tool_called",
-                serde_json::json!({ "call_id": entry.id, "tool": entry.tool, "executed": false, "invalid_args": message }),
-            )?;
-            state.tool_calls.push(entry);
+            journal.append(&Event::ToolCalled(events::ToolCalled {
+                call_id: Some(call_id.clone()),
+                provider_call_id: call.id.clone(),
+                tool: call.name.clone(),
+                arguments: Some(call.arguments.clone()),
+                executed: false,
+                reason: None,
+                invalid_args: Some(message.clone()),
+                status,
+                duration_ms: Some(started.elapsed().as_millis() as u64),
+            }))?;
             return Ok(ContentBlock::ToolResult {
                 tool_use_id: call.id.clone(),
                 content: format!("invalid arguments: {message}"),
@@ -1240,20 +1142,26 @@ fn execute_call(
     if let Some(hints) = prepared.hints.get(&manifest.name) {
         ctx.hints = hints.clone();
     }
-    journal.append(
-        "tool_called",
-        serde_json::json!({ "call_id": call_id, "tool": manifest.name, "arguments": call.arguments, "executed": true }),
-    )?;
+    journal.append(&Event::ToolCalled(events::ToolCalled {
+        call_id: Some(call_id.clone()),
+        provider_call_id: call.id.clone(),
+        tool: manifest.name.clone(),
+        arguments: Some(call.arguments.clone()),
+        executed: true,
+        reason: None,
+        invalid_args: None,
+        status: None,
+        duration_ms: None,
+    }))?;
 
     let mut envelope = tool.call(&call.arguments, &ctx)?;
-    entry.duration_ms = started.elapsed().as_millis() as u64;
-    entry.status = Some(envelope.status);
+    let duration_ms = started.elapsed().as_millis() as u64;
     // The structured result in full, before anything is dropped or presented.
     let envelope_ref = state
         .artifacts
         .put_body(&serde_json::to_string(&envelope)?)?;
-    entry.envelope = Some(envelope_ref.clone());
     if envelope.status == Status::InvalidArgs {
+        status = Some(Status::InvalidArgs);
         let msg = envelope.summary.clone();
         reject!(msg);
     }
@@ -1299,21 +1207,32 @@ fn execute_call(
         config.budget.evidence_items as usize,
     )?;
     for d in &ingest.dropped {
-        journal.append(
-            "evidence_dropped",
-            serde_json::json!({ "call_id": d.call_id, "region_id": d.region_id, "reason": d.reason }),
-        )?;
+        journal.append(&Event::EvidenceDropped(events::EvidenceDropped {
+            call_id: d.call_id.clone(),
+            region_id: d.region_id.clone(),
+            reason: d.reason.clone(),
+        }))?;
     }
-    entry.added_items = ingest.added.clone();
-    entry.dropped = ingest.dropped.iter().map(|d| d.region_id.clone()).collect();
     if matches!(envelope.status, Status::Ok | Status::MeasuredNothing) {
         state.completed_calls.push(call_id.clone());
     }
-    journal.append(
-        "tool_returned",
-        serde_json::json!({ "call_id": call_id, "status": envelope.status, "regions": envelope.regions.len(), "images": envelope.images.iter().map(|i| serde_json::json!({ "frame": i.frame, "artifact": state.images_sent.get(&i.frame) })).collect::<Vec<_>>(), "added_items": ingest.added, "duration_ms": entry.duration_ms, "envelope": envelope_ref }),
-    )?;
-    state.tool_calls.push(entry);
+    journal.append(&Event::ToolReturned(events::ToolReturned {
+        call_id: call_id.clone(),
+        status: envelope.status,
+        regions: envelope.regions.len(),
+        images: envelope
+            .images
+            .iter()
+            .map(|i| events::ReturnedImage {
+                frame: i.frame.clone(),
+                artifact: state.images_sent.get(&i.frame).cloned(),
+            })
+            .collect(),
+        added: ingest.added.clone(),
+        checklist: state.checklist.clone(),
+        duration_ms,
+        envelope: envelope_ref,
+    }))?;
 
     // What the model sees: the envelope minus image bytes, with the checklist ids of its regions.
     let presentation = serde_json::json!({
@@ -1334,7 +1253,7 @@ fn execute_call(
     })
 }
 
-/// Validates the submission and aggregates the verdict.
+/// Validates the submission, journals it with its aggregation rows, and returns the verdict.
 fn finish(
     prepared: &Prepared,
     state: &mut RunState,
@@ -1350,12 +1269,9 @@ fn finish(
             completed_calls: &state.completed_calls,
         },
     )?;
-    journal.append(
-        "submission",
-        serde_json::json!({ "provider_call_id": call.id, "items": sub.items.len(), "findings": sub.findings.len() }),
-    )?;
 
     let mut rows = Vec::new();
+    let mut items = Vec::new();
     for item in &sub.items {
         let deps = state
             .checklist
@@ -1370,7 +1286,7 @@ fn finish(
                 .map(|i| aggregate::row(i, item.disposition, item.confidence)),
         );
         rows.push(row);
-        state.items.push(ItemRow {
+        items.push(ItemRow {
             id: item.id.clone(),
             disposition: item.disposition,
             confidence: item.confidence,
@@ -1380,6 +1296,7 @@ fn finish(
             row,
         });
     }
+    let mut finding_rows = Vec::new();
     for f in &sub.findings {
         let d: aggregate::Disposition = f.disposition.into();
         if d == aggregate::Disposition::Observed {
@@ -1401,7 +1318,14 @@ fn finish(
                 .map(|i| aggregate::row(i, d, f.confidence)),
         );
         rows.push(row);
+        finding_rows.push(row);
     }
+    journal.append(&Event::Submission(events::Submission {
+        provider_call_id: call.id.clone(),
+        items,
+        findings: sub.findings.len(),
+        finding_rows,
+    }))?;
     Ok(aggregate::verdict(&rows))
 }
 
@@ -1417,7 +1341,8 @@ fn new_decision_dir(out_dir: &Path) -> Result<PathBuf> {
 }
 
 /// What the rules resolved to, for the report and the cache key.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct RulesSummary {
     pub base: String,
     pub profile: Option<String>,

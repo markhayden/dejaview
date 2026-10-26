@@ -8,6 +8,10 @@ use crate::{Error, Result};
 
 pub const MANIFEST_VERSION: u32 = 1;
 
+fn d_manifest_version() -> u32 {
+    MANIFEST_VERSION
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CostTier {
@@ -45,6 +49,9 @@ pub struct Bounds {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Manifest {
+    /// The manifest schema version (`MANIFEST_VERSION`); absent means the current one.
+    #[serde(default = "d_manifest_version")]
+    pub manifest_version: u32,
     pub name: String,
     pub version: String,
     pub purpose: String,
@@ -106,6 +113,12 @@ impl Manifest {
     /// Required text fields non-empty, a sane name, schemas are objects, and the input schema is
     /// the model schema plus a required `_dejaview`.
     pub fn validate(&self) -> Result<()> {
+        if self.manifest_version != MANIFEST_VERSION {
+            return Err(Error::Tool(format!(
+                "{}: manifest_version must be {MANIFEST_VERSION}, got {}",
+                self.name, self.manifest_version
+            )));
+        }
         let name_ok = !self.name.is_empty()
             && self
                 .name

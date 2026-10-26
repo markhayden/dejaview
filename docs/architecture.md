@@ -64,6 +64,6 @@ behind the `testkit` feature, and a dev-dependency anywhere.
 | Core domain: job, images, frames, config, obligations, checklist, submission, aggregation, journal, report | done (1.1 to 1.6) | M1 |
 | Run state machine: tool turns, final turn (`refuse`), terminal error classes, repairs, retries, cost ledger, artifacts, cancellation, report rebuild and prune, decision cache, isolation and the environment allowlist | done (1.7a to 1.12) | M1 |
 | Provider adapters, catalog, profiles | pending | M2 |
-| Evaluation sets, runner, metrics, gates, viewer | pending | M3 |
+| Evaluation sets, runner, metrics, gates, viewer | statistics contract frozen (1.15: bootstrap, Wilson, gate rules, ADR 0016); sets, runner, viewer pending | M3 |
 | Built-in tools, MCP client | MCP client lifecycle done (1.13); built-ins, pagination, concurrency pending | M4 |
 | Python tool pack | provisioning bundle, setup and offline launch proven with `echo_region` (1.14); real tools pending | M5 |

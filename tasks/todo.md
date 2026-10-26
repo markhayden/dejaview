@@ -34,7 +34,7 @@ tag.
 - [x] 1.12 Isolation, environment filter, exit codes
 - [x] 1.13 Minimal MCP client against a fake server
 - [x] 1.14 Minimal provisioning bundle proof
-- [ ] 1.15 Statistics contract frozen (ADR 0016 RNG)
+- [x] 1.15 Statistics contract frozen (ADR 0016 RNG)
 - [ ] Checkpoint M1 → tag `m1`
 
 ## M2 Provider adapters

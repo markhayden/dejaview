@@ -289,7 +289,11 @@ dependencies = [
  "dejaview-core",
  "dejaview-providers",
  "dejaview-tools",
+ "rand",
+ "rand_chacha",
+ "serde",
  "thiserror",
+ "toml",
 ]
 
 [[package]]
@@ -308,6 +312,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+ "toml",
 ]
 
 [[package]]
@@ -315,7 +320,12 @@ name = "dejaview-tools"
 version = "0.1.0"
 dependencies = [
  "dejaview-core",
+ "dejaview-testkit",
+ "serde",
+ "serde_json",
+ "sha2",
  "thiserror",
+ "toml",
 ]
 
 [[package]]

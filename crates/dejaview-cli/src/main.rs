@@ -1,6 +1,7 @@
 //! The `dejaview` binary: argument parsing and wiring only. All behaviour lives in the library
 //! crates.
 
+mod eval;
 mod report;
 
 use std::path::{Path, PathBuf};
@@ -41,6 +42,8 @@ enum Command {
     Tools(ToolsArgs),
     /// Rebuild a report from a decision directory, or prune old decisions.
     Report(report::ReportArgs),
+    /// Evaluation: the admission gate on a result table (the runner arrives with M3).
+    Eval(eval::EvalArgs),
 }
 
 #[derive(clap::Args)]
@@ -163,6 +166,7 @@ fn main() {
             command: ToolsCommand::Setup(args),
         })) => tools_setup(&args),
         Some(Command::Report(args)) => report::run(&args),
+        Some(Command::Eval(args)) => eval::run(&args),
     };
     std::process::exit(code);
 }

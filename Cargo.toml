@@ -37,7 +37,9 @@ jsonschema = { version = "0.60", default-features = false }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 sha2 = "0.11"
 tracing = "0.1"
-rand = "0.9"
+# Pinned exactly: the bootstrap's resample indices must reproduce from a seed across builds (ADR 0016).
+rand = "=0.9.5"
+rand_chacha = "=0.9.0"
 tokio = { version = "1.54", features = ["rt-multi-thread", "macros", "process", "io-util", "time", "sync", "signal"] }
 reqwest = { version = "0.13", default-features = false, features = ["rustls-tls", "json"] }
 

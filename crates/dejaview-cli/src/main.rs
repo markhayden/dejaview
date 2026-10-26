@@ -31,6 +31,30 @@ enum Command {
     Check(CheckArgs),
     /// Inspect rules.
     Rules(RulesArgs),
+    /// Inspect tools.
+    Tools(ToolsArgs),
+}
+
+#[derive(clap::Args)]
+struct ToolsArgs {
+    #[command(subcommand)]
+    command: ToolsCommand,
+}
+
+#[derive(Subcommand)]
+enum ToolsCommand {
+    /// Print the manifests of the enabled tools as the model will see them.
+    List(ToolsListArgs),
+}
+
+#[derive(clap::Args)]
+struct ToolsListArgs {
+    /// Path to the config file; `[tools] enabled` names the tools.
+    #[arg(long)]
+    config: PathBuf,
+    /// Print JSON instead of the text form.
+    #[arg(long)]
+    json: bool,
 }
 
 #[derive(clap::Args)]
@@ -108,6 +132,9 @@ fn main() {
         Some(Command::Rules(RulesArgs {
             command: RulesCommand::Show(args),
         })) => rules_show(&args),
+        Some(Command::Tools(ToolsArgs {
+            command: ToolsCommand::List(args),
+        })) => tools_list(&args),
     };
     std::process::exit(code);
 }
@@ -346,4 +373,68 @@ fn rules_show(args: &RulesShowArgs) -> i32 {
             EXIT_USAGE
         }
     }
+}
+
+/// The tools this build knows. Built-ins arrive in M4; the fake tool exists behind `testkit`.
+fn known_manifests() -> Vec<dejaview_core::tool::Manifest> {
+    #[cfg(feature = "testkit")]
+    {
+        vec![
+            dejaview_core::tool::Manifest::from_toml(dejaview_testkit::tool::FAKE_REGIONS_MANIFEST)
+                .expect("fake_regions manifest is valid"),
+        ]
+    }
+    #[cfg(not(feature = "testkit"))]
+    {
+        Vec::new()
+    }
+}
+
+fn tools_list(args: &ToolsListArgs) -> i32 {
+    let config = match Config::load(&args.config) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("dejaview: {e}");
+            return EXIT_USAGE;
+        }
+    };
+    let known = known_manifests();
+    let mut listed = Vec::new();
+    for name in &config.tools.enabled {
+        match known.iter().find(|m| &m.name == name) {
+            Some(m) => listed.push(m.clone()),
+            None => {
+                eprintln!("dejaview: tool {name:?} is enabled but not known to this build");
+                return EXIT_USAGE;
+            }
+        }
+    }
+    if args.json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&listed).unwrap_or_default()
+        );
+        return 0;
+    }
+    for m in &listed {
+        println!(
+            "{} v{} ({:?}, ~{}s)",
+            m.name, m.version, m.cost.tier, m.cost.seconds
+        );
+        println!("  purpose: {}", m.purpose);
+        println!("  when to use: {}", m.when_to_use);
+        println!("  when not to use: {}", m.when_not_to_use);
+        println!("  output: {}", m.output_guidance);
+        if let Some(k) = &m.evidence_kind {
+            println!("  evidence kind: {k}");
+        }
+        if !m.requires.is_empty() {
+            println!("  requires: {}", m.requires.join(", "));
+        }
+        println!(
+            "  model schema: {}",
+            serde_json::to_string(&m.model_schema).unwrap_or_default()
+        );
+    }
+    0
 }

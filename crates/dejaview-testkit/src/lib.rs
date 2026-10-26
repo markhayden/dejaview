@@ -2,8 +2,10 @@
 //! server. A normal dependency of the `dejaview` binary only behind its `testkit` feature.
 
 pub mod provider;
+pub mod tool;
 
 pub use provider::ScriptedProvider;
+pub use tool::ScriptedTool;
 
 /// Errors this crate produces.
 #[derive(Debug, thiserror::Error)]

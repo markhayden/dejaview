@@ -15,6 +15,7 @@ pub mod render;
 pub mod report;
 pub mod run;
 pub mod submission;
+pub mod tool;
 
 /// Errors this crate produces. Every public fallible function returns this type.
 #[derive(Debug, thiserror::Error)]
@@ -38,6 +39,9 @@ pub enum Error {
     /// The run ended without a submission.
     #[error("no_submission: {0}")]
     NoSubmission(String),
+    /// A tool crashed, timed out, returned a malformed envelope or breached its bounds.
+    #[error("tool: {0}")]
+    Tool(String),
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
     #[error("json: {0}")]
@@ -52,6 +56,7 @@ impl Error {
         match self {
             Error::Config(_) | Error::Job(_) | Error::Image(_) | Error::Toml(_) => "resolve",
             Error::Provider(_) => "provider",
+            Error::Tool(_) => "tool",
             Error::Submission(_) => "submission_invalid",
             Error::NoSubmission(_) => "no_submission",
             Error::Io(_) | Error::Json(_) => "io",

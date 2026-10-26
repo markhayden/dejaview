@@ -5,13 +5,14 @@
 
 use std::collections::BTreeMap;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::job::Projection;
 use crate::{Error, Result};
 
 /// A location as a tagged record with nullable fields (see SPEC "Frames and locations").
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Location {
     pub frame: String,
@@ -23,7 +24,7 @@ pub struct Location {
     pub fov: Option<f64>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LocationKind {
     Bbox,
@@ -34,7 +35,7 @@ pub enum LocationKind {
 }
 
 /// How a derived frame sits inside its parent.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Mapping {
     /// The frame covers this normalised box of the parent (may extend past the parent's edges).

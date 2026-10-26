@@ -1,0 +1,24 @@
+[project]
+name = "dejaview-tools"
+version = "0.0.1"
+description = "dejaview Python tool pack: an MCP server of evidence tools"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = []
+
+[project.scripts]
+dejaview-tools = "dejaview_tools.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.0,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = ["pytest>=8.0", "ruff>=0.14"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

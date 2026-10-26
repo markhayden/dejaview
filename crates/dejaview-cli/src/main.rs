@@ -53,6 +53,18 @@ struct ToolsArgs {
 enum ToolsCommand {
     /// Print the manifests of the enabled tools as the model will see them.
     List(ToolsListArgs),
+    /// Install a tool pack's provisioning bundle: verify digests, unpack, `uv sync --frozen`.
+    Setup(ToolsSetupArgs),
+}
+
+#[derive(clap::Args)]
+struct ToolsSetupArgs {
+    /// A bundle directory (`bundle.toml`, the wheel, the provisioning project and its lock).
+    #[arg(long)]
+    bundle: PathBuf,
+    /// Where to install; defaults to `$XDG_DATA_HOME` or `~/.local/share`.
+    #[arg(long)]
+    data_home: Option<PathBuf>,
 }
 
 #[derive(clap::Args)]
@@ -147,6 +159,9 @@ fn main() {
         Some(Command::Tools(ToolsArgs {
             command: ToolsCommand::List(args),
         })) => tools_list(&args),
+        Some(Command::Tools(ToolsArgs {
+            command: ToolsCommand::Setup(args),
+        })) => tools_setup(&args),
         Some(Command::Report(args)) => report::run(&args),
     };
     std::process::exit(code);
@@ -518,22 +533,59 @@ fn build_tools(args: &CheckArgs, config: &Config) -> Result<ToolRegistry, String
         .map_err(|e| e.to_string())
 }
 
-/// Connects every pack the config runs by `command`; provisioned bundles arrive in task 1.14.
+fn tools_setup(args: &ToolsSetupArgs) -> i32 {
+    use dejaview_tools::provision::{Bundle, data_home};
+    let home = args.data_home.clone().unwrap_or_else(data_home);
+    let bundle = match Bundle::load(&args.bundle) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!("dejaview: {e}");
+            return EXIT_USAGE;
+        }
+    };
+    match bundle.install(&home) {
+        Ok(installed) => {
+            println!(
+                "installed {} {} into {}",
+                installed.header.package,
+                installed.header.version,
+                installed.dir.display()
+            );
+            println!("executable: {}", installed.executable.display());
+            println!("lock digest: {}", installed.lock_digest);
+            0
+        }
+        Err(e) => {
+            eprintln!("dejaview: {e}");
+            EXIT_USAGE
+        }
+    }
+}
+
+/// Connects every pack the config names: by `command`, or by `package` and `version` from an
+/// installed bundle.
 fn connect_packs(
     config: &Config,
 ) -> Result<Vec<std::sync::Arc<dejaview_tools::mcp::Pack>>, String> {
     use dejaview_tools::mcp::{Pack, Spawn, Timeouts};
+    use dejaview_tools::provision::{Installed, data_home};
     use std::time::Duration;
     let mut packs = Vec::new();
     for (name, pack) in &config.tools.packs {
-        let Some(command) = &pack.command else {
-            continue;
-        };
-        let spawn = Spawn {
-            command: command.clone(),
-            args: pack.args.clone(),
-            declared_env: pack.env.clone(),
-            cwd: None,
+        let spawn = match (&pack.command, &pack.package, &pack.version) {
+            (Some(command), _, _) => Spawn {
+                command: command.clone(),
+                args: pack.args.clone(),
+                declared_env: pack.env.clone(),
+                cwd: None,
+                extra_env: Vec::new(),
+            },
+            (None, Some(package), Some(version)) => {
+                Installed::locate(&data_home(), package, version)
+                    .map_err(|e| e.to_string())?
+                    .spawn(pack.env.clone())
+            }
+            _ => continue,
         };
         let timeouts = Timeouts {
             startup: Duration::from_secs(pack.startup_timeout_s),

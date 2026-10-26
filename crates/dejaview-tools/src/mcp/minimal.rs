@@ -27,6 +27,7 @@ fn spawn(args: &[&str]) -> Spawn {
             "DEJAVIEW_TEST_SECRET_KEY".into(),
         ],
         cwd: None,
+        extra_env: vec![],
     }
 }
 

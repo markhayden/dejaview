@@ -1,0 +1,14 @@
+# Enables a tool this build does not know, with no packs (tools list / check refuse it).
+[provider]
+profile = "fake"
+model = "fake-model"
+
+[tools]
+enabled = ["view"]
+
+[privacy]
+cloud_calls = true
+account = "fake:test"
+
+[output]
+dir = "./dejaview-out"

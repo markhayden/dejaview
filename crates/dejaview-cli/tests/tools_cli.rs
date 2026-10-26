@@ -47,10 +47,33 @@ fn tools_list_prints_the_enabled_manifests() {
 fn tools_list_refuses_an_unknown_enabled_tool() {
     let o = Command::new(env!("CARGO_BIN_EXE_dejaview"))
         .current_dir(repo_root())
-        .args(["tools", "list", "--config", "fixtures/config/full.toml"])
-        .env("DEJAVIEW_TEST_ACCOUNT", "acct")
+        .args([
+            "tools",
+            "list",
+            "--config",
+            "fixtures/config/unknown-tool.toml",
+        ])
         .output()
         .unwrap();
     assert_eq!(o.status.code(), Some(64));
     assert!(String::from_utf8_lossy(&o.stderr).contains("not known to this build"));
+}
+
+#[test]
+fn tools_list_refuses_a_provisioned_pack_that_is_not_installed() {
+    let home = std::env::temp_dir().join(format!("dejaview-tools-cli-home-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&home);
+    let o = Command::new(env!("CARGO_BIN_EXE_dejaview"))
+        .current_dir(repo_root())
+        .args(["tools", "list", "--config", "fixtures/config/full.toml"])
+        .env("DEJAVIEW_TEST_ACCOUNT", "acct")
+        .env("XDG_DATA_HOME", &home)
+        .output()
+        .unwrap();
+    assert_eq!(o.status.code(), Some(64));
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(
+        err.contains("not installed") && err.contains("dejaview tools setup"),
+        "{err}"
+    );
 }

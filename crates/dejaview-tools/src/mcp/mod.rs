@@ -35,6 +35,8 @@ pub struct Spawn {
     pub declared_env: Vec<String>,
     /// The working directory (the run directory); the current directory when `None`.
     pub cwd: Option<PathBuf>,
+    /// Harness-owned variables set after the allowlist (`UV_OFFLINE`, the lock digest).
+    pub extra_env: Vec<(String, String)>,
 }
 
 /// The clocks of the contract.
@@ -107,7 +109,8 @@ impl Client {
         K: Into<String>,
         V: Into<String>,
     {
-        let env = dejaview_core::env::allowlist(&spawn.declared_env, environment);
+        let mut env = dejaview_core::env::allowlist(&spawn.declared_env, environment);
+        env.extend(spawn.extra_env.iter().cloned());
         let mut command = Command::new(&spawn.command);
         command
             .args(&spawn.args)

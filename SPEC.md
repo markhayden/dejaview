@@ -1095,8 +1095,8 @@ visual artifacts and no diagnostic evidence or evidence items.
 the bundle by relative path; the `uv.lock` generated for that provisioning project; the wheel;
 `MODEL.md`; and `bundle.toml` with the SHA-256 of each file and the declared Python version.
 `dejaview tools setup --config dejaview.toml` downloads the bundle named by
-`[tools.packs.<name>] version`, verifies every digest, unpacks it into
-`$XDG_DATA_HOME/dejaview/tools/<name>-<version>/`, runs `uv sync --frozen --no-dev` there with
+`[tools.packs.<name>] package` and `version` (`--bundle <dir>` installs a local one), verifies
+every digest, unpacks it into `$XDG_DATA_HOME/dejaview/tools/<package>-<version>/`, runs `uv sync --frozen --no-dev` there with
 the declared Python (Python downloads allowed during setup only), then runs the pack's `fetch`
 entry point to download and verify model artifacts into `$XDG_CACHE_HOME/dejaview/models`. The
 harness launches `<dir>/.venv/bin/dejaview-tools serve` directly with `UV_OFFLINE=1` and

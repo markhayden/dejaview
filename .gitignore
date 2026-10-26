@@ -13,3 +13,6 @@ __pycache__/
 
 # the private starting brief: untracked in every clone, not only via .git/info/exclude
 docs/brief.md
+
+# built provisioning bundles
+tools/python/dist/

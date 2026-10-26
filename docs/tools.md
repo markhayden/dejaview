@@ -52,9 +52,34 @@ SIGTERM, waits, then SIGKILL. `structuredContent` is the envelope; image content
 form.
 
 Configured per pack as `[tools.packs.<name>] command = "..."` (plus `args`, `env`,
-`startup_timeout_s`); provisioned bundles by `package` and `version` arrive with task 1.14.
+`startup_timeout_s`) for an executable, or `package` and `version` for a provisioned bundle.
 Pagination beyond a cursor loop, concurrent calls, shared leases across an evaluation and the
 `rmcp` decision are M4.
+
+## The Python pack and its provisioning bundle
+
+`tools/python/` is a uv project (`dejaview-tools`, no runtime dependencies yet) whose
+`dejaview-tools serve` runs the stdio server; this version carries one tool, `echo_region`, a
+transport proof. `just python-check` lints and tests it.
+
+`scripts/build-bundle.sh` (`just bundle`) builds the wheel and assembles
+`tools/python/dist/bundle-<version>/`: the wheel, a provisioning project whose `pyproject.toml`
+pins `dejaview-tools==<version>` by path to that wheel, its `uv.lock`, `MODEL.md`, and
+`bundle.toml` with the SHA-256 of every file, the declared Python and the executable path.
+
+`dejaview tools setup --bundle <dir>` verifies every digest (a mismatch or an unlisted file is
+`error: resolve` and nothing is installed), copies the bundle to
+`$XDG_DATA_HOME/dejaview/tools/<package>-<version>/`, verifies the copy, and runs
+`uv sync --frozen --no-dev --python <declared>` there. A pack configured by `package` and
+`version` is then launched as `<dir>/.venv/bin/dejaview-tools serve` with `UV_OFFLINE=1`,
+`UV_PYTHON_DOWNLOADS=never` and the lock digest in `DEJAVIEW_LOCK_DIGEST`, which the pack echoes
+in every envelope's provenance. Downloading a published bundle by name arrives with M5.
+
+`just provisioning-test` builds the bundle and runs the ignored tests in
+`crates/dejaview-tools/tests/provisioning.rs`: a clean-directory install whose executable
+reports the version the lock pins, an `echo_region` call through MCP, and a tampered bundle
+refused. CI runs the same install and call inside `unshare -rn`, a namespace with no network, as
+the proof that the launch needs none.
 
 ## Testing
 

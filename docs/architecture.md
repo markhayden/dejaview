@@ -66,4 +66,4 @@ behind the `testkit` feature, and a dev-dependency anywhere.
 | Provider adapters, catalog, profiles | pending | M2 |
 | Evaluation sets, runner, metrics, gates, viewer | pending | M3 |
 | Built-in tools, MCP client | MCP client lifecycle done (1.13); built-ins, pagination, concurrency pending | M4 |
-| Python tool pack | pending | M5 |
+| Python tool pack | provisioning bundle, setup and offline launch proven with `echo_region` (1.14); real tools pending | M5 |

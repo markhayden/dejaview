@@ -46,11 +46,43 @@ rules and back with tools.
 
 ## How it works
 
-TBD.
+You describe a **job**: the candidate image, the images it should be judged against (a source
+photo, one or more reference subjects), the use case, and any requirements of your own in plain
+language. dejaview turns the rules for that use case and your requirements into a numbered list
+of **obligations**, each resolved to the image it judges, and builds a **checklist** the model
+must answer item by item.
+
+A vision model then looks at the images with a fixed set of **tools**: zoom into a region, align
+a candidate to its source, and, as the harness grows, find changed regions, read text, or match
+a subject. Every tool is deterministic, describes itself, and returns evidence, never a verdict.
+Tool calls, turns and spend are all bounded.
+
+The model ends by submitting a structured answer: a disposition for every checklist item
+(`violation`, `held`, `allowed_change`, `hidden`, `cant_tell`) with a reason and a location.
+**Code computes the verdict** from those dispositions and the obligations' kinds. A confident
+violation of a mandatory obligation is `fail`; uncertainty on something that matters is `unsure`;
+otherwise `pass`. A provider error, a tool crash or a blown budget is an `error`, never a verdict.
+The model's own opinion is recorded and ignored.
+
+Every run writes a journal and a report with every image the model saw, every tool result and
+every location, viewable offline. Details: [`SPEC.md`](SPEC.md).
 
 ## How it is built
 
-TBD.
+The method is the brief's: measure first, then earn each tool.
+
+1. **Baseline.** Each candidate model alone, no tools, on public labelled sets for all five use
+   cases.
+2. **Equal visual access.** The same sets with zoom and alignment available but no measurements,
+   so a later tool is compared against a model that could already look closely.
+3. **One tool at a time.** A tool is admitted for a use case only if it beats that control on a
+   sealed set by predeclared gates, confirmed on a second set. `inconclusive` is an allowed result.
+
+Rust workspace, one binary, an optional Python tool pack over MCP, provider adapters written
+against recorded fixtures. Nothing is measured yet; results land under [`docs/results/`](docs/results/)
+as they are produced. Plan: [`PLAN.md`](PLAN.md). Decisions: [`docs/adr/`](docs/adr/). External
+reviews of the spec and plan: [`docs/reviews/`](docs/reviews/). Developer setup:
+[`docs/bootstrap.md`](docs/bootstrap.md).
 
 ## Origins
 

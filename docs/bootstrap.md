@@ -23,3 +23,5 @@ installs them on first use. `uv` is needed from M1 task 1.14 onward for the Pyth
 The six package names (`dejaview`, `dejaview-core`, `dejaview-providers`, `dejaview-tools`,
 `dejaview-eval`, `dejaview-testkit`) were all unregistered on crates.io on 2026-10-26, so no
 fallback name is needed. Publication order and the registry install check are task 2.10a.
+
+`cargo-dist` installs an executable named `dist` (run `dist --version`), used from task 2.10b.

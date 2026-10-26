@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Pre-commit hook: formatting, clippy in both feature configurations, and a credential scan of
+# the staged additions. Install with `just hooks`.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --workspace --all-targets --features dejaview/testkit -- -D warnings
+if ! git diff --cached -U0 --no-color | grep '^+' | grep -v '^+++' | scripts/scan-secrets.sh; then
+  echo "pre-commit: staged content contains a credential-shaped value; refusing to commit" >&2
+  exit 1
+fi

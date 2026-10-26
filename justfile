@@ -12,7 +12,7 @@ bootstrap:
     @command -v uv >/dev/null || echo "uv not found: install from https://docs.astral.sh/uv/ before M1 task 1.14"
 
 # Everything a commit must pass: fmt, clippy and tests in both feature configurations, deny, graph.
-check: fmt-check clippy test deny graph
+check: fmt-check clippy test deny graph hooks-test
 
 fmt-check:
     cargo fmt --all -- --check
@@ -39,3 +39,7 @@ check-filter package *filters:
 # Install the git hooks (task 0.2).
 hooks:
     git config core.hooksPath scripts/hooks
+
+# Prove the credential scanner behind the pre-commit hook accepts and rejects what it must.
+hooks-test:
+    scripts/test-hooks.sh

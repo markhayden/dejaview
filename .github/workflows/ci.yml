@@ -1,0 +1,47 @@
+name: ci
+
+on:
+  push:
+    branches: ["main", "m*"]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  rust:
+    name: just check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # rustup reads rust-toolchain.toml and installs clippy and rustfmt on first use.
+      - name: Install Rust toolchain from rust-toolchain.toml
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - name: Install pinned helper tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.59.0,cargo-deny@0.20.2
+      - name: Check scripts are executable and the brief is excluded
+        run: |
+          test -x scripts/check-crate-graph.sh
+          test -x scripts/scan-secrets.sh
+          git check-ignore -q docs/brief.md
+          test -z "$(git ls-files docs/brief.md)"
+      - run: just check
+
+  python:
+    name: python tool pack
+    runs-on: ubuntu-latest
+    # The pack arrives in M1 task 1.14; until then this job is skipped.
+    if: ${{ hashFiles('tools/python/pyproject.toml') != '' }}
+    defaults:
+      run:
+        working-directory: tools/python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run --frozen --offline --no-sync ruff check . && uv run --frozen --offline --no-sync ruff format --check .
+      - run: uv run --frozen --offline --no-sync pytest

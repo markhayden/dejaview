@@ -11,7 +11,7 @@ tag.
 - [x] 0.1 Workspace, crate skeletons, tool bootstrap, crate-graph check
 - [x] 0.2 CI, lint, pre-commit hook, ignore rules
 - [x] 0.3 Docs skeleton, review checklist, README sections
-- [ ] 0.4 Owner readiness document
+- [x] 0.4 Owner readiness document
 - [ ] Checkpoint M0 → tag `m0`
 
 ## M1 Skeleton

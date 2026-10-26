@@ -1099,10 +1099,12 @@ missing artifact is `error: resolve`. The lock digest is recorded in tool proven
 cache key. The pack's CI builds the bundle, installs it into a clean directory, and verifies the
 executable runs and the installed dependency versions match the lock.
 
-The segmenter is the prototype's licence-clean EoMT-L ADE20K ONNX export. Before M5 begins,
-`tools/python/MODEL.md` records the artifact URL and SHA-256, licence and provenance of weights
-and code, preprocessing version, onnxruntime version and execution provider, and the parity
-tolerance against stored outputs. No test or run downloads anything.
+The segmenter is an ONNX export made by this project from publicly licensed upstream weights
+(candidate: EoMT-L ADE20K, MIT code and weights on a DINOv2 backbone under Apache-2.0); nothing
+from the private prototype is reused (owner decision, 2026-10-26). Before M5 begins,
+`tools/python/MODEL.md` records the upstream source and licences, the export procedure, the
+artifact URL and SHA-256, preprocessing version, onnxruntime version and execution provider, and
+the parity tolerance against stored outputs. No test or run downloads anything.
 
 ## Config
 

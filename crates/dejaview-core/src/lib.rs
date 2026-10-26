@@ -8,6 +8,7 @@ pub mod cache;
 pub mod checklist;
 pub mod config;
 pub mod decision;
+pub mod env;
 pub mod events;
 pub mod frames;
 pub mod image;

@@ -228,7 +228,8 @@ projection = "flat"           # optional override
 ```
 
 Roles: `candidate` (exactly one), `source` (the original an edit was made from; at most one),
-`reference` (any number). Image ids are the only way a tool or the model refers to an image; the
+`reference` (any number). Image ids are plain tokens (ASCII letters, digits and `_ . : / -`) and the only way a tool or
+the model refers to an image; the
 harness resolves them through the job registry and never accepts a path or URL from the model.
 
 Each image is decoded once with bounded dimensions (`images.max_decode_pixels`, default 50 MP)

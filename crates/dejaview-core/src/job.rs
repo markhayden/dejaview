@@ -105,6 +105,12 @@ impl Job {
             if image.id.is_empty() {
                 return Err(Error::Job("an image id must not be empty".into()));
             }
+            if !image.id.chars().all(is_id_char) {
+                return Err(Error::Job(format!(
+                    "image id {:?}: ids are ASCII letters, digits and `_ . : / -` only",
+                    image.id
+                )));
+            }
             if !seen.insert(image.id.as_str()) {
                 return Err(Error::Job(format!("duplicate image id {:?}", image.id)));
             }
@@ -184,6 +190,11 @@ impl Job {
                 .collect(),
         }
     }
+}
+
+/// Image ids name frames in prompts, tool arguments and checklist ids, so they are plain tokens.
+pub fn is_id_char(c: char) -> bool {
+    c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | ':' | '/' | '-')
 }
 
 /// The job as written into a report.

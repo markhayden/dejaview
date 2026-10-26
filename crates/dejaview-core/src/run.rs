@@ -604,7 +604,7 @@ async fn drive(
                 img.role,
                 img.label
                     .as_deref()
-                    .map(|l| format!(", {l}"))
+                    .map(|l| format!(", {}", render::clean(l)))
                     .unwrap_or_default(),
                 img.id,
                 img.width,

@@ -31,7 +31,7 @@ tag.
 - [x] 1.10a Journal and artifact durability
 - [x] 1.10b Report, schema, rebuild, prune
 - [x] 1.11 Cache at the decision boundary
-- [ ] 1.12 Isolation, environment filter, exit codes
+- [x] 1.12 Isolation, environment filter, exit codes
 - [ ] 1.13 Minimal MCP client against a fake server
 - [ ] 1.14 Minimal provisioning bundle proof
 - [ ] 1.15 Statistics contract frozen (ADR 0016 RNG)

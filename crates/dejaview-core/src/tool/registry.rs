@@ -1,10 +1,12 @@
 //! The tool registry for one run: the enabled tools in prompt order, with lookup by name.
 
+use std::sync::Arc;
+
 use super::{Manifest, Tool};
 use crate::{Error, Result};
 
 pub struct ToolRegistry {
-    tools: Vec<Box<dyn Tool>>,
+    tools: Vec<Arc<dyn Tool>>,
 }
 
 impl ToolRegistry {
@@ -15,7 +17,7 @@ impl ToolRegistry {
         enabled: &[String],
         order: &[String],
     ) -> Result<ToolRegistry> {
-        let mut tools: Vec<Box<dyn Tool>> = Vec::new();
+        let mut tools: Vec<Arc<dyn Tool>> = Vec::new();
         for name in enabled {
             let pos = available
                 .iter()
@@ -25,7 +27,7 @@ impl ToolRegistry {
                         "tool {name:?} is enabled but not available in this build"
                     ))
                 })?;
-            tools.push(available.remove(pos));
+            tools.push(Arc::from(available.remove(pos)));
         }
         for t in &tools {
             for req in &t.manifest().requires {
@@ -83,6 +85,14 @@ impl ToolRegistry {
             .iter()
             .find(|t| t.manifest().name == name)
             .map(|t| t.as_ref())
+    }
+
+    /// A shared handle, for running a call on another thread.
+    pub fn get_shared(&self, name: &str) -> Option<Arc<dyn Tool>> {
+        self.tools
+            .iter()
+            .find(|t| t.manifest().name == name)
+            .cloned()
     }
 }
 

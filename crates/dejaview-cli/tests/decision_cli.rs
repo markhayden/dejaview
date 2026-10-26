@@ -101,3 +101,15 @@ fn policy_maps_unsure_to_the_exit_code_only() {
     assert_eq!(r["policy"]["on_unsure"], "pass");
     assert_eq!(r["exit_code"], 0);
 }
+
+#[test]
+fn a_run_that_errors_makes_the_decision_an_error_and_both_runs_are_kept() {
+    let out = tempdir("pass-then-error");
+    let (code, report, err) = run("fixtures/scripts/two-runs-pass-then-error.json", &out, &[]);
+    assert_eq!(code, Some(3), "{err}");
+    assert_eq!(report["decision"]["error"], true);
+    assert!(report["verdict"].is_null());
+    assert_eq!(report["runs"][0]["verdict"], "pass");
+    assert_eq!(report["runs"][1]["error"]["class"], "submission_invalid");
+    assert_eq!(report["runs"][1]["repairs"].as_array().unwrap().len(), 1);
+}

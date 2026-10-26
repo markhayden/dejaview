@@ -25,6 +25,7 @@ pub enum Event {
     Reserved(Reserved),
     TurnSent(TurnSent),
     Retry(Retry),
+    AttemptFailed(AttemptFailed),
     TurnReceived(TurnReceived),
     TurnExcluded(TurnExcluded),
     ToolCalled(ToolCalled),
@@ -46,6 +47,7 @@ impl Event {
             Event::Reserved(_) => "reserved",
             Event::TurnSent(_) => "turn_sent",
             Event::Retry(_) => "retry",
+            Event::AttemptFailed(_) => "attempt_failed",
             Event::TurnReceived(_) => "turn_received",
             Event::TurnExcluded(_) => "turn_excluded",
             Event::ToolCalled(_) => "tool_called",
@@ -107,6 +109,18 @@ pub struct Retry {
     pub charged_usd: f64,
 }
 
+/// The last attempt of a turn failed (retries exhausted, a non-retryable status, the server
+/// ended the conversation): its usage is unknown and it is charged at the bound.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttemptFailed {
+    pub turn: u32,
+    /// Attempts made in all for this turn, this one included.
+    pub attempts: u32,
+    pub class: String,
+    pub error: String,
+    pub charged_usd: f64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TurnReceived {
     pub turn: u32,
@@ -137,6 +151,8 @@ pub struct ToolCalled {
     pub call_id: Option<String>,
     pub provider_call_id: String,
     pub tool: String,
+    /// The manifest version, once the tool was looked up.
+    pub version: Option<String>,
     pub arguments: Option<serde_json::Value>,
     pub executed: bool,
     pub reason: Option<String>,

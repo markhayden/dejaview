@@ -151,8 +151,12 @@ fn cache_key_changes_for_every_key_input() {
             Box::new(|k| k.image_settings.max_long_edge = Some(512)),
         ),
         (
-            "tool settings",
-            Box::new(|k| k.tool_settings.enabled.push("regions".into())),
+            "tools enabled",
+            Box::new(|k| k.tools_enabled.push("regions".into())),
+        ),
+        (
+            "tools order",
+            Box::new(|k| k.tools_order.push("regions".into())),
         ),
         ("harness version", Box::new(|k| k.harness_version.push('1'))),
     ];
@@ -180,6 +184,7 @@ fn cache_key_ignores_credentials_output_and_cache_settings() {
         ],
         vec!["privacy.account=someone-else".to_string()],
         vec!["policy.on_unsure=\"pass\"".to_string()],
+        vec!["tools.packs.fake.command=\"/elsewhere/server\"".to_string()],
     ] {
         let mut config = config(&overrides);
         config.secrets.push("SYNTHETIC-secret".into());
@@ -355,4 +360,70 @@ fn cache_is_off_without_a_dir_and_with_read_off() {
         "read off: the entry is ignored"
     );
     assert_eq!(second.runs_executed(), 1);
+}
+
+#[test]
+fn cache_write_off_leaves_no_entry() {
+    let cache_dir = tempdir("write-off-cache");
+    let first = check(
+        &tempdir("write-off-1"),
+        &cache_dir,
+        "held.json",
+        &["cache.write=false"],
+        false,
+    );
+    assert_eq!(first.report().cache.status, "miss");
+    let second = check(&tempdir("write-off-2"), &cache_dir, "held.json", &[], false);
+    assert_eq!(second.report().cache.status, "miss", "nothing was stored");
+    assert_eq!(second.runs_executed(), 1);
+}
+
+#[test]
+fn cache_is_not_written_when_one_of_two_runs_errors() {
+    let cache_dir = tempdir("two-run-error-cache");
+    let first = check(
+        &tempdir("two-run-error-1"),
+        &cache_dir,
+        "two-runs-pass-then-error.json",
+        &["budget.decision_runs=2"],
+        false,
+    );
+    assert_eq!(first.outcome.exit_code, 3);
+    assert_eq!(first.runs_executed(), 2);
+    let key = first.report().cache.key.unwrap();
+    assert!(
+        Cache::open(&cache_dir)
+            .unwrap()
+            .lookup(&key)
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn cache_hit_applies_this_decisions_policy_to_the_exit_code() {
+    let cache_dir = tempdir("policy-cache");
+    let first = check(
+        &tempdir("policy-1"),
+        &cache_dir,
+        "two-runs-pass-then-unsure.json",
+        &["budget.decision_runs=2"],
+        false,
+    );
+    assert_eq!(first.outcome.exit_code, 2, "{:?}", first.outcome.error);
+    let second = check(
+        &tempdir("policy-2"),
+        &cache_dir,
+        "two-runs-pass-then-unsure.json",
+        &["budget.decision_runs=2", "policy.on_unsure=\"fail\""],
+        false,
+    );
+    let r = second.report();
+    assert_eq!(r.cache.status, "hit");
+    assert_eq!(
+        second.outcome.exit_code, 1,
+        "the hit is judged under this check's policy"
+    );
+    assert_eq!(r.exit_code, 1);
+    assert_eq!(r.verdict, first.report().verdict);
 }

@@ -287,6 +287,7 @@ impl Client {
                         continue; // a late answer to a cancelled call
                     }
                     if mid != id {
+                        self.tainted = true;
                         return Err(tool_err(format!(
                             "response for unknown id {mid} while waiting for {id} ({method})"
                         )));
@@ -301,12 +302,14 @@ impl Client {
                     return Ok(m.get("result").cloned().unwrap_or(Value::Null));
                 }
                 Ok(Incoming::Eof) => {
+                    self.tainted = true;
                     return Err(tool_err(format!(
                         "the server ended the conversation during {method}"
                     )));
                 }
                 Err(RecvTimeoutError::Timeout) => return Err(self.cancel(id, method)),
                 Err(RecvTimeoutError::Disconnected) => {
+                    self.tainted = true;
                     return Err(tool_err(format!("the server died during {method}")));
                 }
             }

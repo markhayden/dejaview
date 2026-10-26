@@ -909,6 +909,13 @@
             }
           ]
         },
+        "finding_rows": {
+          "description": "Aggregation rows of the submission's findings (observed findings produce none).",
+          "items": {
+            "$ref": "#/$defs/Row"
+          },
+          "type": "array"
+        },
         "images": {
           "items": {
             "$ref": "#/$defs/CanonicalImage"
@@ -983,7 +990,8 @@
         "turns",
         "tool_calls",
         "repairs",
-        "items"
+        "items",
+        "finding_rows"
       ],
       "type": "object"
     },
@@ -1023,7 +1031,7 @@
     },
     "ToolCallEntry": {
       "additionalProperties": false,
-      "description": "One executed or argument-rejected tool call as the harness handled it.",
+      "description": "One tool call the model made: executed, rejected for its arguments, or refused (call budget,\nfinal turn). A refused call has no harness id; its `id` is the provider's.",
       "properties": {
         "added_items": {
           "items": {
@@ -1054,6 +1062,9 @@
           ],
           "description": "The structured result in full; `None` when the call was not executed."
         },
+        "executed": {
+          "type": "boolean"
+        },
         "id": {
           "type": "string"
         },
@@ -1065,6 +1076,13 @@
         },
         "provider_call_id": {
           "type": "string"
+        },
+        "reason": {
+          "description": "Why a call was refused without execution (`call budget`, `final_turn`).",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "status": {
           "anyOf": [
@@ -1078,12 +1096,19 @@
         },
         "tool": {
           "type": "string"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [
         "id",
         "provider_call_id",
         "tool",
+        "executed",
         "arguments",
         "duration_ms",
         "added_items",

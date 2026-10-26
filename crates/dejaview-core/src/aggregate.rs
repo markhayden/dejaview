@@ -111,33 +111,51 @@ mod tests {
     fn aggregation_table_matches_the_spec_row_by_row() {
         use Confidence::*;
         use Disposition::*;
-        use Row::*;
-        let cases = [
-            // (disposition, confidence, matters, hidden_ok, expected)
-            (Violation, Confident, true, false, Fail),
-            (Violation, Confident, false, true, Fail),
-            (Violation, Tentative, true, false, Unsure),
-            (Violation, Tentative, false, false, Unsure),
-            (CantTell, Confident, true, false, Unsure),
-            (CantTell, Tentative, true, true, Unsure),
-            (CantTell, Confident, false, false, Recorded),
-            (Hidden, Confident, true, false, Unsure),
-            (Hidden, Tentative, true, true, Recorded),
-            (Hidden, Confident, false, false, Recorded),
-            (Held, Tentative, true, false, Unsure),
-            (Held, Tentative, false, false, Recorded),
-            (Held, Confident, true, false, Recorded),
-            (AllowedChange, Confident, true, false, Recorded),
-            (AllowedChange, Tentative, true, false, Unsure),
-            (AllowedChange, Tentative, false, false, Recorded),
-        ];
-        for (d, c, matters, hidden_ok, expected) in cases {
-            assert_eq!(
-                row(&inst(matters, hidden_ok), d, c),
-                expected,
-                "{d:?} {c:?} matters={matters} hidden_ok={hidden_ok}"
-            );
+        // The spec's table, transcribed: every disposition, confidence and flag combination.
+        fn spec_row(d: Disposition, c: Confidence, matters: bool, hidden_ok: bool) -> Row {
+            match (d, c) {
+                (Violation, Confident) => Row::Fail,
+                (Violation, Tentative) => Row::Unsure,
+                (CantTell, _) => {
+                    if matters {
+                        Row::Unsure
+                    } else {
+                        Row::Recorded
+                    }
+                }
+                (Hidden, _) => {
+                    if matters && !hidden_ok {
+                        Row::Unsure
+                    } else {
+                        Row::Recorded
+                    }
+                }
+                (Held, Tentative) | (AllowedChange, Tentative) => {
+                    if matters {
+                        Row::Unsure
+                    } else {
+                        Row::Recorded
+                    }
+                }
+                (Held, Confident) | (AllowedChange, Confident) | (Observed, _) => Row::Recorded,
+            }
         }
+        let mut cells = 0;
+        for d in [Violation, Held, AllowedChange, Hidden, CantTell, Observed] {
+            for c in [Confident, Tentative] {
+                for matters in [true, false] {
+                    for hidden_ok in [true, false] {
+                        cells += 1;
+                        assert_eq!(
+                            row(&inst(matters, hidden_ok), d, c),
+                            spec_row(d, c, matters, hidden_ok),
+                            "{d:?} {c:?} matters={matters} hidden_ok={hidden_ok}"
+                        );
+                    }
+                }
+            }
+        }
+        assert_eq!(cells, 48, "the whole domain");
     }
 
     #[test]

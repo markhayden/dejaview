@@ -153,3 +153,48 @@ fn ledger_counts_a_retry_as_a_charged_attempt() {
     assert!((r["cost"]["spent_usd"].as_f64().unwrap() - bound).abs() < 1e-12);
     assert_eq!(r["cost"]["attempts"], 2);
 }
+
+// ---- added at the M1 checkpoint from the code review ----------------------------------------
+
+#[test]
+fn ledger_charges_the_final_failed_attempt_at_its_bound() {
+    let (o, r) = check("failed-attempt", "bad-request.json", &[], None);
+    assert_eq!(o.exit_code, 3);
+    assert_eq!(r["runs"][0]["error"]["class"], "provider");
+    let turn = &r["runs"][0]["turns"][0];
+    let bound = turn["bound_usd"].as_f64().unwrap();
+    assert!(bound > 0.0);
+    assert!(
+        (turn["cost_usd"].as_f64().unwrap() - bound).abs() < 1e-12,
+        "the 400 attempt is charged"
+    );
+    assert_eq!(turn["attempts"], 1);
+    assert!((r["cost"]["spent_usd"].as_f64().unwrap() - bound).abs() < 1e-12);
+    assert!(events(&o).iter().any(|e| e == "attempt_failed"));
+}
+
+#[test]
+fn ledger_shared_reservation_is_released_even_when_the_journal_fails() {
+    let shared = CapLedger::new(10.0);
+    let out = tempdir("journal-fault");
+    let provider = ScriptedProvider::from_path(&root().join("fixtures/scripts/held.json")).unwrap();
+    let tools = ToolRegistry::new(vec![], &[], &[]).unwrap();
+    let job = Job::load(&root().join("fixtures/jobs/pair.toml")).unwrap();
+    let mut services = run::Services::new(&provider, &tools).with_shared_ledger(Some(&shared));
+    services.fail_journal_at = Some(3);
+    let err = block_on(run::check(
+        &config(&[]),
+        &job,
+        &root(),
+        &services,
+        &out,
+        "test",
+    ))
+    .unwrap_err();
+    assert!(err.to_string().contains("injected journal fault"), "{err}");
+    assert!(
+        shared.reserved().abs() < 1e-9,
+        "nothing left reserved: {}",
+        shared.reserved()
+    );
+}

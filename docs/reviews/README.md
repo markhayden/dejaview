@@ -23,3 +23,9 @@ first.
 
 Draft 4 of the plan made every before-M0 change from round 3 and records the owning-task items in
 the tasks that own them.
+
+## Checkpoints
+
+| Checkpoint | Record |
+|---|---|
+| M1 | [m1-checkpoint.md](m1-checkpoint.md): code review and coverage findings, each fixed or recorded with its owning task |

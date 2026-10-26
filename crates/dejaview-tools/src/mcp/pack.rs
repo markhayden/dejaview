@@ -44,10 +44,11 @@ impl Pack {
         K: Into<String>,
         V: Into<String>,
     {
-        let environment: Vec<(String, String)> = environment
-            .into_iter()
-            .map(|(k, v)| (k.into(), v.into()))
-            .collect();
+        // Only the allowlisted variables are kept for restarts; credentials never linger here.
+        let environment: Vec<(String, String)> =
+            dejaview_core::env::allowlist(&spawn.declared_env, environment)
+                .into_iter()
+                .collect();
         let client = Client::connect(
             &spawn,
             environment.iter().cloned(),

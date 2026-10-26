@@ -339,3 +339,77 @@ fn retry_budget_of_zero_fails_on_the_first_transport_error() {
     assert_eq!(r.outcome.exit_code, 3);
     assert_eq!(r.run()["error"]["class"], "provider");
 }
+
+// ---- added at the M1 checkpoint from the coverage review ------------------------------------
+
+#[test]
+fn repair_on_the_final_turn_reissues_a_truncated_answer_with_the_raised_allowance() {
+    let r = run_case(
+        "final-trunc",
+        "final-truncated-then-submit.json",
+        &["budget.tool_turns=1"],
+    );
+    assert_eq!(r.outcome.exit_code, 0, "{:?}", r.outcome.error);
+    let recorded = r.provider.recorded.lock().unwrap();
+    assert_eq!(recorded.len(), 3);
+    assert_eq!(
+        recorded[2].max_output_tokens,
+        r.config.budget.repair_output_tokens
+    );
+    assert_eq!(
+        recorded[1].history, recorded[2].history,
+        "the excluded answer never entered history"
+    );
+    assert!(matches!(
+        &recorded[2].history.last().unwrap().content[0],
+        ContentBlock::Text { text } if text.contains("Only submit_verdict will be executed now")
+    ));
+    assert_eq!(
+        r.repairs(),
+        [("reissue".to_string(), "truncated".to_string())]
+    );
+}
+
+#[test]
+fn repair_on_the_final_turn_answers_an_invalid_submission_with_the_final_instruction_again() {
+    let r = run_case(
+        "final-invalid",
+        "final-invalid-then-submit.json",
+        &["budget.tool_turns=1"],
+    );
+    assert_eq!(r.outcome.exit_code, 0, "{:?}", r.outcome.error);
+    assert_eq!(
+        r.repairs(),
+        [("rejected".to_string(), "invalid_submission".to_string())]
+    );
+    let recorded = r.provider.recorded.lock().unwrap();
+    let repair = recorded[2].history.last().unwrap();
+    assert!(matches!(
+        &repair.content[0],
+        ContentBlock::ToolResult { is_error: true, .. }
+    ));
+    assert!(text_of(&repair.content[1]).contains("Only submit_verdict will be executed now"));
+}
+
+#[test]
+fn repair_does_not_consume_a_tool_turn() {
+    // One tool turn allowed: a mixed batch is repaired, then a real batch still fits in the turn.
+    let r = run_case(
+        "no-turn",
+        "mixed-then-batch-then-submit.json",
+        &["budget.tool_turns=1"],
+    );
+    assert_eq!(r.outcome.exit_code, 0, "{:?}", r.outcome.error);
+    let run = r.run();
+    assert_eq!(
+        run["tool_calls"].as_array().unwrap().len(),
+        1,
+        "the batch after the repair executed"
+    );
+    assert_eq!(run["tool_calls"][0]["status"], "ok");
+    assert_eq!(
+        r.repairs(),
+        [("rejected".to_string(), "mixed_batch".to_string())]
+    );
+    assert!(!r.events().iter().any(|e| e == "turn_excluded"));
+}

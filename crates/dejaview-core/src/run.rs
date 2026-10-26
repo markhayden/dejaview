@@ -234,11 +234,20 @@ pub async fn check(
         account: None,
     };
 
+    let mut runs_result = Ok(());
     for n in 1..=config.budget.decision_runs {
         let run_dir = dir.join(format!("run-{n}"));
-        std::fs::create_dir(&run_dir)?;
-        run_once(config, services, &setup, &run_dir, n, &mut money).await?;
+        if let Err(e) = std::fs::create_dir(&run_dir) {
+            runs_result = Err(e.into());
+            break;
+        }
+        runs_result = run_once(config, services, &setup, &run_dir, n, &mut money).await;
+        if runs_result.is_err() || services.cancel.is_some_and(Cancel::is_cancelled) {
+            // A cancelled decision stops here; the report treats the missing runs as an error.
+            break;
+        }
     }
+    // The reservation is given back whatever happened, so a shared ledger never leaks it.
     if let Some(account) = money.account.take() {
         let closing = account.close();
         job_ledger.settle(closing.envelope_usd, closing.spent_usd);
@@ -246,6 +255,7 @@ pub async fn check(
             s.settle(closing.envelope_usd, closing.spent_usd);
         }
     }
+    runs_result?;
 
     let report = Report::rebuild(&dir)?;
     report.write(&dir)?;
@@ -489,6 +499,7 @@ impl RunState {
         pixels
             .save(&path)
             .map_err(|e| Error::Tool(format!("cannot write {}: {e}", path.display())))?;
+        crate::artifacts::make_private(&path)?;
         self.frame_files.insert(frame_id.to_string(), path.clone());
         Ok(path)
     }
@@ -512,6 +523,7 @@ fn not_executed(call: &ToolCall, reason: &str) -> Event {
         call_id: None,
         provider_call_id: call.id.clone(),
         tool: call.name.clone(),
+        version: None,
         arguments: None,
         executed: false,
         reason: Some(reason.into()),
@@ -728,7 +740,10 @@ async fn drive(
                 }
                 let mut results: Vec<ContentBlock> = Vec::new();
                 for c in calls {
-                    results.push(execute_call(config, tools, prepared, journal, state, c)?);
+                    results.push(
+                        execute_call(config, tools, prepared, journal, state, c, services.cancel)
+                            .await?,
+                    );
                 }
                 calls_used += calls.len() as u32;
                 results.push(ContentBlock::Text {
@@ -810,7 +825,7 @@ async fn drive(
             Class::Excluded(reason) => {
                 exclude(journal, state, &response, reason)?;
                 if !take_repair(config, state, journal, "reissue", reason.name())? {
-                    return Err(Error::NoSubmission(format!(
+                    return Err(Error::ModelOutput(format!(
                         "the final turn ended with {} (stop reason {:?}), again after the repair",
                         reason.describe(),
                         response.stop_reason
@@ -1062,7 +1077,28 @@ async fn send_turn(
             }
         }
         None => send.await,
-    }?;
+    };
+    let sent = match sent {
+        Ok(sent) => sent,
+        Err(e) => {
+            // The attempt that failed was sent too: unknown usage, charged at the bound. A
+            // cancellation is journaled as the terminal event with the state reached, so the
+            // charge is recorded there only in the ledger.
+            let hold = account.hold(bound_usd);
+            account.charge(hold);
+            if !matches!(e, Error::Cancelled(_)) {
+                let attempts = 1 + (charged_usd / bound_usd.max(f64::MIN_POSITIVE)).round() as u32;
+                journal.append(&Event::AttemptFailed(events::AttemptFailed {
+                    turn,
+                    attempts,
+                    class: e.class().into(),
+                    error: e.to_string(),
+                    charged_usd: bound_usd,
+                }))?;
+            }
+            return Err(e);
+        }
+    };
     let response = sent.response;
     let hold = account.hold(bound_usd);
     let settled_usd = pricing.cost(&response.usage);
@@ -1084,14 +1120,17 @@ async fn send_turn(
 }
 
 /// Validates and executes one tool call, returning the result block for the model. A model-side
-/// mistake is an error result; a tool failure or bound breach is `error: tool`.
-fn execute_call(
+/// mistake is an error result; a tool failure or bound breach is `error: tool`. The call itself
+/// runs on its own thread so a signal lands while a tool works.
+#[allow(clippy::too_many_arguments)]
+async fn execute_call(
     config: &Config,
     tools: &ToolRegistry,
     prepared: &Prepared,
     journal: &mut Journal,
     state: &mut RunState,
     call: &ToolCall,
+    cancel: Option<&Cancel>,
 ) -> Result<ContentBlock> {
     let call_id = state.next_call_id();
     let started = Instant::now();
@@ -1105,6 +1144,7 @@ fn execute_call(
                 call_id: Some(call_id.clone()),
                 provider_call_id: call.id.clone(),
                 tool: call.name.clone(),
+                version: None,
                 arguments: Some(call.arguments.clone()),
                 executed: false,
                 reason: None,
@@ -1121,7 +1161,7 @@ fn execute_call(
         }};
     }
 
-    let Some(tool) = tools.get(&call.name) else {
+    let Some(tool) = tools.get_shared(&call.name) else {
         reject!(format!("unknown tool {:?}", call.name));
     };
     let manifest = tool.manifest().clone();
@@ -1170,19 +1210,37 @@ fn execute_call(
             Ok(p) => p,
             Err(_) => reject!(format!("{arg}: frame {id:?} has no pixels available")),
         };
-        let (parent, transform) = match &frame {
-            crate::frames::Frame::Raw { .. } => (None, None),
+        let (parent, transform, width, height) = match &frame {
+            crate::frames::Frame::Raw { width, height, .. } => (None, None, *width, *height),
             crate::frames::Frame::Aligned {
                 parent,
                 transform_id,
+                width,
+                height,
                 ..
             } => (
                 Some(parent.clone()),
                 Some(serde_json::json!({ "id": transform_id })),
+                *width,
+                *height,
             ),
             crate::frames::Frame::Crop {
-                parent, mapping, ..
-            } => (Some(parent.clone()), Some(serde_json::to_value(mapping)?)),
+                parent,
+                mapping,
+                width,
+                height,
+                ..
+            } => (
+                Some(parent.clone()),
+                Some(serde_json::to_value(mapping)?),
+                *width,
+                *height,
+            ),
+        };
+        let media_type = if path.extension().is_some_and(|e| e == "jpg") {
+            "image/jpeg"
+        } else {
+            "image/png"
         };
         ctx.frames.insert(
             id.to_string(),
@@ -1192,9 +1250,9 @@ fn execute_call(
                 parent,
                 transform,
                 pixels: ImageHandle {
-                    media_type: "image/png".into(),
-                    width: 0,
-                    height: 0,
+                    media_type: media_type.into(),
+                    width,
+                    height,
                     projection,
                     path: Some(path.display().to_string()),
                     base64: None,
@@ -1209,6 +1267,7 @@ fn execute_call(
         call_id: Some(call_id.clone()),
         provider_call_id: call.id.clone(),
         tool: manifest.name.clone(),
+        version: Some(manifest.version.clone()),
         arguments: Some(call.arguments.clone()),
         executed: true,
         reason: None,
@@ -1217,7 +1276,29 @@ fn execute_call(
         duration_ms: None,
     }))?;
 
-    let mut envelope = tool.call(&call.arguments, &ctx)?;
+    // The tool runs on its own thread; the run keeps listening for a cancellation meanwhile.
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    {
+        let tool = std::sync::Arc::clone(&tool);
+        let args = call.arguments.clone();
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            let _ = tx.send(tool.call(&args, &ctx));
+        });
+    }
+    let outcome = match cancel {
+        Some(c) => {
+            tokio::select! {
+                r = rx => r,
+                _ = c.cancelled() => {
+                    return Err(Error::Cancelled(format!("during tool call {call_id}")));
+                }
+            }
+        }
+        None => rx.await,
+    };
+    let mut envelope = outcome
+        .map_err(|_| Error::Tool(format!("{}: the tool's thread died", manifest.name)))??;
     let duration_ms = started.elapsed().as_millis() as u64;
     // The structured result in full, before anything is dropped or presented.
     let envelope_ref = state
@@ -1230,14 +1311,37 @@ fn execute_call(
     }
     envelope.check_bounds(&manifest.returns)?;
 
-    // Returned images become crop frames with their pixels stored for later calls.
-    for img in &envelope.images {
+    // Returned images become crop frames with their pixels stored for later calls. Their ids are
+    // the harness's to assign (`crop:<call id>:<n>`), never an existing frame, and always with
+    // their bytes.
+    for (n, img) in envelope.images.iter().enumerate() {
+        let expected = format!("crop:{call_id}:{n}");
+        if img.frame != expected {
+            return Err(Error::Tool(format!(
+                "{}: returned image {n} is named {:?}; it must be {expected:?}",
+                manifest.name, img.frame
+            )));
+        }
+        if state.registry.get(&img.frame).is_some() {
+            return Err(Error::Tool(format!(
+                "{}: returned image {:?} is already a frame",
+                manifest.name, img.frame
+            )));
+        }
         if state.registry.get(&img.parent).is_none() {
             return Err(Error::Tool(format!(
                 "{}: returned image parent {:?} is not a frame",
                 manifest.name, img.parent
             )));
         }
+        let Some(b64) = &img.base64 else {
+            return Err(Error::Tool(format!(
+                "{}: returned image {:?} carries no bytes",
+                manifest.name, img.frame
+            )));
+        };
+        let bytes = image::base64_decode(b64)
+            .map_err(|e| Error::Tool(format!("{}: returned image: {e}", manifest.name)))?;
         state.registry.add_crop(
             &img.frame,
             &img.parent,
@@ -1245,21 +1349,17 @@ fn execute_call(
             img.width,
             img.height,
         );
-        if let Some(b64) = &img.base64 {
-            let bytes = image::base64_decode(b64)
-                .map_err(|e| Error::Tool(format!("{}: returned image: {e}", manifest.name)))?;
-            let dir = state.run_dir.join("frames");
-            std::fs::create_dir_all(&dir)?;
-            let ext = if img.media_type == "image/jpeg" {
-                "jpg"
-            } else {
-                "png"
-            };
-            let path = dir.join(format!("{}.{ext}", sanitise(&img.frame)));
-            std::fs::write(&path, bytes)?;
-            state.frame_files.insert(img.frame.clone(), path);
-            state.record_image_sent(&img.frame)?;
-        }
+        let dir = state.run_dir.join("frames");
+        std::fs::create_dir_all(&dir)?;
+        let ext = if img.media_type == "image/jpeg" {
+            "jpg"
+        } else {
+            "png"
+        };
+        let path = dir.join(format!("{}.{ext}", sanitise(&img.frame)));
+        crate::artifacts::write_private(&path, &bytes)?;
+        state.frame_files.insert(img.frame.clone(), path);
+        state.record_image_sent(&img.frame)?;
     }
     let ingest = state.checklist.ingest(
         &call_id,
@@ -1276,7 +1376,10 @@ fn execute_call(
             reason: d.reason.clone(),
         }))?;
     }
-    if matches!(envelope.status, Status::Ok | Status::MeasuredNothing) {
+    if matches!(
+        envelope.status,
+        Status::Ok | Status::MeasuredNothing | Status::NotApplicable
+    ) {
         state.completed_calls.push(call_id.clone());
     }
     journal.append(&Event::ToolReturned(events::ToolReturned {
@@ -1398,9 +1501,23 @@ fn new_decision_dir(out_dir: &Path) -> Result<PathBuf> {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0);
-    let dir = out_dir.join(format!("decision-{unix_ms}-{}", std::process::id()));
-    std::fs::create_dir(&dir)?;
-    Ok(dir)
+    let pid = std::process::id();
+    let mut suffix = 0u32;
+    loop {
+        let name = if suffix == 0 {
+            format!("decision-{unix_ms}-{pid}")
+        } else {
+            format!("decision-{unix_ms}-{pid}-{suffix}")
+        };
+        let dir = out_dir.join(name);
+        match std::fs::create_dir(&dir) {
+            Ok(()) => return Ok(dir),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists && suffix < 1000 => {
+                suffix += 1;
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
 }
 
 /// What the rules resolved to, for the report and the cache key.

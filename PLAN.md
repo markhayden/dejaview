@@ -414,7 +414,7 @@ item exits 2 with both runs in the report.
 ### Task 1.7a: State machine: tool turns
 
 **Description.** Resolve, prepare (stub sizing), reserve (stub ledger), tool turns with batch
-validation before execution, call budget exhaustion with error results, serial versus concurrent
+validation before execution, call budget exhaustion with error results, serial execution (concurrent dispatch for `concurrent = true` packs lands in 4.4a)
 execution, status handling, the versioned prompt template in `prompts/v1.md` with the Tools
 section from manifests.
 

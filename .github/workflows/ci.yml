@@ -87,6 +87,10 @@ jobs:
       - if: steps.pack.outputs.present == 'true'
         name: Build the provisioning test with the network
         run: cargo test -p dejaview-tools --test provisioning --no-run
-      - if: steps.pack.outputs.present == 'true'
+      # act's container cannot create namespaces; there the same install and call run without one.
+      - if: steps.pack.outputs.present == 'true' && !env.ACT
         name: Install and launch the pack without a network
         run: unshare -rn env UV_OFFLINE=1 UV_PYTHON_DOWNLOADS=never cargo test --offline -p dejaview-tools --test provisioning -- --ignored
+      - if: steps.pack.outputs.present == 'true' && env.ACT
+        name: Install and launch the pack (no namespace under act)
+        run: env UV_OFFLINE=1 UV_PYTHON_DOWNLOADS=never cargo test --offline -p dejaview-tools --test provisioning -- --ignored

@@ -223,10 +223,13 @@ fn a_batch_over_the_call_budget_is_answered_with_errors_then_the_final_turn() {
         matches!(&instruction.content[0], ContentBlock::Text { text } if text.contains("Only submit_verdict"))
     );
     let r = report(&o.dir);
-    assert_eq!(
-        r["runs"][0]["tool_calls"].as_array().unwrap().len(),
-        0,
-        "nothing was executed"
+    let calls = r["runs"][0]["tool_calls"].as_array().unwrap();
+    assert_eq!(calls.len(), 2, "both refused calls are on record");
+    assert!(
+        calls
+            .iter()
+            .all(|c| c["executed"] == false && c["reason"] == "call budget"),
+        "nothing was executed: {calls:?}"
     );
 }
 
@@ -287,4 +290,213 @@ fn a_tool_crash_is_an_operational_error() {
     let r = report(&o.dir);
     assert_eq!(r["runs"][0]["error"]["class"], "tool");
     assert!(r["verdict"].is_null());
+}
+
+// ---- added at the M1 checkpoint from the coverage review ------------------------------------
+
+fn check_with(
+    tag: &str,
+    script: &str,
+    tool_script: &str,
+    overrides: &[&str],
+) -> (run::Outcome, ScriptedProvider) {
+    let out = tempdir(tag);
+    let p = provider(script);
+    let t = tools(tool_script);
+    let job = Job::load(&root().join("fixtures/jobs/pair.toml")).unwrap();
+    let o = block_on(run::check(
+        &config(overrides),
+        &job,
+        &root(),
+        &run::Services::new(&p, &t),
+        &out,
+        "test",
+    ))
+    .unwrap();
+    (o, p)
+}
+
+#[test]
+fn a_call_budget_exactly_exhausted_goes_to_the_final_turn() {
+    let (o, p) = check_with(
+        "exact-budget",
+        "one-call.json",
+        "regions-3-then-1.json",
+        &["budget.tool_calls=1"],
+    );
+    // The scripted submission omits the evidence items, so a repair and then the exhausted script
+    // follow; what matters here is that request 2 carried the final instruction.
+    assert_eq!(o.exit_code, 3);
+    let recorded = p.recorded.lock().unwrap();
+    assert!(recorded.len() >= 2);
+    assert!(matches!(
+        &recorded[1].history.last().unwrap().content[0],
+        ContentBlock::Text { text } if text.starts_with("Tool budget exhausted.")
+    ));
+    assert_eq!(
+        report(&o.dir)["runs"][0]["tool_calls"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn an_envelope_over_its_bounds_is_an_operational_error() {
+    let (o, p) = check_with("over-bound", "one-call.json", "over-bound.json", &[]);
+    assert_eq!(o.exit_code, 3);
+    let r = report(&o.dir);
+    assert_eq!(r["runs"][0]["error"]["class"], "tool");
+    assert!(
+        r["runs"][0]["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("regions")
+    );
+    let ev = journal_events(&o.dir);
+    assert!(ev.contains(&"tool_called".to_string()) && !ev.contains(&"tool_returned".to_string()));
+    assert_eq!(p.remaining(), 1, "the submission was never requested");
+}
+
+#[test]
+fn a_returned_image_with_an_unknown_parent_is_an_operational_error() {
+    let (o, _) = check_with("bad-parent", "one-call.json", "bad-parent.json", &[]);
+    assert_eq!(o.exit_code, 3);
+    let r = report(&o.dir);
+    assert_eq!(r["runs"][0]["error"]["class"], "tool");
+    assert!(
+        r["runs"][0]["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("not a frame")
+    );
+}
+
+#[test]
+fn measured_nothing_and_not_applicable_results_are_evidence_a_submission_may_cite() {
+    for script in ["measured-nothing.json", "not-applicable.json"] {
+        let (o, _) = check_with(script, "one-call-cite.json", script, &[]);
+        assert_eq!(o.exit_code, 0, "{script}: {:?}", o.error);
+        let r = report(&o.dir);
+        assert_eq!(
+            r["runs"][0]["tool_calls"][0]["status"],
+            script.trim_end_matches(".json").replace('-', "_")
+        );
+        assert!(
+            r["runs"][0]["checklist"]["items"].as_array().unwrap().len() == 2,
+            "no evidence items added"
+        );
+    }
+}
+
+// ---- added at the M1 checkpoint from the code review ----------------------------------------
+
+#[test]
+fn a_returned_image_becomes_a_crop_frame_the_report_records() {
+    let (o, _) = check_with("crop-image", "one-call-cite.json", "crop-image.json", &[]);
+    assert_eq!(o.exit_code, 0, "{:?}", o.error);
+    let r = report(&o.dir);
+    let sent = r["runs"][0]["images_sent"].as_object().unwrap();
+    assert!(
+        sent.contains_key("crop:call:1:0"),
+        "{:?}",
+        sent.keys().collect::<Vec<_>>()
+    );
+    assert!(o.dir.join("run-1/frames/crop_call_1_0.png").is_file());
+}
+
+#[test]
+fn a_returned_image_may_not_rename_itself_or_replace_a_frame_or_come_without_bytes() {
+    for (script, message) in [
+        ("overwrite-frame.json", "must be"),
+        ("image-without-bytes.json", "carries no bytes"),
+    ] {
+        let (o, p) = check_with(script, "one-call-cite.json", script, &[]);
+        assert_eq!(o.exit_code, 3, "{script}");
+        let r = report(&o.dir);
+        assert_eq!(r["runs"][0]["error"]["class"], "tool", "{script}");
+        assert!(
+            r["runs"][0]["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains(message),
+            "{script}: {}",
+            r["runs"][0]["error"]["message"]
+        );
+        assert_eq!(
+            p.remaining(),
+            1,
+            "{script}: the submission was never requested"
+        );
+        assert!(
+            !o.dir.join("run-1/frames/crop_call_1_0.png").exists(),
+            "{script}"
+        );
+    }
+}
+
+#[test]
+fn a_cancel_during_a_slow_tool_call_lands_without_waiting_for_the_tool() {
+    let out = tempdir("cancel-tool");
+    let p = provider("one-call.json");
+    let text = std::fs::read_to_string(root().join("fixtures/tool-scripts/regions-3-then-1.json"))
+        .unwrap();
+    let envelopes: Vec<Envelope> = serde_json::from_str(&text).unwrap();
+    let slow: Vec<Box<dyn Tool>> = vec![Box::new(
+        ScriptedTool::fake_regions(envelopes).with_delay(std::time::Duration::from_secs(3)),
+    )];
+    let t = ToolRegistry::new(slow, &["fake_regions".into()], &[]).unwrap();
+    let job = Job::load(&root().join("fixtures/jobs/pair.toml")).unwrap();
+    let cancel = run::Cancel::new();
+    let config = config(&[]);
+    let base = root();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let started = std::time::Instant::now();
+    let o = runtime.block_on(async {
+        let services = run::Services::new(&p, &t).with_cancel(&cancel);
+        let run = run::check(&config, &job, &base, &services, &out, "test");
+        let trigger = async {
+            tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+            cancel.cancel();
+        };
+        let (o, ()) = tokio::join!(run, trigger);
+        o.unwrap()
+    });
+    assert!(
+        started.elapsed() < std::time::Duration::from_millis(2500),
+        "the tool's 3 s did not block the cancel: {:?}",
+        started.elapsed()
+    );
+    assert_eq!(o.exit_code, 3);
+    let r = report(&o.dir);
+    assert_eq!(r["runs"][0]["error"]["class"], "cancelled");
+    assert_eq!(journal_events(&o.dir).last().unwrap(), "cancelled");
+}
+
+#[test]
+fn refused_calls_appear_in_the_report_as_not_executed() {
+    let (o, _) = check_with(
+        "refused",
+        "stray-then-submit.json",
+        "regions-3-then-1.json",
+        &["budget.tool_turns=1"],
+    );
+    assert_eq!(o.exit_code, 0, "{:?}", o.error);
+    let r = report(&o.dir);
+    let calls = r["runs"][0]["tool_calls"].as_array().unwrap();
+    assert_eq!(calls.len(), 2, "{calls:?}");
+    assert_eq!(calls[0]["executed"], false);
+    assert!(
+        calls[0]["invalid_args"]
+            .as_str()
+            .unwrap()
+            .contains("unknown image id")
+    );
+    assert_eq!(calls[1]["executed"], false);
+    assert_eq!(calls[1]["reason"], "final_turn");
+    assert_eq!(calls[1]["id"], calls[1]["provider_call_id"]);
 }

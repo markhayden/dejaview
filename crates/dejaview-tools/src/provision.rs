@@ -64,12 +64,9 @@ impl Bundle {
             .map_err(|e| resolve(format!("cannot read {}: {e}", path.display())))?;
         let file: BundleFile =
             toml::from_str(&text).map_err(|e| resolve(format!("{}: {e}", path.display())))?;
-        if !file.header_is_sane() {
-            return Err(resolve(format!(
-                "{}: package, version, python and executable must be set and files must include {LOCK_FILE}",
-                path.display()
-            )));
-        }
+        file.bundle
+            .check()
+            .map_err(|m| resolve(format!("{}: {m}", path.display())))?;
         Ok(Bundle {
             dir: dir.to_path_buf(),
             header: file.bundle,
@@ -128,14 +125,51 @@ impl Bundle {
     }
 }
 
-impl BundleFile {
-    fn header_is_sane(&self) -> bool {
-        let h = &self.bundle;
-        !h.package.is_empty()
-            && !h.version.is_empty()
-            && !h.python.is_empty()
-            && !h.executable.is_empty()
-            && h.files.contains_key(LOCK_FILE)
+/// A plain file or directory name: no separators, not `.` or `..`, nothing hidden.
+fn is_plain_name(name: &str) -> bool {
+    !name.is_empty()
+        && name != "."
+        && name != ".."
+        && !name.starts_with('.')
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '+'))
+}
+
+impl BundleHeader {
+    /// Every path the header names stays inside the bundle and the install directory: file keys
+    /// are plain names, package and version are plain tokens, the executable is a relative path
+    /// without `..`, and the lock is listed.
+    fn check(&self) -> std::result::Result<(), String> {
+        if self.python.is_empty() {
+            return Err("python must be set".into());
+        }
+        for (field, value) in [("package", &self.package), ("version", &self.version)] {
+            if !is_plain_name(value) {
+                return Err(format!("{field} {value:?} must be a plain token"));
+            }
+        }
+        for name in self.files.keys() {
+            if !is_plain_name(name) {
+                return Err(format!("file {name:?} must be a plain file name"));
+            }
+        }
+        if !self.files.contains_key(LOCK_FILE) {
+            return Err(format!("files must include {LOCK_FILE}"));
+        }
+        let exe = Path::new(&self.executable);
+        let relative_and_contained = !self.executable.is_empty()
+            && exe.is_relative()
+            && exe
+                .components()
+                .all(|c| matches!(c, std::path::Component::Normal(_)));
+        if !relative_and_contained {
+            return Err(format!(
+                "executable {:?} must be a relative path inside the install directory",
+                self.executable
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -283,6 +317,48 @@ mod tests {
             .verify()
             .expect_err("missing");
         assert!(err.to_string().contains("cannot read"), "{err}");
+    }
+
+    #[test]
+    fn provisioning_bundle_refuses_paths_that_escape() {
+        let dir = synthetic("escape");
+        let digest = |s: &str| hex(&Sha256::digest(s.as_bytes()));
+        let cases = [
+            (
+                "file key",
+                format!(
+                    "[bundle]\npackage = \"p\"\nversion = \"1\"\npython = \">=3.12\"\nexecutable = \".venv/bin/p\"\n[bundle.files]\n\"uv.lock\" = \"{}\"\n\"../escape\" = \"{}\"\n",
+                    digest("lock"),
+                    digest("x")
+                ),
+            ),
+            (
+                "package",
+                format!(
+                    "[bundle]\npackage = \"../p\"\nversion = \"1\"\npython = \">=3.12\"\nexecutable = \".venv/bin/p\"\n[bundle.files]\n\"uv.lock\" = \"{}\"\n",
+                    digest("lock")
+                ),
+            ),
+            (
+                "executable",
+                format!(
+                    "[bundle]\npackage = \"p\"\nversion = \"1\"\npython = \">=3.12\"\nexecutable = \"../../bin/sh\"\n[bundle.files]\n\"uv.lock\" = \"{}\"\n",
+                    digest("lock")
+                ),
+            ),
+            (
+                "absolute executable",
+                format!(
+                    "[bundle]\npackage = \"p\"\nversion = \"1\"\npython = \">=3.12\"\nexecutable = \"/bin/sh\"\n[bundle.files]\n\"uv.lock\" = \"{}\"\n",
+                    digest("lock")
+                ),
+            ),
+        ];
+        for (what, header) in cases {
+            std::fs::write(dir.join(BUNDLE_FILE), header).expect("write");
+            let err = Bundle::load(&dir).expect_err(what);
+            assert_eq!(err.class(), "resolve", "{what}");
+        }
     }
 
     #[test]

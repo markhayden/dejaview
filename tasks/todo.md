@@ -35,7 +35,7 @@ tag.
 - [x] 1.13 Minimal MCP client against a fake server
 - [x] 1.14 Minimal provisioning bundle proof
 - [x] 1.15 Statistics contract frozen (ADR 0016 RNG)
-- [ ] Checkpoint M1 → tag `m1`
+- [ ] Checkpoint M1 → tag `m1` (`just check` 59 s, docs filled, review and coverage passes applied: docs/reviews/m1-checkpoint.md; awaiting owner review, merge, tag)
 
 ## M2 Provider adapters
 - [ ] 2.1 Model catalog and capability validation

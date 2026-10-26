@@ -94,11 +94,16 @@ impl ArtifactStore {
         Ok(r)
     }
 
-    /// Replaces every expanded secret.
+    /// Replaces every expanded secret, in the raw form and as a JSON string would escape it.
     pub fn redact(&self, text: &str) -> String {
         let mut out = text.to_string();
         for s in &self.secrets {
             out = out.replace(s, REDACTED);
+            let escaped = serde_json::to_string(s).unwrap_or_default();
+            let escaped = escaped.trim_matches('"');
+            if escaped != s && !escaped.is_empty() {
+                out = out.replace(escaped, REDACTED);
+            }
         }
         out
     }
@@ -133,6 +138,31 @@ impl ArtifactStore {
         std::fs::rename(&tmp, &final_path)?;
         Ok(())
     }
+}
+
+/// Writes a file under the run directory with mode 0600, replacing any previous content.
+pub fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut f = options.open(path)?;
+    f.write_all(bytes)?;
+    make_private(path)
+}
+
+/// Sets mode 0600 on an existing file (one another library wrote).
+pub fn make_private(path: &Path) -> Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+    }
+    let _ = path;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -196,6 +226,13 @@ mod tests {
         let stored = std::fs::read_to_string(s.path(&r)).expect("read");
         assert_eq!(stored, "auth [redacted] and again [redacted] end");
         assert!(!r.truncated);
+        // A secret with characters JSON escapes is caught in its escaped form too.
+        let s = store("redact-escaped", &["pa\"ss\\word"]);
+        let body = serde_json::json!({ "text": "token pa\"ss\\word here" }).to_string();
+        let r = s.put_body(&body).expect("put");
+        let stored = std::fs::read_to_string(s.path(&r)).expect("read");
+        assert!(!stored.contains("ss\\\\word"), "{stored}");
+        assert!(stored.contains("[redacted]"));
     }
 
     #[cfg(unix)]

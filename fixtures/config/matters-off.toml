@@ -1,0 +1,15 @@
+# Minimal config layering fixtures/rules/matters-off.toml over the shipped base.
+[provider]
+profile = "fake"
+model = "fake-model"
+
+[rules]
+base = "source-fidelity"
+extra = ["fixtures/rules/matters-off.toml"]
+
+[privacy]
+cloud_calls = true
+account = "fake:test"
+
+[output]
+dir = "./dejaview-out"

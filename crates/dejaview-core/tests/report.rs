@@ -191,3 +191,63 @@ fn report_prune_respects_age() {
     assert_eq!(removed, std::slice::from_ref(&young));
     assert!(other.exists(), "only decision directories are pruned");
 }
+
+#[test]
+fn report_rebuild_from_every_truncation_point_of_a_journal_with_tools_repairs_and_retries() {
+    // A run with tool calls, a stray final call repaired, and the tool script's drops.
+    let out = tempdir("rich");
+    let text = std::fs::read_to_string(root().join("fixtures/tool-scripts/regions-3-then-1.json"))
+        .unwrap();
+    let envelopes: Vec<dejaview_core::tool::Envelope> = serde_json::from_str(&text).unwrap();
+    let tool: Vec<Box<dyn dejaview_core::tool::Tool>> = vec![Box::new(
+        dejaview_testkit::ScriptedTool::fake_regions(envelopes),
+    )];
+    let tools = ToolRegistry::new(tool, &["fake_regions".into()], &[]).unwrap();
+    let provider =
+        ScriptedProvider::from_path(&root().join("fixtures/scripts/stray-then-submit.json"))
+            .unwrap();
+    let config_text =
+        std::fs::read_to_string(root().join("fixtures/config/fake-tool.toml")).unwrap();
+    let config = Config::parse(&config_text, &["budget.tool_turns=1".to_string()], &|_| {
+        None
+    })
+    .unwrap();
+    let job = Job::load(&root().join("fixtures/jobs/pair.toml")).unwrap();
+    let o = block_on(run::check(
+        &config,
+        &job,
+        &root(),
+        &Services::new(&provider, &tools),
+        &out,
+        "test",
+    ))
+    .unwrap();
+    assert_eq!(o.exit_code, 0, "{:?}", o.error);
+    let journal = std::fs::read_to_string(o.dir.join("run-1/journal.jsonl")).unwrap();
+    let lines: Vec<&str> = journal.lines().collect();
+    assert!(
+        journal.contains("\"event\":\"repair\"") && journal.contains("\"event\":\"tool_called\"")
+    );
+    for keep in 0..=lines.len() {
+        let copy = truncated_copy(&o.dir, keep, &format!("rich-{keep}"));
+        let r = Report::rebuild(&copy).unwrap();
+        let run = &r.runs[0];
+        if keep == lines.len() {
+            assert_eq!(run.terminal, report::TERMINAL_VERDICT);
+            assert_eq!(run.repairs.len(), 1);
+            assert_eq!(
+                run.tool_calls.len(),
+                2,
+                "the rejected call and the refused stray call"
+            );
+        } else {
+            assert_eq!(run.terminal, report::TERMINAL_INCOMPLETE, "keep {keep}");
+            assert_eq!(r.exit_code, 3);
+        }
+        let sent = lines[..keep]
+            .iter()
+            .filter(|l| l.contains("\"event\":\"turn_sent\""))
+            .count();
+        assert_eq!(run.turns.len(), sent, "keep {keep}");
+    }
+}

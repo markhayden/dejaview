@@ -68,8 +68,10 @@ pub struct DecisionHeader {
 
 impl DecisionHeader {
     pub fn write(&self, dir: &Path) -> Result<()> {
-        std::fs::write(dir.join(HEADER_FILE), serde_json::to_string_pretty(self)?)?;
-        Ok(())
+        crate::artifacts::write_private(
+            &dir.join(HEADER_FILE),
+            serde_json::to_string_pretty(self)?.as_bytes(),
+        )
     }
 
     pub fn read(dir: &Path) -> Result<DecisionHeader> {
@@ -146,6 +148,8 @@ pub struct RunReport {
     /// Repairs taken, in order (at most `budget.repairs`).
     pub repairs: Vec<RepairEntry>,
     pub items: Vec<ItemRow>,
+    /// Aggregation rows of the submission's findings (observed findings produce none).
+    pub finding_rows: Vec<Row>,
     pub verdict: Option<Verdict>,
     pub error: Option<ErrorEntry>,
 }
@@ -189,13 +193,18 @@ pub struct RepairEntry {
     pub after_turn: u32,
 }
 
-/// One executed or argument-rejected tool call as the harness handled it.
+/// One tool call the model made: executed, rejected for its arguments, or refused (call budget,
+/// final turn). A refused call has no harness id; its `id` is the provider's.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ToolCallEntry {
     pub id: String,
     pub provider_call_id: String,
     pub tool: String,
+    pub version: Option<String>,
+    pub executed: bool,
+    /// Why a call was refused without execution (`call budget`, `final_turn`).
+    pub reason: Option<String>,
     pub arguments: serde_json::Value,
     pub status: Option<crate::tool::Status>,
     pub invalid_args: Option<String>,
@@ -247,6 +256,7 @@ impl RunReport {
             tool_calls: Vec::new(),
             repairs: Vec::new(),
             items: Vec::new(),
+            finding_rows: Vec::new(),
             verdict: None,
             error: None,
         };
@@ -286,6 +296,12 @@ impl RunReport {
                         t.cost_usd += e.charged_usd;
                     }
                 }
+                Event::AttemptFailed(e) => {
+                    if let Some(t) = r.turns.iter_mut().find(|t| t.turn == e.turn) {
+                        t.attempts = e.attempts;
+                        t.cost_usd += e.charged_usd;
+                    }
+                }
                 Event::TurnReceived(e) => {
                     if let Some(t) = r.turns.iter_mut().find(|t| t.turn == e.turn) {
                         t.stop_reason = Some(e.stop_reason.clone());
@@ -304,8 +320,15 @@ impl RunReport {
                     }
                 }
                 Event::ToolCalled(e) => {
-                    let Some(id) = &e.call_id else { continue };
-                    match r.tool_calls.iter_mut().find(|c| &c.id == id) {
+                    let id = e
+                        .call_id
+                        .clone()
+                        .unwrap_or_else(|| e.provider_call_id.clone());
+                    match r
+                        .tool_calls
+                        .iter_mut()
+                        .find(|c| c.id == id && e.call_id.is_some())
+                    {
                         Some(c) => {
                             if e.invalid_args.is_some() {
                                 c.invalid_args = e.invalid_args.clone();
@@ -316,11 +339,17 @@ impl RunReport {
                             if let Some(d) = e.duration_ms {
                                 c.duration_ms = d;
                             }
+                            if e.version.is_some() {
+                                c.version = e.version.clone();
+                            }
                         }
                         None => r.tool_calls.push(ToolCallEntry {
-                            id: id.clone(),
+                            id,
                             provider_call_id: e.provider_call_id.clone(),
                             tool: e.tool.clone(),
+                            version: e.version.clone(),
+                            executed: e.executed,
+                            reason: e.reason.clone(),
                             arguments: e.arguments.clone().unwrap_or(serde_json::Value::Null),
                             status: e.status,
                             invalid_args: e.invalid_args.clone(),
@@ -355,7 +384,10 @@ impl RunReport {
                     reason: e.reason.clone(),
                     after_turn: e.after_turn,
                 }),
-                Event::Submission(e) => r.items = e.items.clone(),
+                Event::Submission(e) => {
+                    r.items = e.items.clone();
+                    r.finding_rows = e.finding_rows.clone();
+                }
                 Event::Verdict(e) => {
                     r.verdict = Some(e.verdict);
                     r.terminal = TERMINAL_VERDICT.into();
@@ -425,8 +457,12 @@ impl Report {
                     dir.join(HEADER_FILE).display()
                 )))
             })?;
+            // The policy, config and cache settings are outside the key: this decision's apply.
             let mut report = Report::rebuild(&source)?;
             report.cache = header.cache;
+            report.policy = header.policy;
+            report.config = header.config;
+            report.exit_code = decision::exit_code(report.verdict, &report.policy);
             return Ok(report);
         }
         let mut runs = Vec::new();
@@ -508,8 +544,10 @@ impl Report {
 
     /// Writes `report.json` into the decision directory.
     pub fn write(&self, dir: &Path) -> Result<()> {
-        std::fs::write(dir.join(REPORT_FILE), serde_json::to_string_pretty(self)?)?;
-        Ok(())
+        crate::artifacts::write_private(
+            &dir.join(REPORT_FILE),
+            serde_json::to_string_pretty(self)?.as_bytes(),
+        )
     }
 
     /// Reads a written `report.json`.

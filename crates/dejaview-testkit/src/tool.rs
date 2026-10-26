@@ -12,6 +12,7 @@ pub const FAKE_REGIONS_MANIFEST: &str = include_str!("../fixtures/fake_regions.t
 pub struct ScriptedTool {
     manifest: Manifest,
     envelopes: Mutex<VecDeque<Envelope>>,
+    delay: std::time::Duration,
     /// Every call's arguments and context, for tests that assert what the harness injected.
     pub calls: Mutex<Vec<(serde_json::Value, DejaviewContext)>>,
 }
@@ -24,8 +25,15 @@ impl ScriptedTool {
         ScriptedTool {
             manifest,
             envelopes: Mutex::new(envelopes.into()),
+            delay: std::time::Duration::ZERO,
             calls: Mutex::new(Vec::new()),
         }
+    }
+
+    /// Every call sleeps this long first, for cancellation tests.
+    pub fn with_delay(mut self, delay: std::time::Duration) -> ScriptedTool {
+        self.delay = delay;
+        self
     }
 
     /// Loads envelopes from a JSON array file.
@@ -48,6 +56,9 @@ impl Tool for ScriptedTool {
         args: &serde_json::Value,
         ctx: &DejaviewContext,
     ) -> dejaview_core::Result<Envelope> {
+        if !self.delay.is_zero() {
+            std::thread::sleep(self.delay);
+        }
         if let Ok(mut calls) = self.calls.lock() {
             calls.push((args.clone(), ctx.clone()));
         }

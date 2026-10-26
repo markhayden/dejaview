@@ -264,6 +264,22 @@ mod tests {
     }
 
     #[test]
+    fn retry_classifies_statuses_as_the_spec_lists_them() {
+        let t = |status| TransportError {
+            status,
+            retry_after: None,
+            message: String::new(),
+        };
+        for s in [408, 409, 429, 500, 502, 503, 599] {
+            assert!(t(Some(s)).retryable(), "{s}");
+        }
+        for s in [400, 401, 403, 404, 422] {
+            assert!(!t(Some(s)).retryable(), "{s}");
+        }
+        assert!(t(None).retryable());
+    }
+
+    #[test]
     fn retry_covers_connection_errors_and_timeouts() {
         let (result, slept, _) = run(vec![transport(None, None), ok()], 1);
         assert!(result.is_ok());

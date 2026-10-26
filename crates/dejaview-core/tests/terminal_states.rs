@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use dejaview_core::config::Config;
 use dejaview_core::job::Job;
-use dejaview_core::provider::{ContentBlock, TurnResponse};
+use dejaview_core::provider::ContentBlock;
 use dejaview_core::run;
 use dejaview_core::tool::{Envelope, Tool, ToolRegistry};
 use dejaview_testkit::{ScriptedProvider, ScriptedTool};
@@ -30,8 +30,7 @@ fn config(overrides: &[&str]) -> Config {
 }
 
 fn provider(script: &str) -> ScriptedProvider {
-    let text = std::fs::read_to_string(root().join("fixtures/scripts").join(script)).unwrap();
-    ScriptedProvider::new(serde_json::from_str::<Vec<TurnResponse>>(&text).unwrap())
+    ScriptedProvider::from_path(&root().join("fixtures/scripts").join(script)).unwrap()
 }
 
 fn tools(tool_script: &str) -> ToolRegistry {
@@ -226,4 +225,112 @@ fn an_invalid_submission_is_submission_invalid() {
     );
     assert_eq!(o.exit_code, 3);
     assert_eq!(error_class(&o), "submission_invalid");
+}
+
+// ---- added at the M1 checkpoint from the coverage review ------------------------------------
+
+#[test]
+fn a_second_non_replayable_response_on_the_final_turn_is_model_output() {
+    // One tool turn spent on an invalid call, then two call-less answers to the final instruction.
+    let (o, p) = run_case(
+        "final-text-twice",
+        "final-text-twice.json",
+        "regions-3-then-1.json",
+        &["budget.tool_turns=1"],
+        "pair.toml",
+    );
+    assert_eq!(o.exit_code, 3);
+    assert_eq!(error_class(&o), "model_output");
+    let ev = events(&o.dir);
+    let n = names(&ev);
+    assert_eq!(n.iter().filter(|e| **e == "turn_excluded").count(), 2);
+    assert_eq!(n.iter().filter(|e| **e == "repair").count(), 1);
+    assert_eq!(p.recorded.lock().unwrap().len(), 3);
+}
+
+#[test]
+fn a_second_refusal_is_model_output() {
+    let (o, _) = run_case(
+        "refusal-twice",
+        "refusal-twice.json",
+        "empty.json",
+        &[],
+        "pair.toml",
+    );
+    assert_eq!(o.exit_code, 3);
+    assert_eq!(error_class(&o), "model_output");
+}
+
+#[test]
+fn retries_exhausted_through_the_run_loop_are_a_provider_error() {
+    let (o, p) = run_case(
+        "retries-exhausted",
+        "retries-exhausted.json",
+        "empty.json",
+        &["budget.retries=2"],
+        "pair.toml",
+    );
+    assert_eq!(o.exit_code, 3);
+    assert_eq!(error_class(&o), "provider");
+    let ev = events(&o.dir);
+    let n = names(&ev);
+    assert_eq!(n.iter().filter(|e| **e == "retry").count(), 2);
+    assert_eq!(p.remaining(), 1, "the submission was never requested");
+}
+
+#[test]
+fn a_provider_that_cannot_price_is_a_budget_error_before_any_request() {
+    struct Unpriced(ScriptedProvider);
+    impl dejaview_core::provider::Provider for Unpriced {
+        fn id(&self) -> &str {
+            "unpriced"
+        }
+        fn send<'a>(
+            &'a self,
+            req: dejaview_core::provider::TurnRequest<'a>,
+        ) -> dejaview_core::provider::SendFuture<'a> {
+            self.0.send(req)
+        }
+    }
+    let out = tempdir("unpriced");
+    let p = Unpriced(provider("held.json"));
+    let t = tools("empty.json");
+    let job = Job::load(&root().join("fixtures/jobs/pair.toml")).unwrap();
+    let o = block_on(run::check(
+        &config(&[]),
+        &job,
+        &root(),
+        &run::Services::new(&p, &t),
+        &out,
+        "test",
+    ))
+    .unwrap();
+    assert_eq!(o.exit_code, 3);
+    assert_eq!(error_class(&o), "budget");
+    assert_eq!(names(&events(&o.dir)), ["resolved", "prepared", "error"]);
+    assert_eq!(p.0.remaining(), 1);
+}
+
+#[test]
+fn a_cancel_before_the_first_turn_ends_in_cancelled_at_the_reserved_state() {
+    let out = tempdir("cancel-before");
+    let p = provider("held.json");
+    let t = tools("empty.json");
+    let job = Job::load(&root().join("fixtures/jobs/pair.toml")).unwrap();
+    let cancel = run::Cancel::new();
+    cancel.cancel();
+    let o = block_on(run::check(
+        &config(&[]),
+        &job,
+        &root(),
+        &run::Services::new(&p, &t).with_cancel(&cancel),
+        &out,
+        "test",
+    ))
+    .unwrap();
+    assert_eq!(o.exit_code, 3);
+    assert_eq!(error_class(&o), "cancelled");
+    let ev = events(&o.dir);
+    assert_eq!(ev.last().unwrap()["data"]["state"], "reserved");
+    assert_eq!(p.remaining(), 1);
 }

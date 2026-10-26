@@ -34,10 +34,14 @@ impl Journal {
     /// Creates `journal.jsonl` in `run_dir` (which must exist). Fails if it already exists.
     pub fn create(run_dir: &Path) -> Result<Journal> {
         let path = run_dir.join("journal.jsonl");
-        let file = OpenOptions::new()
-            .create_new(true)
-            .append(true)
-            .open(&path)?;
+        let mut options = OpenOptions::new();
+        options.create_new(true).append(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let file = options.open(&path)?;
         Ok(Journal {
             file,
             path,

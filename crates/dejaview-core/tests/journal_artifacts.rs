@@ -245,3 +245,77 @@ fn journal_cancel_during_a_retry_wait_appends_cancelled_with_the_state_reached()
     assert_eq!(report["runs"][0]["error"]["class"], "cancelled");
     assert!(report["verdict"].is_null());
 }
+
+// ---- added at the M1 checkpoint from the code review ----------------------------------------
+
+#[test]
+fn journal_cancel_in_the_first_run_stops_a_two_run_decision() {
+    let out = tempdir("cancel-two-runs");
+    let provider =
+        ScriptedProvider::from_path(&root().join("fixtures/scripts/slow-retry.json")).unwrap();
+    let tools = ToolRegistry::new(vec![], &[], &[]).unwrap();
+    let job = Job::load(&root().join("fixtures/jobs/pair.toml")).unwrap();
+    let cancel = Cancel::new();
+    let text = std::fs::read_to_string(root().join("fixtures/config/minimal.toml")).unwrap();
+    let config = Config::parse(&text, &["budget.decision_runs=2".to_string()], &|_| None).unwrap();
+    let base = root();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let o = runtime.block_on(async {
+        let services = Services::new(&provider, &tools).with_cancel(&cancel);
+        let run = run::check(&config, &job, &base, &services, &out, "test");
+        let trigger = async {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            cancel.cancel();
+        };
+        let (o, ()) = tokio::join!(run, trigger);
+        o.unwrap()
+    });
+    assert_eq!(o.exit_code, 3);
+    assert!(
+        o.dir.join("run-1").exists() && !o.dir.join("run-2").exists(),
+        "run 2 never started"
+    );
+    let report: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(o.dir.join("report.json")).unwrap()).unwrap();
+    assert_eq!(report["decision"]["error"], true);
+    assert_eq!(report["runs"].as_array().unwrap().len(), 1);
+}
+
+#[cfg(unix)]
+#[test]
+fn journal_every_run_directory_file_is_private() {
+    use std::os::unix::fs::PermissionsExt;
+    let out = tempdir("modes");
+    let provider = ScriptedProvider::from_path(&root().join("fixtures/scripts/held.json")).unwrap();
+    let tools = ToolRegistry::new(vec![], &[], &[]).unwrap();
+    let job = Job::load(&root().join("fixtures/jobs/pair.toml")).unwrap();
+    let o = block_on(run::check(
+        &config("minimal.toml", &|_| None),
+        &job,
+        &root(),
+        &Services::new(&provider, &tools),
+        &out,
+        "test",
+    ))
+    .unwrap();
+    let mut files = vec![
+        o.dir.join("report.json"),
+        o.dir.join("decision.json"),
+        o.dir.join("run-1/journal.jsonl"),
+    ];
+    for sub in ["run-1/artifacts", "run-1/frames"] {
+        files.extend(
+            std::fs::read_dir(o.dir.join(sub))
+                .unwrap()
+                .map(|e| e.unwrap().path()),
+        );
+    }
+    assert!(files.len() >= 7, "{files:?}");
+    for f in files {
+        let mode = std::fs::metadata(&f).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "{}", f.display());
+    }
+}

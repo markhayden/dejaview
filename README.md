@@ -79,8 +79,10 @@ The method is the brief's: measure first, then earn each tool.
    sealed set by predeclared gates, confirmed on a second set. `inconclusive` is an allowed result.
 
 Rust workspace, one binary, an optional Python tool pack over MCP, provider adapters written
-against recorded fixtures. Nothing is measured yet; results land under [`docs/results/`](docs/results/)
-as they are produced. Plan: [`PLAN.md`](PLAN.md). Decisions: [`docs/adr/`](docs/adr/). External
+against recorded fixtures. The harness core (milestones M0 and M1) runs a job end to end against a
+scripted provider: rules, checklist, tool turns, repairs, ledger, journal, report, cache, and the
+MCP transport with a provisioned pack; live provider adapters are milestone M2. Nothing is measured
+yet; results land under [`docs/results/`](docs/results/) as they are produced. Plan: [`PLAN.md`](PLAN.md). Decisions: [`docs/adr/`](docs/adr/). External
 reviews of the spec and plan: [`docs/reviews/`](docs/reviews/). Developer setup:
 [`docs/bootstrap.md`](docs/bootstrap.md).
 

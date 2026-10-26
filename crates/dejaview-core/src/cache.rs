@@ -16,9 +16,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::config::{
-    BudgetConfig, CONFIG_VERSION, CacheConfig, ImagesConfig, RulesConfig, ToolsConfig,
-};
+use crate::config::{BudgetConfig, CONFIG_VERSION, CacheConfig, ImagesConfig, RulesConfig};
 use crate::image::{CanonicalImage, hex};
 use crate::job::{Job, Projection, Role};
 use crate::obligations::Instance;
@@ -49,7 +47,10 @@ pub struct KeyInput {
     pub max_output_tokens: u32,
     pub budget: BudgetConfig,
     pub image_settings: ImagesConfig,
-    pub tool_settings: ToolsConfig,
+    /// Which tools, in what order; the frozen manifests above carry the rest. How a pack is
+    /// launched (`command`, `args`, timeouts) is not part of the decision.
+    pub tools_enabled: Vec<String>,
+    pub tools_order: Vec<String>,
     pub rules_settings: Option<RulesConfig>,
     pub harness_version: String,
 }
@@ -114,7 +115,8 @@ impl KeyInput {
             max_output_tokens: config.provider.max_output_tokens,
             budget: config.budget.clone(),
             image_settings: config.images.clone(),
-            tool_settings: config.tools.clone(),
+            tools_enabled: config.tools.enabled.clone(),
+            tools_order: config.tools.order.clone(),
             rules_settings: config.rules.clone(),
             harness_version: harness_version.to_string(),
         }

@@ -18,7 +18,8 @@ rust-version = "1.99"
 
 # The dependency list from SPEC.md "Tech stack". Entries no crate uses yet are declared here so a
 # later task adds one line to its crate manifest and nothing else; anything outside this list
-# needs an ADR.
+# needs an ADR. Versions are the crates.io releases current on 2026-10-26; entries no crate uses yet
+# are not in Cargo.lock until first use.
 [workspace.dependencies]
 dejaview-core = { path = "crates/dejaview-core", version = "0.1.0" }
 dejaview-providers = { path = "crates/dejaview-providers", version = "0.1.0" }

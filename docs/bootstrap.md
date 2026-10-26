@@ -10,13 +10,20 @@ just check                                      # what every commit must pass
 
 `just check` runs `cargo fmt --all -- --check`, Clippy with `-D warnings` in both feature
 configurations (default, and `--features dejaview/testkit`), `cargo test --workspace` in both
-configurations, `cargo deny check`, and `scripts/check-crate-graph.sh`.
+configurations, `cargo deny check licenses bans sources` (advisories need the network and run in
+CI as `just deny-advisories`), `scripts/check-crate-graph.sh`, `scripts/test-hooks.sh` (the
+credential scanner and the pre-commit hook, end to end in a scratch repository) and
+`scripts/test-checks.sh` (the checks fail when they should).
+
+`just hooks` installs the pre-commit hook from `scripts/hooks/`. It scans every staged blob for
+credential-shaped values first, then runs fmt and Clippy. Only the exact synthetic values in
+`scripts/synthetic-tokens.txt` are allowed, and each must contain `SYNTHETIC`.
 
 The `testkit` feature of the `dejaview` package enables the scripted fake provider and the
 `--provider-script` flag for tests and debugging. Release builds never enable it.
 
-Toolchain: `rust-toolchain.toml` pins the stable channel with `clippy` and `rustfmt`; rustup
-installs them on first use. `uv` is needed from M1 task 1.14 onward for the Python tool pack.
+Toolchain: `rust-toolchain.toml` pins an exact stable version (bumped deliberately, since `just
+check` runs Clippy with `-D warnings`) with `clippy` and `rustfmt`; rustup installs them on first use. `uv` is needed from M1 task 1.14 onward for the Python tool pack.
 
 ## Package names
 

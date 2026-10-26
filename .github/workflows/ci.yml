@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # rustup reads rust-toolchain.toml and installs clippy and rustfmt on first use.
+      # rustup reads the exact version pinned in rust-toolchain.toml and installs clippy and rustfmt.
       - name: Install Rust toolchain from rust-toolchain.toml
         run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
@@ -30,6 +30,7 @@ jobs:
           git check-ignore -q docs/brief.md
           test -z "$(git ls-files docs/brief.md)"
       - run: just check
+      - run: just deny-advisories
 
   python:
     name: python tool pack

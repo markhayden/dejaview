@@ -189,8 +189,9 @@ values are allowed anywhere. `.gitignore` for `target/`, `eval-out/`, `dejaview-
 
 **Verification.** `just hooks && scripts/test-hooks.sh`; draft PR with CI.
 
-**Dependencies.** 0.1. **Files.** `.github/workflows/ci.yml`, `scripts/pre-commit`,
-`scripts/test-hooks.sh`, `fixtures/synthetic-secrets/`, `.gitignore`. **Size.** S.
+**Dependencies.** 0.1. **Files.** `.github/workflows/ci.yml`, `scripts/hooks/pre-commit`,
+`scripts/scan-secrets.sh`, `scripts/test-hooks.sh`, `scripts/test-checks.sh`,
+`fixtures/synthetic-secrets/`, `.gitignore`. **Size.** S.
 
 ### Task 0.3: Docs skeleton, review checklist and README sections
 

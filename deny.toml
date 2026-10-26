@@ -15,7 +15,7 @@ allow = [
   "CC0-1.0",
   "0BSD",
   "Unlicense",
-  "MPL-2.0",
+  "MPL-2.0",   # file-level copyleft; acceptable for a binary that does not modify such files
 ]
 
 [advisories]

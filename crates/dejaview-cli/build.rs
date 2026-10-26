@@ -10,6 +10,14 @@ fn main() {
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
         .unwrap_or_else(|| "unknown".to_string());
     println!("cargo:rustc-env=DEJAVIEW_GIT_SHA={sha}");
-    println!("cargo:rerun-if-changed=../../.git/HEAD");
-    println!("cargo:rerun-if-changed=../../.git/refs/heads");
+    // `--git-path` resolves correctly inside worktrees, where `.git` is a file.
+    if let Some(head) = Command::new("git")
+        .args(["rev-parse", "--git-path", "HEAD"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+    {
+        println!("cargo:rerun-if-changed={head}");
+    }
 }

@@ -14,9 +14,15 @@ fn version_prints_crate_version_and_commit() {
     assert!(out.status.success());
     let text = String::from_utf8_lossy(&out.stdout);
     assert!(text.contains(env!("CARGO_PKG_VERSION")), "got {text}");
+    let sha = text
+        .trim()
+        .rsplit_once('(')
+        .map(|(_, rest)| rest.trim_end_matches(')'))
+        .unwrap_or("");
+    let hex9 = sha.len() == 9 && sha.chars().all(|c| c.is_ascii_hexdigit());
     assert!(
-        text.contains('('),
-        "expected a commit in parentheses, got {text}"
+        hex9 || sha == "unknown",
+        "expected a 9-char commit or 'unknown', got {text}"
     );
 }
 
@@ -40,11 +46,11 @@ fn feature_off_binary_rejects_provider_script() {
 
 #[cfg(feature = "testkit")]
 #[test]
-fn feature_on_binary_accepts_provider_script() {
+fn feature_on_binary_lists_provider_script() {
     let out = dejaview()
-        .args(["check", "--provider-script", "x.json"])
+        .args(["check", "--help"])
         .output()
         .expect("run dejaview");
-    let err = String::from_utf8_lossy(&out.stderr);
-    assert!(!err.contains("unexpected argument"), "got {err}");
+    let help = String::from_utf8_lossy(&out.stdout);
+    assert!(help.contains("--provider-script"), "got {help}");
 }

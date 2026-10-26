@@ -12,7 +12,7 @@ bootstrap:
     @command -v uv >/dev/null || echo "uv not found: install from https://docs.astral.sh/uv/ before M1 task 1.14"
 
 # Everything a commit must pass: fmt, clippy and tests in both feature configurations, deny, graph.
-check: fmt-check clippy test deny graph hooks-test
+check: fmt-check clippy test deny graph hooks-test checks-test
 
 fmt-check:
     cargo fmt --all -- --check
@@ -25,8 +25,12 @@ test:
     cargo test --workspace
     cargo test --workspace --features dejaview/testkit
 
+# Licences, bans and sources work offline; advisories need the network and run in CI (`just deny-advisories`).
 deny:
-    cargo deny check
+    cargo deny check licenses bans sources
+
+deny-advisories:
+    cargo deny check advisories
 
 graph:
     scripts/check-crate-graph.sh
@@ -43,3 +47,7 @@ hooks:
 # Prove the credential scanner behind the pre-commit hook accepts and rejects what it must.
 hooks-test:
     scripts/test-hooks.sh
+
+# Prove the repository checks (crate graph, filter) fail when they should.
+checks-test:
+    scripts/test-checks.sh

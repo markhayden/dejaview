@@ -1,6 +1,6 @@
-//! The append-only run journal: one JSON object per line, written from the first event so a
-//! failure at any step leaves a durable record. Artifacts, redaction and body truncation arrive in
-//! task 1.10a.
+//! The append-only run journal: one JSON object per line, fsynced per event, written from the
+//! first event so a failure at any step leaves a durable record. Artifacts an event references are
+//! written first (see `artifacts`).
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -16,6 +16,8 @@ pub struct Journal {
     file: File,
     path: PathBuf,
     seq: u64,
+    last_event: Option<String>,
+    fail_at: Option<u64>,
 }
 
 #[derive(Serialize)]
@@ -34,11 +36,35 @@ impl Journal {
             .create_new(true)
             .append(true)
             .open(&path)?;
-        Ok(Journal { file, path, seq: 0 })
+        Ok(Journal {
+            file,
+            path,
+            seq: 0,
+            last_event: None,
+            fail_at: None,
+        })
+    }
+
+    /// Test knob: the append at this sequence number fails as if the process had died between an
+    /// artifact write and its event.
+    pub fn fail_at(&mut self, seq: u64) {
+        self.fail_at = Some(seq);
+    }
+
+    /// The last event appended: the state a run reached.
+    pub fn last_event(&self) -> Option<&str> {
+        self.last_event.as_deref()
     }
 
     /// Appends one event and flushes it to disk.
     pub fn append(&mut self, event: &str, data: serde_json::Value) -> Result<()> {
+        if self.fail_at == Some(self.seq) {
+            return Err(std::io::Error::other(format!(
+                "injected journal fault at seq {}",
+                self.seq
+            ))
+            .into());
+        }
         let unix_ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_millis())
@@ -54,6 +80,7 @@ impl Journal {
         self.file.write_all(text.as_bytes())?;
         self.file.sync_data()?;
         self.seq += 1;
+        self.last_event = Some(event.to_string());
         Ok(())
     }
 

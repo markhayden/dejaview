@@ -51,11 +51,9 @@ fn check(
         &config(overrides),
         &job,
         &root(),
-        &provider,
-        &tools,
+        &run::Services::new(&provider, &tools).with_shared_ledger(shared),
         &out,
         "test",
-        shared,
     ))
     .unwrap();
     let report: serde_json::Value =

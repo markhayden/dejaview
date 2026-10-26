@@ -3,6 +3,7 @@
 //! `Provider` and `Tool` traits. No dependency on other workspace crates.
 
 pub mod aggregate;
+pub mod artifacts;
 pub mod checklist;
 pub mod config;
 pub mod decision;
@@ -56,6 +57,9 @@ pub enum Error {
     /// A budget (evidence items, spend, turns) would be exceeded.
     #[error("budget: {0}")]
     Budget(String),
+    /// The run was cancelled (SIGINT, SIGTERM); the journal ends in `cancelled`.
+    #[error("cancelled: {0}")]
+    Cancelled(String),
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
     #[error("json: {0}")]
@@ -72,6 +76,7 @@ impl Error {
             Error::Provider(_) | Error::Transport(_) => "provider",
             Error::Tool(_) => "tool",
             Error::Budget(_) => "budget",
+            Error::Cancelled(_) => "cancelled",
             Error::Submission(_) => "submission_invalid",
             Error::NoSubmission(_) => "no_submission",
             Error::ModelOutput(_) => "model_output",

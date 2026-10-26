@@ -62,7 +62,7 @@ behind the `testkit` feature, and a dev-dependency anywhere.
 |---|---|---|
 | Workspace, checks, CI | done | 0.1, 0.2 |
 | Core domain: job, images, frames, config, obligations, checklist, submission, aggregation, journal, report | done (1.1 to 1.6) | M1 |
-| Run state machine: tool turns, final turn (`refuse`), terminal error classes, repairs, retries, cost ledger | done (1.7a to 1.9); durability, cache pending (1.10 to 1.12) | M1 |
+| Run state machine: tool turns, final turn (`refuse`), terminal error classes, repairs, retries, cost ledger, artifacts, cancellation | done (1.7a to 1.10a); report rebuild and cache pending (1.10b to 1.12) | M1 |
 | Provider adapters, catalog, profiles | pending | M2 |
 | Evaluation sets, runner, metrics, gates, viewer | pending | M3 |
 | Built-in tools, MCP client | pending | M4 |

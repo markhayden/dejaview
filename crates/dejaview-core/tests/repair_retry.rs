@@ -95,11 +95,9 @@ fn run_case(tag: &str, script: &str, overrides: &[&str]) -> Run {
         &config,
         &job,
         &root(),
-        &provider,
-        &tools(),
+        &run::Services::new(&provider, &tools()),
         &out,
         "test",
-        None,
     ))
     .unwrap();
     Run {
@@ -292,11 +290,9 @@ fn repair_is_run_wide_so_two_different_failures_are_terminal() {
         &config(&[]),
         &job,
         &root(),
-        &provider,
-        &tools(),
+        &run::Services::new(&provider, &tools()),
         &out,
         "test",
-        None,
     ))
     .unwrap();
     assert_eq!(o.exit_code, 3);

@@ -2,13 +2,15 @@
 //! final turn, aggregate, record. A decision is one or two independent runs combined (`decision`).
 //! Task 1.7a: tool turns with batch validation, the call budget, result ingestion. Task 1.7b: the
 //! final turn's refuse mechanism and every terminal error class. Task 1.8: both repair forms and
-//! transport retries. Task 1.9: the cost ledger. Tasks 1.10 and 1.11: journal artifacts, cache.
+//! transport retries. Task 1.9: the cost ledger. Task 1.10a: artifacts and cancellation. Task
+//! 1.11: cache.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::aggregate::{self, Verdict};
+use crate::artifacts::{ArtifactRef, ArtifactStore};
 use crate::checklist::Checklist;
 use crate::config::Config;
 use crate::decision::{self, Decision, DecisionItem, RunSummary};
@@ -50,21 +52,94 @@ pub const EXIT_ERROR: i32 = 3;
 /// The reserved tool the model submits with.
 pub const SUBMIT: &str = "submit_verdict";
 
+/// What a decision runs with: the adapter, the tools, and the optional cross-cutting services.
+pub struct Services<'a> {
+    pub provider: &'a dyn Provider,
+    pub tools: &'a ToolRegistry,
+    /// The evaluation's shared ledger, reserved against in addition to the per-job cap.
+    pub shared_ledger: Option<&'a dyn Ledger>,
+    /// Cooperative cancellation (SIGINT, SIGTERM): the run appends `cancelled` and ends.
+    pub cancel: Option<&'a Cancel>,
+    /// Test knob: fail the first run's journal append at this sequence number, as if the process
+    /// had died between an artifact write and its event.
+    pub fail_journal_at: Option<u64>,
+}
+
+impl<'a> Services<'a> {
+    pub fn new(provider: &'a dyn Provider, tools: &'a ToolRegistry) -> Services<'a> {
+        Services {
+            provider,
+            tools,
+            shared_ledger: None,
+            cancel: None,
+            fail_journal_at: None,
+        }
+    }
+
+    pub fn with_shared_ledger(mut self, ledger: Option<&'a dyn Ledger>) -> Services<'a> {
+        self.shared_ledger = ledger;
+        self
+    }
+
+    pub fn with_cancel(mut self, cancel: &'a Cancel) -> Services<'a> {
+        self.cancel = Some(cancel);
+        self
+    }
+}
+
+/// A cancellation handle: `cancel()` from a signal handler, `cancelled()` awaited by the run.
+#[derive(Debug)]
+pub struct Cancel {
+    tx: tokio::sync::watch::Sender<bool>,
+}
+
+impl Default for Cancel {
+    fn default() -> Self {
+        Cancel {
+            tx: tokio::sync::watch::Sender::new(false),
+        }
+    }
+}
+
+impl Cancel {
+    pub fn new() -> Cancel {
+        Cancel::default()
+    }
+
+    pub fn cancel(&self) {
+        self.tx.send_replace(true);
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        *self.tx.borrow()
+    }
+
+    /// Resolves once `cancel` has been called.
+    pub async fn cancelled(&self) {
+        let mut rx = self.tx.subscribe();
+        while !*rx.borrow_and_update() {
+            if rx.changed().await.is_err() {
+                return;
+            }
+        }
+    }
+}
+
 /// Runs one decision (`budget.decision_runs` independent runs) and writes its report under
 /// `out_dir/<decision dir>/`, with each run's journal under `run-<n>/`. The decision envelope is
-/// reserved against a per-job ledger capped at `budget.spend_cap_usd` and, when given, a `shared`
-/// ledger (the evaluation's).
-#[allow(clippy::too_many_arguments)]
+/// reserved against a per-job ledger capped at `budget.spend_cap_usd` and, when given, the
+/// services' shared ledger (the evaluation's).
 pub async fn check(
     config: &Config,
     job: &Job,
     job_base: &Path,
-    provider: &dyn Provider,
-    tools: &ToolRegistry,
+    services: &Services<'_>,
     out_dir: &Path,
     harness_version: &str,
-    shared: Option<&dyn Ledger>,
 ) -> Result<Outcome> {
+    let provider = services.provider;
+    let tools = services.tools;
+    let shared = services.shared_ledger;
     let dir = new_decision_dir(out_dir)?;
     let prepared = resolve_rules(config, job, job_base, tools);
     let job_ledger = CapLedger::new(config.budget.spend_cap_usd);
@@ -90,7 +165,7 @@ pub async fn check(
         let run_dir = dir.join(format!("run-{n}"));
         std::fs::create_dir(&run_dir)?;
         let (report, summary, error) = run_once(
-            config, job, job_base, provider, tools, &prepared, &run_dir, n, &mut money,
+            config, job, job_base, services, &prepared, &run_dir, n, &mut money,
         )
         .await?;
         if first_error.is_none() {
@@ -172,23 +247,26 @@ async fn run_once(
     config: &Config,
     job: &Job,
     job_base: &Path,
-    provider: &dyn Provider,
-    tools: &ToolRegistry,
+    services: &Services<'_>,
     prepared: &Result<Prepared>,
     run_dir: &Path,
     n: u32,
     money: &mut Money<'_>,
 ) -> Result<(RunReport, RunSummary, Option<String>)> {
     let mut journal = Journal::create(run_dir)?;
-    let mut state = RunState::new(run_dir, n);
+    if let Some(seq) = services.fail_journal_at
+        && n == 1
+    {
+        journal.fail_at(seq);
+    }
+    let mut state = RunState::new(run_dir, n, &config.secrets)?;
     let result = match prepared {
         Ok(p) => {
             drive(
                 config,
                 job,
                 job_base,
-                provider,
-                tools,
+                services,
                 p,
                 &mut journal,
                 &mut state,
@@ -204,9 +282,16 @@ async fn run_once(
             (Some(v), None)
         }
         Err(e) => {
+            // A cancellation ends the journal in `cancelled` with the state reached.
+            let event = if matches!(e, Error::Cancelled(_)) {
+                "cancelled"
+            } else {
+                "error"
+            };
+            let state_reached = journal.last_event().map(str::to_string);
             journal.append(
-                "error",
-                serde_json::json!({ "class": e.class(), "message": e.to_string() }),
+                event,
+                serde_json::json!({ "class": e.class(), "message": e.to_string(), "state": state_reached }),
             )?;
             (None, Some(e))
         }
@@ -215,6 +300,7 @@ async fn run_once(
     let report = RunReport {
         run: n,
         images: state.images.clone(),
+        images_sent: state.images_sent.clone(),
         instances: state
             .instances
             .iter()
@@ -339,6 +425,8 @@ fn shape_of(request: &TurnRequest<'_>) -> RequestShape {
 struct RunState {
     run_dir: PathBuf,
     run_id: String,
+    artifacts: ArtifactStore,
+    images_sent: BTreeMap<String, ArtifactRef>,
     images: Vec<CanonicalImage>,
     instances: Vec<Instance>,
     checklist: Checklist,
@@ -354,10 +442,12 @@ struct RunState {
 }
 
 impl RunState {
-    fn new(run_dir: &Path, n: u32) -> RunState {
-        RunState {
+    fn new(run_dir: &Path, n: u32, secrets: &[String]) -> Result<RunState> {
+        Ok(RunState {
             run_dir: run_dir.to_path_buf(),
             run_id: format!("run-{n}"),
+            artifacts: ArtifactStore::create(run_dir, secrets)?,
+            images_sent: BTreeMap::new(),
             images: Vec::new(),
             instances: Vec::new(),
             checklist: Checklist::default(),
@@ -369,7 +459,16 @@ impl RunState {
             repairs: Vec::new(),
             items: Vec::new(),
             next_call: 1,
-        }
+        })
+    }
+
+    /// Stores a frame's pixels as sent to the model and records it under `images_sent`.
+    fn record_image_sent(&mut self, frame_id: &str) -> Result<ArtifactRef> {
+        let path = self.frame_file(frame_id)?;
+        let bytes = std::fs::read(&path)?;
+        let r = self.artifacts.put(&bytes)?;
+        self.images_sent.insert(frame_id.to_string(), r.clone());
+        Ok(r)
     }
 
     fn next_call_id(&mut self) -> String {
@@ -424,13 +523,14 @@ async fn drive(
     config: &Config,
     job: &Job,
     job_base: &Path,
-    provider: &dyn Provider,
-    tools: &ToolRegistry,
+    services: &Services<'_>,
     prepared: &Prepared,
     journal: &mut Journal,
     state: &mut RunState,
     money: &mut Money<'_>,
 ) -> Result<Verdict> {
+    let provider = services.provider;
+    let tools = services.tools;
     // Resolve.
     let bounds = config.images.decode_bounds();
     state.images = job
@@ -445,10 +545,15 @@ async fn drive(
             .registry
             .add_raw(&img.id, img.width, img.height, img.projection);
     }
+    // Every image the model will see is stored as sent before the event that names it.
+    let ids: Vec<String> = state.images.iter().map(|i| i.id.clone()).collect();
+    for id in &ids {
+        state.record_image_sent(&format!("raw:{id}"))?;
+    }
     journal.append(
         "resolved",
         serde_json::json!({
-            "images": state.images.iter().map(|i| serde_json::json!({"id": i.id, "role": i.role, "sha256": i.sha256, "canonical_sha256": i.canonical_sha256, "width": i.width, "height": i.height, "projection": i.projection, "warnings": i.warnings})).collect::<Vec<_>>(),
+            "images": state.images.iter().map(|i| serde_json::json!({"id": i.id, "role": i.role, "sha256": i.sha256, "canonical_sha256": i.canonical_sha256, "width": i.width, "height": i.height, "projection": i.projection, "warnings": i.warnings, "artifact": state.images_sent.get(&format!("raw:{}", i.id))})).collect::<Vec<_>>(),
             "instances": state.instances.iter().map(Instance::id).collect::<Vec<_>>(),
             "checklist": state.checklist.ids().collect::<Vec<_>>(),
             "tools": tools.manifests().map(|m| m.name.clone()).collect::<Vec<_>>(),
@@ -555,6 +660,7 @@ async fn drive(
             state,
             pricing,
             account,
+            services.cancel,
         )
         .await?;
         allowance = config.provider.max_output_tokens;
@@ -676,6 +782,7 @@ async fn drive(
             state,
             pricing,
             account,
+            services.cancel,
         )
         .await?;
         allowance = config.provider.max_output_tokens;
@@ -909,8 +1016,14 @@ async fn send_turn(
     state: &mut RunState,
     pricing: &dyn Pricing,
     account: &mut Account,
+    cancel: Option<&Cancel>,
 ) -> Result<TurnResponse> {
     let turn = state.turns.len() as u32 + 1;
+    if let Some(c) = cancel
+        && c.is_cancelled()
+    {
+        return Err(Error::Cancelled(format!("before turn {turn}")));
+    }
     let request = TurnRequest {
         system: &prepared.system_prompt,
         history,
@@ -918,9 +1031,19 @@ async fn send_turn(
         max_output_tokens,
     };
     let bound_usd = pricing.bound(&shape_of(&request))?;
+    // The model-visible request body, with images by frame id (their bytes are artifacts of their
+    // own), redacted and bounded.
+    let request_ref = state
+        .artifacts
+        .put_body(&serde_json::to_string(&serde_json::json!({
+            "system": request.system,
+            "history": request.history,
+            "tools": request.tools,
+            "max_output_tokens": request.max_output_tokens,
+        }))?)?;
     journal.append(
         "turn_sent",
-        serde_json::json!({ "turn": turn, "tools": definitions.iter().map(|t| t.name.clone()).collect::<Vec<_>>(), "history_messages": history.len(), "max_output_tokens": max_output_tokens, "bound_usd": bound_usd }),
+        serde_json::json!({ "turn": turn, "tools": definitions.iter().map(|t| t.name.clone()).collect::<Vec<_>>(), "history_messages": history.len(), "max_output_tokens": max_output_tokens, "bound_usd": bound_usd, "request": request_ref }),
     )?;
     // A failed attempt's usage is unknown: its hold is charged at the bound.
     let mut charged_usd = 0.0;
@@ -933,21 +1056,34 @@ async fn send_turn(
             serde_json::json!({ "turn": turn, "attempt": a.attempt, "status": a.status, "delay_ms": a.delay.as_millis() as u64, "error": a.message, "charged_usd": bound_usd }),
         )
     };
-    let sent = retry::send_with_retries(
+    let backoff = retry::Backoff::default();
+    let mut jitter = rand::random::<f64>;
+    let send = retry::send_with_retries(
         provider,
         request,
         config.budget.retries,
-        &retry::Backoff::default(),
+        &backoff,
         &retry::TokioSleeper,
-        &mut rand::random::<f64>,
+        &mut jitter,
         &mut on_retry,
-    )
-    .await?;
+    );
+    let sent = match cancel {
+        Some(c) => {
+            tokio::select! {
+                r = send => r,
+                _ = c.cancelled() => Err(Error::Cancelled(format!("while waiting for turn {turn}"))),
+            }
+        }
+        None => send.await,
+    }?;
     let response = sent.response;
     let hold = account.hold(bound_usd);
     let settled_usd = pricing.cost(&response.usage);
     account.settle(hold, settled_usd);
     let cost_usd = settled_usd + charged_usd;
+    let response_ref = state
+        .artifacts
+        .put_body(&serde_json::to_string(&response)?)?;
     journal.append(
         "turn_received",
         serde_json::json!({
@@ -957,6 +1093,7 @@ async fn send_turn(
             "usage": response.usage,
             "attempts": sent.attempts,
             "cost_usd": cost_usd,
+            "response": response_ref,
         }),
     )?;
     state.turns.push(TurnEntry {
@@ -970,6 +1107,8 @@ async fn send_turn(
         bound_usd,
         cost_usd,
         entered_history: true,
+        request: request_ref,
+        response: response_ref,
     });
     Ok(response)
 }
@@ -996,6 +1135,7 @@ fn execute_call(
         duration_ms: 0,
         added_items: vec![],
         dropped: vec![],
+        envelope: None,
     };
 
     // Model-side mistakes become error results, never operational failures.
@@ -1108,6 +1248,11 @@ fn execute_call(
     let mut envelope = tool.call(&call.arguments, &ctx)?;
     entry.duration_ms = started.elapsed().as_millis() as u64;
     entry.status = Some(envelope.status);
+    // The structured result in full, before anything is dropped or presented.
+    let envelope_ref = state
+        .artifacts
+        .put_body(&serde_json::to_string(&envelope)?)?;
+    entry.envelope = Some(envelope_ref.clone());
     if envelope.status == Status::InvalidArgs {
         let msg = envelope.summary.clone();
         reject!(msg);
@@ -1142,6 +1287,7 @@ fn execute_call(
             let path = dir.join(format!("{}.{ext}", sanitise(&img.frame)));
             std::fs::write(&path, bytes)?;
             state.frame_files.insert(img.frame.clone(), path);
+            state.record_image_sent(&img.frame)?;
         }
     }
     let ingest = state.checklist.ingest(
@@ -1165,7 +1311,7 @@ fn execute_call(
     }
     journal.append(
         "tool_returned",
-        serde_json::json!({ "call_id": call_id, "status": envelope.status, "regions": envelope.regions.len(), "images": envelope.images.len(), "added_items": ingest.added, "duration_ms": entry.duration_ms }),
+        serde_json::json!({ "call_id": call_id, "status": envelope.status, "regions": envelope.regions.len(), "images": envelope.images.iter().map(|i| serde_json::json!({ "frame": i.frame, "artifact": state.images_sent.get(&i.frame) })).collect::<Vec<_>>(), "added_items": ingest.added, "duration_ms": entry.duration_ms, "envelope": envelope_ref }),
     )?;
     state.tool_calls.push(entry);
 

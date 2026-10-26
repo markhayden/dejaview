@@ -79,11 +79,9 @@ fn two_tool_turns_then_submit() {
         &config(&[]),
         &job,
         &root(),
-        &p,
-        &t,
+        &run::Services::new(&p, &t),
         &out,
         "test",
-        None,
     ))
     .unwrap();
     assert_eq!(o.exit_code, 0, "{:?}", o.error);
@@ -176,11 +174,9 @@ fn first_look_then_submit_with_no_tools_enabled() {
         &config(&["tools.enabled=[]"]),
         &job,
         &root(),
-        &p,
-        &t,
+        &run::Services::new(&p, &t),
         &out,
         "test",
-        None,
     ))
     .unwrap();
     assert_eq!(o.exit_code, 0, "{:?}", o.error);
@@ -203,11 +199,9 @@ fn a_batch_over_the_call_budget_is_answered_with_errors_then_the_final_turn() {
         &config(&["budget.tool_calls=1"]),
         &job,
         &root(),
-        &p,
-        &t,
+        &run::Services::new(&p, &t),
         &out,
         "test",
-        None,
     ))
     .unwrap();
     assert_eq!(o.exit_code, 0, "{:?}", o.error);
@@ -246,11 +240,9 @@ fn invalid_arguments_are_error_results_not_failures() {
         &config(&[]),
         &job,
         &root(),
-        &p,
-        &t,
+        &run::Services::new(&p, &t),
         &out,
         "test",
-        None,
     ))
     .unwrap();
     assert_eq!(o.exit_code, 0, "{:?}", o.error);
@@ -286,11 +278,9 @@ fn a_tool_crash_is_an_operational_error() {
         &config(&[]),
         &job,
         &root(),
-        &p,
-        &t,
+        &run::Services::new(&p, &t),
         &out,
         "test",
-        None,
     ))
     .unwrap();
     assert_eq!(o.exit_code, 3);

@@ -7,6 +7,7 @@ use clap::{Parser, Subcommand};
 use dejaview_core::config::Config;
 use dejaview_core::job::Job;
 use dejaview_core::provider::Provider;
+use dejaview_core::run::{Cancel, Services};
 use dejaview_core::tool::{Tool, ToolRegistry};
 
 const VERSION: &str = concat!(
@@ -223,15 +224,11 @@ fn check(args: &CheckArgs) -> i32 {
             return EXIT_USAGE;
         }
     };
+    let cancel = std::sync::Arc::new(Cancel::new());
+    runtime.spawn(cancel_on_signal(std::sync::Arc::clone(&cancel)));
+    let services = Services::new(provider.as_ref(), &tools).with_cancel(&cancel);
     let outcome = runtime.block_on(dejaview_core::run::check(
-        &config,
-        &job,
-        job_base,
-        provider.as_ref(),
-        &tools,
-        &out_dir,
-        VERSION,
-        None,
+        &config, &job, job_base, &services, &out_dir, VERSION,
     ));
     match outcome {
         Ok(o) => {
@@ -253,6 +250,28 @@ fn check(args: &CheckArgs) -> i32 {
             dejaview_core::run::EXIT_ERROR
         }
     }
+}
+
+/// SIGINT or SIGTERM cancels the run; it appends `cancelled` and exits 3.
+async fn cancel_on_signal(cancel: std::sync::Arc<Cancel>) {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+        let Ok(mut term) = signal(SignalKind::terminate()) else {
+            let _ = tokio::signal::ctrl_c().await;
+            cancel.cancel();
+            return;
+        };
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            _ = term.recv() => {}
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = tokio::signal::ctrl_c().await;
+    }
+    cancel.cancel();
 }
 
 /// Error text never carries an expanded secret.

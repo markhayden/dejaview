@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::Result;
 use crate::aggregate::{Confidence, Disposition, Row, Verdict};
+use crate::artifacts::ArtifactRef;
 use crate::checklist::Checklist;
 use crate::config::PolicyConfig;
 use crate::decision::Decision;
@@ -65,6 +66,9 @@ pub struct CostSummary {
 pub struct RunReport {
     pub run: u32,
     pub images: Vec<CanonicalImage>,
+    /// Every image the model saw, by frame id: the job images as sent and every image a tool
+    /// returned.
+    pub images_sent: std::collections::BTreeMap<String, ArtifactRef>,
     pub instances: Vec<InstanceEntry>,
     pub checklist: Checklist,
     pub turns: Vec<TurnEntry>,
@@ -94,6 +98,9 @@ pub struct TurnEntry {
     pub cost_usd: f64,
     /// Whether the response entered provider history (false for an excluded turn).
     pub entered_history: bool,
+    /// The model-visible request and response bodies, redacted and bounded.
+    pub request: ArtifactRef,
+    pub response: ArtifactRef,
 }
 
 /// One repair (SPEC "Repair protocol").
@@ -120,6 +127,8 @@ pub struct ToolCallEntry {
     pub duration_ms: u64,
     pub added_items: Vec<String>,
     pub dropped: Vec<String>,
+    /// The structured result in full; `None` when the call was not executed.
+    pub envelope: Option<ArtifactRef>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

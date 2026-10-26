@@ -77,11 +77,9 @@ fn run_case(
         &config(overrides),
         &job,
         &root(),
-        &p,
-        &t,
+        &run::Services::new(&p, &t),
         &out,
         "test",
-        None,
     ))
     .unwrap();
     (o, p)

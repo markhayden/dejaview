@@ -1,8 +1,8 @@
 //! The run state machine (SPEC "Run state machine"): resolve, prepare, reserve, tool turns, the
 //! final turn, aggregate, record. A decision is one or two independent runs combined (`decision`).
 //! Task 1.7a: tool turns with batch validation, the call budget, result ingestion. Task 1.7b: the
-//! final turn's refuse mechanism and every terminal error class. Task 1.8: repairs and retries.
-//! Tasks 1.9 to 1.11: ledger, journal artifacts, cache.
+//! final turn's refuse mechanism and every terminal error class. Task 1.8: both repair forms and
+//! transport retries. Tasks 1.9 to 1.11: ledger, journal artifacts, cache.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -23,8 +23,10 @@ use crate::provider::{
 };
 use crate::render;
 use crate::report::{
-    ErrorEntry, InstanceEntry, ItemRow, REPORT_VERSION, Report, RunReport, ToolCallEntry, TurnEntry,
+    ErrorEntry, InstanceEntry, ItemRow, REPORT_VERSION, RepairEntry, Report, RunReport,
+    ToolCallEntry, TurnEntry,
 };
+use crate::retry;
 use crate::submission::{self, ValidationContext};
 use crate::tool::{
     self, ArgCheck, DejaviewContext, FrameHandle, ImageHandle, Status, ToolRegistry,
@@ -173,6 +175,7 @@ async fn run_once(
         checklist: state.checklist.clone(),
         turns: state.turns.clone(),
         tool_calls: state.tool_calls.clone(),
+        repairs: state.repairs.clone(),
         items: state.items.clone(),
         verdict,
         error: error.map(|e| ErrorEntry {
@@ -214,6 +217,7 @@ struct RunState {
     turns: Vec<TurnEntry>,
     tool_calls: Vec<ToolCallEntry>,
     completed_calls: Vec<String>,
+    repairs: Vec<RepairEntry>,
     items: Vec<ItemRow>,
     next_call: u32,
 }
@@ -231,6 +235,7 @@ impl RunState {
             turns: Vec::new(),
             tool_calls: Vec::new(),
             completed_calls: Vec::new(),
+            repairs: Vec::new(),
             items: Vec::new(),
             next_call: 1,
         }
@@ -374,41 +379,70 @@ async fn drive(
     }];
 
     let mut calls_used: u32 = 0;
-    let mut turn: u32 = 0;
-    while turn < config.budget.tool_turns {
-        turn += 1;
+    let mut turns_used: u32 = 0;
+    let mut allowance = config.provider.max_output_tokens;
+    while turns_used < config.budget.tool_turns {
         let response = send_turn(
             config,
             provider,
             prepared,
             &history,
             &definitions,
+            allowance,
             journal,
             state,
-            turn,
         )
         .await?;
-        history.push(assistant_message(&response.text, &response.tool_calls));
+        allowance = config.provider.max_output_tokens;
 
         match classify(&response.stop_reason, &response.tool_calls) {
-            Class::Submission(call) => return finish(prepared, state, journal, call),
-            Class::MixedCalls(_) => {
-                return Err(Error::ModelOutput(
-                    "submit_verdict must be the only call in its batch (repairs arrive in task 1.8)".into(),
+            Class::Submission(call) => {
+                history.push(assistant_message(&response.text, &response.tool_calls));
+                match finish(prepared, state, journal, call) {
+                    Ok(verdict) => return Ok(verdict),
+                    Err(Error::Submission(message)) => {
+                        if !take_repair(config, state, journal, "rejected", "invalid_submission")? {
+                            return Err(Error::Submission(message));
+                        }
+                        history.push(rejection(
+                            std::slice::from_ref(call),
+                            &format!("Submission rejected: {message}"),
+                            None,
+                        ));
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
+            Class::MixedCalls(calls) => {
+                history.push(assistant_message(&response.text, &response.tool_calls));
+                if !take_repair(config, state, journal, "rejected", "mixed_batch")? {
+                    return Err(Error::ModelOutput(
+                        "submit_verdict must be the only call in its batch (mixed batch), again after the repair".into(),
+                    ));
+                }
+                history.push(rejection(
+                    calls,
+                    &format!("Not executed: {SUBMIT} must be the only call in its batch."),
+                    None,
                 ));
             }
-            Class::NoCall => {
-                return Err(Error::ModelOutput(format!(
-                    "the model ended turn {turn} ({:?}) without calling a tool or submitting (repairs arrive in task 1.8)",
-                    response.stop_reason
-                )));
-            }
-            Class::Truncated => {
-                return Err(Error::ModelOutput(
-                    "the response was truncated (max_tokens); repairs arrive in task 1.8".into(),
-                ));
+            Class::Excluded(reason) => {
+                exclude(journal, state, &response, reason)?;
+                if !take_repair(config, state, journal, "reissue", reason.name())? {
+                    return Err(Error::ModelOutput(format!(
+                        "{} (stop reason {:?}), again after the repair",
+                        reason.describe(),
+                        response.stop_reason
+                    )));
+                }
+                match reason {
+                    Excluded::Truncated => allowance = config.budget.repair_output_tokens,
+                    Excluded::Refusal | Excluded::NoCall => history.push(discarded_notice(None)),
+                }
             }
             Class::Batch(calls) => {
+                history.push(assistant_message(&response.text, &response.tool_calls));
+                turns_used += 1;
                 let remaining = config.budget.tool_calls.saturating_sub(calls_used);
                 if calls.len() as u32 > remaining {
                     // Execute none; answer every call; go to the final turn.
@@ -457,60 +491,83 @@ async fn drive(
 
     // Final turn, `refuse` mechanism: the same frozen tool definitions, an appended instruction,
     // and only submit_verdict is executed. A stray call is answered with a provider-native error
-    // result; the single repair (task 1.8) may then ask once more, otherwise the run ends
-    // `error: no_submission`.
+    // result and consumes the repair; a repair after the final turn carries the same instruction.
+    // Then `error: no_submission`.
+    let instruction = final_turn_instruction(state);
     history.push(Message {
         role: MessageRole::User,
         content: vec![ContentBlock::Text {
-            text: final_turn_instruction(state),
+            text: instruction.clone(),
         }],
     });
-    let response = send_turn(
-        config,
-        provider,
-        prepared,
-        &history,
-        &definitions,
-        journal,
-        state,
-        turn + 1,
-    )
-    .await?;
-    history.push(assistant_message(&response.text, &response.tool_calls));
-    match classify(&response.stop_reason, &response.tool_calls) {
-        Class::Submission(call) => finish(prepared, state, journal, call),
-        Class::Batch(calls) | Class::MixedCalls(calls) => {
-            let results: Vec<ContentBlock> = calls
-                .iter()
-                .map(|c| ContentBlock::ToolResult {
-                    tool_use_id: c.id.clone(),
-                    content: format!("Not available: only {SUBMIT} is executed on the final turn. Submit your verdict now."),
-                    is_error: true,
-                    images: vec![],
-                })
-                .collect();
-            for c in calls {
-                journal.append(
-                    "tool_called",
-                    serde_json::json!({ "tool": c.name, "provider_call_id": c.id, "executed": false, "reason": "final_turn" }),
-                )?;
+    loop {
+        let response = send_turn(
+            config,
+            provider,
+            prepared,
+            &history,
+            &definitions,
+            allowance,
+            journal,
+            state,
+        )
+        .await?;
+        allowance = config.provider.max_output_tokens;
+        match classify(&response.stop_reason, &response.tool_calls) {
+            Class::Submission(call) => {
+                history.push(assistant_message(&response.text, &response.tool_calls));
+                match finish(prepared, state, journal, call) {
+                    Ok(verdict) => return Ok(verdict),
+                    Err(Error::Submission(message)) => {
+                        if !take_repair(config, state, journal, "rejected", "invalid_submission")? {
+                            return Err(Error::Submission(message));
+                        }
+                        history.push(rejection(
+                            std::slice::from_ref(call),
+                            &format!("Submission rejected: {message}"),
+                            Some(&instruction),
+                        ));
+                    }
+                    Err(e) => return Err(e),
+                }
             }
-            history.push(Message {
-                role: MessageRole::User,
-                content: results,
-            });
-            Err(Error::NoSubmission(format!(
-                "the final turn called {:?} instead of submitting; the repair arrives in task 1.8",
-                calls.iter().map(|c| c.name.as_str()).collect::<Vec<_>>()
-            )))
+            Class::Batch(calls) | Class::MixedCalls(calls) => {
+                history.push(assistant_message(&response.text, &response.tool_calls));
+                for c in calls {
+                    journal.append(
+                        "tool_called",
+                        serde_json::json!({ "tool": c.name, "provider_call_id": c.id, "executed": false, "reason": "final_turn" }),
+                    )?;
+                }
+                if !take_repair(config, state, journal, "rejected", "stray_call")? {
+                    return Err(Error::NoSubmission(format!(
+                        "the final turn called {:?} instead of submitting, again after the repair",
+                        calls.iter().map(|c| c.name.as_str()).collect::<Vec<_>>()
+                    )));
+                }
+                history.push(rejection(
+                    calls,
+                    &format!("Not available: only {SUBMIT} is executed on the final turn."),
+                    Some(&instruction),
+                ));
+            }
+            Class::Excluded(reason) => {
+                exclude(journal, state, &response, reason)?;
+                if !take_repair(config, state, journal, "reissue", reason.name())? {
+                    return Err(Error::NoSubmission(format!(
+                        "the final turn ended with {} (stop reason {:?}), again after the repair",
+                        reason.describe(),
+                        response.stop_reason
+                    )));
+                }
+                match reason {
+                    Excluded::Truncated => allowance = config.budget.repair_output_tokens,
+                    Excluded::Refusal | Excluded::NoCall => {
+                        history.push(discarded_notice(Some(&instruction)));
+                    }
+                }
+            }
         }
-        Class::NoCall => Err(Error::NoSubmission(format!(
-            "the final turn ended ({:?}) without a submission",
-            response.stop_reason
-        ))),
-        Class::Truncated => Err(Error::NoSubmission(
-            "the final turn's response was truncated".into(),
-        )),
     }
 }
 
@@ -523,23 +580,132 @@ fn final_turn_instruction(state: &RunState) -> String {
     )
 }
 
+/// Spends the run's repair if one is left, journaling it.
+fn take_repair(
+    config: &Config,
+    state: &mut RunState,
+    journal: &mut Journal,
+    form: &str,
+    reason: &str,
+) -> Result<bool> {
+    if state.repairs.len() as u32 >= config.budget.repairs {
+        return Ok(false);
+    }
+    let entry = RepairEntry {
+        form: form.into(),
+        reason: reason.into(),
+        after_turn: state.turns.len() as u32,
+    };
+    journal.append(
+        "repair",
+        serde_json::json!({ "form": entry.form, "reason": entry.reason, "after_turn": entry.after_turn, "repairs_used": state.repairs.len() + 1 }),
+    )?;
+    state.repairs.push(entry);
+    Ok(true)
+}
+
+/// Journals a non-replayable response and marks its turn as never having entered provider history.
+fn exclude(
+    journal: &mut Journal,
+    state: &mut RunState,
+    response: &TurnResponse,
+    reason: Excluded,
+) -> Result<()> {
+    let turn = state.turns.len() as u32;
+    journal.append(
+        "turn_excluded",
+        serde_json::json!({ "turn": turn, "stop_reason": response.stop_reason, "reason": reason.name(), "text_blocks": response.text.len(), "tool_calls": response.tool_calls.len() }),
+    )?;
+    if let Some(entry) = state.turns.last_mut() {
+        entry.entered_history = false;
+    }
+    Ok(())
+}
+
+/// The repair message for a replayable response that was rejected: one error result per call, in
+/// order, then the repair instruction (and the final-turn instruction again when inside it).
+fn rejection(calls: &[ToolCall], reason: &str, final_instruction: Option<&str>) -> Message {
+    let mut content: Vec<ContentBlock> = calls
+        .iter()
+        .map(|c| ContentBlock::ToolResult {
+            tool_use_id: c.id.clone(),
+            content: reason.to_string(),
+            is_error: true,
+            images: vec![],
+        })
+        .collect();
+    content.push(ContentBlock::Text {
+        text: format!(
+            "Repair: call {SUBMIT} once, alone, with exactly one disposition per checklist item. This is the only repair.{}",
+            final_instruction.map(|i| format!("\n\n{i}")).unwrap_or_default()
+        ),
+    });
+    Message {
+        role: MessageRole::User,
+        content,
+    }
+}
+
+/// The reissue message after a refusal or a call-less text: the previous output was discarded.
+fn discarded_notice(final_instruction: Option<&str>) -> Message {
+    Message {
+        role: MessageRole::User,
+        content: vec![ContentBlock::Text {
+            text: format!(
+                "Your previous output was discarded: it contained no tool call. Inspect the images and call a tool, or call {SUBMIT} with exactly one disposition per checklist item.{}",
+                final_instruction
+                    .map(|i| format!("\n\n{i}"))
+                    .unwrap_or_default()
+            ),
+        }],
+    }
+}
+
 #[derive(Debug)]
 enum Class<'a> {
     Submission(&'a ToolCall),
     Batch(&'a [ToolCall]),
     /// A batch that mixes submit_verdict with other calls.
     MixedCalls(&'a [ToolCall]),
-    NoCall,
+    /// A non-replayable response: never enters provider history.
+    Excluded(Excluded),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Excluded {
     Truncated,
+    Refusal,
+    NoCall,
+}
+
+impl Excluded {
+    fn name(self) -> &'static str {
+        match self {
+            Excluded::Truncated => "truncated",
+            Excluded::Refusal => "refusal",
+            Excluded::NoCall => "no_call",
+        }
+    }
+
+    fn describe(self) -> &'static str {
+        match self {
+            Excluded::Truncated => "the response was truncated",
+            Excluded::Refusal => "the model refused",
+            Excluded::NoCall => "the model answered without calling a tool",
+        }
+    }
 }
 
 fn classify<'a>(stop: &StopReason, calls: &'a [ToolCall]) -> Class<'a> {
-    if *stop == StopReason::MaxTokens {
-        return Class::Truncated;
+    match stop {
+        // Never dispatched, even if a call inside parses.
+        StopReason::MaxTokens => return Class::Excluded(Excluded::Truncated),
+        StopReason::Refusal => return Class::Excluded(Excluded::Refusal),
+        _ => {}
     }
     let submits = calls.iter().filter(|c| c.name == SUBMIT).count();
     match (calls.len(), submits) {
-        (0, _) => Class::NoCall,
+        (0, _) => Class::Excluded(Excluded::NoCall),
         (1, 1) => Class::Submission(&calls[0]),
         (_, 0) => Class::Batch(calls),
         _ => Class::MixedCalls(calls),
@@ -564,6 +730,7 @@ fn assistant_message(text: &[String], calls: &[ToolCall]) -> Message {
     }
 }
 
+/// Sends one request with transport retries, journaling the attempt and the response.
 #[allow(clippy::too_many_arguments)]
 async fn send_turn(
     config: &Config,
@@ -571,21 +738,38 @@ async fn send_turn(
     prepared: &Prepared,
     history: &[Message],
     definitions: &[ToolDefinition],
+    max_output_tokens: u32,
     journal: &mut Journal,
     state: &mut RunState,
-    turn: u32,
 ) -> Result<TurnResponse> {
+    let turn = state.turns.len() as u32 + 1;
     let request = TurnRequest {
         system: &prepared.system_prompt,
         history,
         tools: definitions,
-        max_output_tokens: config.provider.max_output_tokens,
+        max_output_tokens,
     };
     journal.append(
         "turn_sent",
-        serde_json::json!({ "turn": turn, "tools": definitions.iter().map(|t| t.name.clone()).collect::<Vec<_>>(), "history_messages": history.len() }),
+        serde_json::json!({ "turn": turn, "tools": definitions.iter().map(|t| t.name.clone()).collect::<Vec<_>>(), "history_messages": history.len(), "max_output_tokens": max_output_tokens }),
     )?;
-    let response = provider.send(request).await?;
+    let mut on_retry = |a: &retry::Attempt| -> Result<()> {
+        journal.append(
+            "retry",
+            serde_json::json!({ "turn": turn, "attempt": a.attempt, "status": a.status, "delay_ms": a.delay.as_millis() as u64, "error": a.message }),
+        )
+    };
+    let sent = retry::send_with_retries(
+        provider,
+        request,
+        config.budget.retries,
+        &retry::Backoff::default(),
+        &retry::TokioSleeper,
+        &mut rand::random::<f64>,
+        &mut on_retry,
+    )
+    .await?;
+    let response = sent.response;
     journal.append(
         "turn_received",
         serde_json::json!({
@@ -593,6 +777,7 @@ async fn send_turn(
             "stop_reason": response.stop_reason,
             "tool_calls": response.tool_calls.iter().map(|c| c.name.clone()).collect::<Vec<_>>(),
             "usage": response.usage,
+            "attempts": sent.attempts,
         }),
     )?;
     state.turns.push(TurnEntry {
@@ -601,6 +786,9 @@ async fn send_turn(
         tool_calls: response.tool_calls.iter().map(|c| c.name.clone()).collect(),
         usage: response.usage,
         provider_request_id: response.provider_request_id.clone(),
+        max_output_tokens,
+        attempts: sent.attempts,
+        entered_history: true,
     });
     Ok(response)
 }

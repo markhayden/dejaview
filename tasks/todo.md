@@ -26,7 +26,7 @@ tag.
 - [x] 1.6b Aggregation and decision tables
 - [x] 1.7a State machine: tool turns
 - [x] 1.7b State machine: final turn and terminal states → tag `m1.2`
-- [ ] 1.8 Repair protocol and retries
+- [x] 1.8 Repair protocol and retries
 - [ ] 1.9 Cost ledger
 - [ ] 1.10a Journal and artifact durability
 - [ ] 1.10b Report, schema, rebuild, prune

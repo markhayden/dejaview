@@ -54,6 +54,8 @@ pub struct RunReport {
     pub checklist: Checklist,
     pub turns: Vec<TurnEntry>,
     pub tool_calls: Vec<ToolCallEntry>,
+    /// Repairs taken, in order (at most `budget.repairs`).
+    pub repairs: Vec<RepairEntry>,
     pub items: Vec<ItemRow>,
     pub verdict: Option<Verdict>,
     pub error: Option<ErrorEntry>,
@@ -67,6 +69,24 @@ pub struct TurnEntry {
     pub tool_calls: Vec<String>,
     pub usage: crate::provider::Usage,
     pub provider_request_id: Option<String>,
+    /// The output allowance of the request (raised to `repair_output_tokens` on a reissue).
+    pub max_output_tokens: u32,
+    /// Billable attempts the request took (1 plus transport retries).
+    pub attempts: u32,
+    /// Whether the response entered provider history (false for an excluded turn).
+    pub entered_history: bool,
+}
+
+/// One repair (SPEC "Repair protocol").
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RepairEntry {
+    /// `rejected` (the response stayed in history, error results answered it) or `reissue` (the
+    /// response was excluded and the request sent again).
+    pub form: String,
+    /// `invalid_submission`, `mixed_batch`, `stray_call`, `truncated`, `refusal` or `no_call`.
+    pub reason: String,
+    /// The turn number whose response was repaired.
+    pub after_turn: u32,
 }
 
 /// One tool call as the harness handled it.

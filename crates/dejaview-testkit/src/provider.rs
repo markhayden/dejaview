@@ -1,20 +1,48 @@
 //! A scripted fake provider: answers each turn with the next canned response from a JSON file,
-//! so the run loop can be driven through every state offline.
+//! so the run loop can be driven through every state offline. An entry may instead be a
+//! transport error (`{"error": {"status": 429, "retry_after_s": 2}}`) to drive the retries.
 
 use std::collections::VecDeque;
 use std::path::Path;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use dejaview_core::provider::{
     Message, Provider, SendFuture, ToolDefinition, TurnRequest, TurnResponse,
 };
+use dejaview_core::retry::TransportError;
+use serde::Deserialize;
 
 use crate::{Error, Result};
 
-/// Replays a list of `TurnResponse`s in order. Exhausting the script is a provider error, which
+/// One scripted turn: a response, or a transport failure.
+#[derive(Debug, Clone)]
+pub enum ScriptTurn {
+    Response(TurnResponse),
+    Error(TransportError),
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum Entry {
+    Error { error: ScriptError },
+    Response(TurnResponse),
+}
+
+#[derive(Deserialize)]
+struct ScriptError {
+    #[serde(default)]
+    status: Option<u16>,
+    #[serde(default)]
+    retry_after_s: Option<u64>,
+    #[serde(default)]
+    message: Option<String>,
+}
+
+/// Replays a list of scripted turns in order. Exhausting the script is a provider error, which
 /// is what a test wants when the harness asks for more turns than expected.
 pub struct ScriptedProvider {
-    turns: Mutex<VecDeque<TurnResponse>>,
+    turns: Mutex<VecDeque<ScriptTurn>>,
     /// Every request's history length, for tests that assert the loop's shape.
     pub seen_history_lengths: Mutex<Vec<usize>>,
     /// Every request as sent, for tests that assert the provider history is append-only.
@@ -32,6 +60,10 @@ pub struct RecordedRequest {
 
 impl ScriptedProvider {
     pub fn new(turns: Vec<TurnResponse>) -> ScriptedProvider {
+        ScriptedProvider::from_turns(turns.into_iter().map(ScriptTurn::Response).collect())
+    }
+
+    pub fn from_turns(turns: Vec<ScriptTurn>) -> ScriptedProvider {
         ScriptedProvider {
             turns: Mutex::new(turns.into()),
             seen_history_lengths: Mutex::new(Vec::new()),
@@ -39,13 +71,30 @@ impl ScriptedProvider {
         }
     }
 
-    /// Loads a JSON array of turn responses.
+    /// Parses a JSON array of turn responses and transport errors.
+    pub fn from_json(text: &str) -> Result<ScriptedProvider> {
+        let entries: Vec<Entry> =
+            serde_json::from_str(text).map_err(|e| Error::Script(e.to_string()))?;
+        let turns = entries
+            .into_iter()
+            .map(|e| match e {
+                Entry::Response(r) => ScriptTurn::Response(r),
+                Entry::Error { error } => ScriptTurn::Error(TransportError {
+                    status: error.status,
+                    retry_after: error.retry_after_s.map(Duration::from_secs),
+                    message: error.message.unwrap_or_else(|| "scripted failure".into()),
+                }),
+            })
+            .collect();
+        Ok(ScriptedProvider::from_turns(turns))
+    }
+
+    /// Loads a script file.
     pub fn from_path(path: &Path) -> Result<ScriptedProvider> {
         let text = std::fs::read_to_string(path)
             .map_err(|e| Error::Script(format!("cannot read {}: {e}", path.display())))?;
-        let turns: Vec<TurnResponse> = serde_json::from_str(&text)
-            .map_err(|e| Error::Script(format!("{}: {e}", path.display())))?;
-        Ok(ScriptedProvider::new(turns))
+        ScriptedProvider::from_json(&text)
+            .map_err(|e| Error::Script(format!("{}: {e}", path.display())))
     }
 }
 
@@ -75,9 +124,13 @@ impl Provider for ScriptedProvider {
                 });
             }
             let next = self.turns.lock().ok().and_then(|mut t| t.pop_front());
-            next.ok_or_else(|| {
-                dejaview_core::Error::Provider("scripted provider: script exhausted".into())
-            })
+            match next {
+                Some(ScriptTurn::Response(r)) => Ok(r),
+                Some(ScriptTurn::Error(t)) => Err(dejaview_core::Error::Transport(t)),
+                None => Err(dejaview_core::Error::Provider(
+                    "scripted provider: script exhausted".into(),
+                )),
+            }
         })
     }
 }

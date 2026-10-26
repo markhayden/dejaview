@@ -1,5 +1,6 @@
 //! Task 1.7b CLI scenario: a script that keeps calling tools exhausts the turns, gets the final
-//! instruction, calls once more, receives an error result, and the run ends `error: no_submission`;
+//! instruction, calls once more, receives an error result and the repair, calls again, and the run
+//! ends `error: no_submission`;
 //! a tool crash followed by a valid submission still ends `error: tool`.
 #![cfg(feature = "testkit")]
 #![allow(clippy::unwrap_used)]
@@ -65,7 +66,11 @@ fn stray_final_call_ends_no_submission() {
     );
     assert_eq!(code, Some(3));
     assert_eq!(r["runs"][0]["error"]["class"], "no_submission");
-    assert_eq!(r["runs"][0]["turns"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        r["runs"][0]["turns"].as_array().unwrap().len(),
+        3,
+        "final turn, repair, second stray"
+    );
 }
 
 #[test]

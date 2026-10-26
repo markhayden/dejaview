@@ -18,7 +18,38 @@
             }
           ],
           "findings": [],
-          "opinion": { "verdict": "pass", "reason": "recorded only" }
+          "opinion": {
+            "verdict": "pass",
+            "reason": "recorded only"
+          }
+        }
+      }
+    ],
+    "stop_reason": "tool_use"
+  },
+  {
+    "tool_calls": [
+      {
+        "id": "call_1",
+        "name": "submit_verdict",
+        "arguments": {
+          "schema_version": 1,
+          "items": [
+            {
+              "id": "chk:ob:SF1@candidate",
+              "disposition": "held",
+              "confidence": "confident",
+              "reason": "Nothing protected changed.",
+              "allowed_by": null,
+              "location": null,
+              "evidence": []
+            }
+          ],
+          "findings": [],
+          "opinion": {
+            "verdict": "pass",
+            "reason": "recorded only"
+          }
         }
       }
     ],

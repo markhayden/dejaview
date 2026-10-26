@@ -22,5 +22,17 @@
       }
     ],
     "stop_reason": "tool_use"
+  },
+  {
+    "tool_calls": [
+      {
+        "id": "c3",
+        "name": "fake_regions",
+        "arguments": {
+          "image": "candidate"
+        }
+      }
+    ],
+    "stop_reason": "tool_use"
   }
 ]

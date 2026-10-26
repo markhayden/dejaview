@@ -14,6 +14,7 @@ pub mod obligations;
 pub mod provider;
 pub mod render;
 pub mod report;
+pub mod retry;
 pub mod run;
 pub mod submission;
 pub mod tool;
@@ -31,9 +32,13 @@ pub enum Error {
     /// An image could not be read or decoded.
     #[error("image: {0}")]
     Image(String),
-    /// The provider failed or answered in a way the harness cannot continue from.
+    /// The provider answered in a way the harness cannot continue from. Never retried.
     #[error("provider: {0}")]
     Provider(String),
+    /// A transport failure from an adapter: status and `retry-after` let the state machine decide
+    /// whether to retry (see `retry`).
+    #[error("provider: {0}")]
+    Transport(retry::TransportError),
     /// The model's submission did not validate.
     #[error("submission: {0}")]
     Submission(String),
@@ -63,7 +68,7 @@ impl Error {
     pub fn class(&self) -> &'static str {
         match self {
             Error::Config(_) | Error::Job(_) | Error::Image(_) | Error::Toml(_) => "resolve",
-            Error::Provider(_) => "provider",
+            Error::Provider(_) | Error::Transport(_) => "provider",
             Error::Tool(_) => "tool",
             Error::Budget(_) => "budget",
             Error::Submission(_) => "submission_invalid",

@@ -607,8 +607,8 @@ only to the exit code; the report carries the raw verdict and the policy outcome
 
 Every run writes an append-only **journal** (`journal.jsonl`) from the first event, so a failure
 at any step leaves a durable record: `resolved`, `prepared`, `reserved`, `turn_sent`,
-`turn_received`, `turn_excluded`, `tool_called`, `tool_returned`, `evidence_dropped`, `repair`,
-`submission`, `verdict`, `error`, `cancelled`. Every artifact a journal event references is
+`turn_received`, `retry`, `turn_excluded`, `tool_called`, `tool_returned`, `evidence_dropped`,
+`repair`, `submission`, `verdict`, `error`, `cancelled`. Every artifact a journal event references is
 written and fsynced before the event is appended. Artifacts in `artifacts/` by content hash:
 
 - model-visible request and response bodies per turn, redacted (auth headers never stored; image

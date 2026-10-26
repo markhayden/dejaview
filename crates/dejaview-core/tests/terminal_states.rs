@@ -1,5 +1,6 @@
-//! Task 1.7b: the final turn's refuse mechanism and every error class this task implements, each
-//! reached by a scripted path, with the journal order asserted.
+//! Task 1.7b: the final turn's refuse mechanism and every error class, each reached by a scripted
+//! path, with the journal order asserted. Since task 1.8 the model-output failures fail twice: the
+//! first failure is repaired.
 #![allow(clippy::unwrap_used)]
 
 use std::path::PathBuf;
@@ -120,6 +121,10 @@ fn a_stray_call_on_the_final_turn_gets_an_error_result_and_the_run_ends_no_submi
             "turn_sent",
             "turn_received",
             "tool_called",
+            "repair",
+            "turn_sent",
+            "turn_received",
+            "tool_called",
             "error"
         ]
     );
@@ -127,14 +132,15 @@ fn a_stray_call_on_the_final_turn_gets_an_error_result_and_the_run_ends_no_submi
     assert_eq!(stray["data"]["executed"], false);
     assert_eq!(stray["data"]["reason"], "final_turn");
     let recorded = p.recorded.lock().unwrap();
-    assert_eq!(recorded.len(), 2);
+    assert_eq!(recorded.len(), 3);
     let final_instruction = recorded[1].history.last().unwrap();
-    assert!(
-        matches!(&final_instruction.content[0], ContentBlock::Text { text } if text.contains("Only submit_verdict will be executed now"))
-    );
+    assert!(matches!(
+        &final_instruction.content[0],
+        ContentBlock::Text { text } if text.contains("Only submit_verdict will be executed now")
+    ));
     assert_eq!(
-        recorded[0].tools, recorded[1].tools,
-        "the final turn keeps the frozen tool definitions"
+        recorded[0].tools, recorded[2].tools,
+        "the final turn and its repair keep the frozen tool definitions"
     );
 }
 
@@ -155,12 +161,12 @@ fn a_tool_crash_is_terminal_even_when_the_script_would_submit_afterwards() {
 
 #[test]
 fn an_exhausted_provider_is_a_provider_error() {
-    // Two scripted turns, four allowed: the third request finds the script empty.
+    // Two truncated turns, two repairs allowed: the third request finds the script empty.
     let (o, _) = run_case(
         "provider",
-        "stray-final-call.json",
+        "truncated.json",
         "regions-3-then-1.json",
-        &["budget.tool_turns=4"],
+        &["budget.repairs=2"],
         "pair.toml",
     );
     assert_eq!(o.exit_code, 3);
@@ -180,7 +186,7 @@ fn a_bad_image_is_a_resolve_error() {
 }
 
 #[test]
-fn model_output_failures_are_terminal_until_repairs_exist() {
+fn a_second_model_output_failure_after_the_repair_is_terminal() {
     for (tag, script) in [
         ("text", "text-no-call.json"),
         ("trunc", "truncated.json"),

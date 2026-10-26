@@ -40,6 +40,10 @@ pub enum Error {
     /// The run ended without a submission.
     #[error("no_submission: {0}")]
     NoSubmission(String),
+    /// The model's output could not be used: a refusal, text without a call, a truncation, or a
+    /// mixed batch, after any repair.
+    #[error("model_output: {0}")]
+    ModelOutput(String),
     /// A tool crashed, timed out, returned a malformed envelope or breached its bounds.
     #[error("tool: {0}")]
     Tool(String),
@@ -64,6 +68,7 @@ impl Error {
             Error::Budget(_) => "budget",
             Error::Submission(_) => "submission_invalid",
             Error::NoSubmission(_) => "no_submission",
+            Error::ModelOutput(_) => "model_output",
             Error::Io(_) | Error::Json(_) => "io",
         }
     }

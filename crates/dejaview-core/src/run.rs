@@ -1,9 +1,12 @@
-//! The run: resolve the job, show it to the model, take the submission, aggregate, record. A
-//! decision is one or two independent runs combined (`decision`). Tool turns, the final turn,
-//! repairs, the ledger and the cache arrive in tasks 1.7a to 1.11.
+//! The run state machine (SPEC "Run state machine"): resolve, prepare, reserve, tool turns, the
+//! final turn, aggregate, record. A decision is one or two independent runs combined (`decision`).
+//! Task 1.7a: tool turns with batch validation, the call budget, result ingestion. Task 1.7b: the
+//! final turn's refuse mechanism and every terminal error class. Task 1.8: repairs and retries.
+//! Tasks 1.9 to 1.11: ledger, journal artifacts, cache.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use crate::aggregate::{self, Verdict};
 use crate::checklist::Checklist;
@@ -14,10 +17,18 @@ use crate::image::{self, CanonicalImage};
 use crate::job::Job;
 use crate::journal::Journal;
 use crate::obligations::{self, Instance, MergeInput, Resolved, RulesFile};
-use crate::provider::{ContentBlock, Message, MessageRole, Provider, StopReason, TurnRequest};
+use crate::provider::{
+    ContentBlock, Message, MessageRole, Provider, StopReason, ToolCall, ToolDefinition,
+    TurnRequest, TurnResponse,
+};
 use crate::render;
-use crate::report::{ErrorEntry, InstanceEntry, ItemRow, REPORT_VERSION, Report, RunReport};
+use crate::report::{
+    ErrorEntry, InstanceEntry, ItemRow, REPORT_VERSION, Report, RunReport, ToolCallEntry, TurnEntry,
+};
 use crate::submission::{self, ValidationContext};
+use crate::tool::{
+    self, ArgCheck, DejaviewContext, FrameHandle, ImageHandle, Status, ToolRegistry,
+};
 use crate::{Error, Result};
 
 /// What `check` produced: a decision and where its directory is.
@@ -33,6 +44,9 @@ pub struct Outcome {
 /// Exit code for a decision that ended in an error under the default policy.
 pub const EXIT_ERROR: i32 = 3;
 
+/// The reserved tool the model submits with.
+pub const SUBMIT: &str = "submit_verdict";
+
 /// Runs one decision (`budget.decision_runs` independent runs) and writes its report under
 /// `out_dir/<decision dir>/`, with each run's journal under `run-<n>/`.
 pub async fn check(
@@ -40,11 +54,12 @@ pub async fn check(
     job: &Job,
     job_base: &Path,
     provider: &dyn Provider,
+    tools: &ToolRegistry,
     out_dir: &Path,
     harness_version: &str,
 ) -> Result<Outcome> {
     let dir = new_decision_dir(out_dir)?;
-    let prepared = resolve_rules(config, job, job_base);
+    let prepared = resolve_rules(config, job, job_base, tools);
 
     let mut runs: Vec<RunReport> = Vec::new();
     let mut summaries: Vec<RunSummary> = Vec::new();
@@ -52,8 +67,10 @@ pub async fn check(
     for n in 1..=config.budget.decision_runs {
         let run_dir = dir.join(format!("run-{n}"));
         std::fs::create_dir(&run_dir)?;
-        let (report, summary, error) =
-            run_once(config, job, job_base, provider, &prepared, &run_dir, n).await?;
+        let (report, summary, error) = run_once(
+            config, job, job_base, provider, tools, &prepared, &run_dir, n,
+        )
+        .await?;
         if first_error.is_none() {
             first_error = error;
         }
@@ -75,7 +92,12 @@ pub async fn check(
         job: job.summary(),
         config: config.redacted_json(),
         rules: rules_summary,
+        prompt_version: render::PROMPT_VERSION.to_string(),
         provider: provider.id().to_string(),
+        tools: tools
+            .manifests()
+            .map(|m| format!("{}@{}", m.name, m.version))
+            .collect(),
         decision_runs: config.budget.decision_runs,
         runs,
         decision: decision.clone(),
@@ -94,19 +116,33 @@ pub async fn check(
 
 /// One run of the state machine. Never fails for run-level reasons: those become the run's error
 /// entry; only I/O on the journal propagates.
+#[allow(clippy::too_many_arguments)]
 async fn run_once(
     config: &Config,
     job: &Job,
     job_base: &Path,
     provider: &dyn Provider,
+    tools: &ToolRegistry,
     prepared: &Result<Prepared>,
     run_dir: &Path,
     n: u32,
 ) -> Result<(RunReport, RunSummary, Option<String>)> {
     let mut journal = Journal::create(run_dir)?;
-    let mut state = RunState::default();
+    let mut state = RunState::new(run_dir, n);
     let result = match prepared {
-        Ok(p) => drive(config, job, job_base, provider, p, &mut journal, &mut state).await,
+        Ok(p) => {
+            drive(
+                config,
+                job,
+                job_base,
+                provider,
+                tools,
+                p,
+                &mut journal,
+                &mut state,
+            )
+            .await
+        }
         Err(e) => Err(Error::Config(e.to_string())),
     };
     let (verdict, error) = match result {
@@ -135,6 +171,8 @@ async fn run_once(
             })
             .collect(),
         checklist: state.checklist.clone(),
+        turns: state.turns.clone(),
+        tool_calls: state.tool_calls.clone(),
         items: state.items.clone(),
         verdict,
         error: error.map(|e| ErrorEntry {
@@ -164,20 +202,94 @@ async fn run_once(
     Ok((report, summary, error_text))
 }
 
-#[derive(Default)]
 struct RunState {
+    run_dir: PathBuf,
+    run_id: String,
     images: Vec<CanonicalImage>,
     instances: Vec<Instance>,
     checklist: Checklist,
     registry: Registry,
+    /// Lossless pixels per frame id, written under the run directory for tools.
+    frame_files: BTreeMap<String, PathBuf>,
+    turns: Vec<TurnEntry>,
+    tool_calls: Vec<ToolCallEntry>,
+    completed_calls: Vec<String>,
     items: Vec<ItemRow>,
+    next_call: u32,
 }
 
+impl RunState {
+    fn new(run_dir: &Path, n: u32) -> RunState {
+        RunState {
+            run_dir: run_dir.to_path_buf(),
+            run_id: format!("run-{n}"),
+            images: Vec::new(),
+            instances: Vec::new(),
+            checklist: Checklist::default(),
+            registry: Registry::new(),
+            frame_files: BTreeMap::new(),
+            turns: Vec::new(),
+            tool_calls: Vec::new(),
+            completed_calls: Vec::new(),
+            items: Vec::new(),
+            next_call: 1,
+        }
+    }
+
+    fn next_call_id(&mut self) -> String {
+        let id = format!("call:{}", self.next_call);
+        self.next_call += 1;
+        id
+    }
+
+    /// The pixels of a frame as a file under `frames/`: raw frames are written from the canonical
+    /// pixels on first use; derived frames were written when the tool returned them.
+    fn frame_file(&mut self, frame_id: &str) -> Result<PathBuf> {
+        if let Some(p) = self.frame_files.get(frame_id) {
+            return Ok(p.clone());
+        }
+        let image_id = frame_id
+            .strip_prefix("raw:")
+            .ok_or_else(|| Error::Tool(format!("no pixels stored for frame {frame_id:?}")))?;
+        let img = self
+            .images
+            .iter()
+            .find(|i| i.id == image_id)
+            .ok_or_else(|| Error::Tool(format!("unknown image {image_id:?}")))?;
+        let pixels = img
+            .pixels
+            .clone()
+            .ok_or_else(|| Error::Tool(format!("image {image_id:?} has no pixels")))?;
+        let dir = self.run_dir.join("frames");
+        std::fs::create_dir_all(&dir)?;
+        let path = dir.join(format!("{}.png", sanitise(frame_id)));
+        pixels
+            .save(&path)
+            .map_err(|e| Error::Tool(format!("cannot write {}: {e}", path.display())))?;
+        self.frame_files.insert(frame_id.to_string(), path.clone());
+        Ok(path)
+    }
+}
+
+fn sanitise(id: &str) -> String {
+    id.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+#[allow(clippy::too_many_arguments)]
 async fn drive(
     config: &Config,
     job: &Job,
     job_base: &Path,
     provider: &dyn Provider,
+    tools: &ToolRegistry,
     prepared: &Prepared,
     journal: &mut Journal,
     state: &mut RunState,
@@ -202,10 +314,26 @@ async fn drive(
             "images": state.images.iter().map(|i| serde_json::json!({"id": i.id, "role": i.role, "sha256": i.sha256, "canonical_sha256": i.canonical_sha256, "width": i.width, "height": i.height, "projection": i.projection, "warnings": i.warnings})).collect::<Vec<_>>(),
             "instances": state.instances.iter().map(Instance::id).collect::<Vec<_>>(),
             "checklist": state.checklist.ids().collect::<Vec<_>>(),
+            "tools": tools.manifests().map(|m| m.name.clone()).collect::<Vec<_>>(),
         }),
     )?;
+    // Prepare and reserve are stubs until tasks 2.3 and 1.9; the events exist so the journal's
+    // shape is final.
+    journal.append(
+        "prepared",
+        serde_json::json!({ "prep_version": "canonical", "images": state.images.len() }),
+    )?;
+    journal.append(
+        "reserved",
+        serde_json::json!({ "envelope_usd": null, "cap_usd": config.budget.spend_cap_usd }),
+    )?;
 
-    // First look: every image, the checklist, the instruction to submit.
+    // Tool definitions are declared once and never change for the conversation.
+    let mut definitions: Vec<ToolDefinition> =
+        tools.manifests().map(|m| m.tool_definition()).collect();
+    definitions.push(submission::submit_verdict_tool());
+
+    // First look.
     let mut content: Vec<ContentBlock> = Vec::new();
     for img in &state.images {
         content.push(ContentBlock::Text {
@@ -231,70 +359,449 @@ async fn drive(
         text: state.checklist.render(&state.instances),
     });
     content.push(ContentBlock::Text {
-        text:
-            "Inspect the images, then call submit_verdict with one disposition per checklist item."
-                .into(),
+        text: if tools.is_empty() {
+            "Inspect the images, then call submit_verdict with one disposition per checklist item.".into()
+        } else {
+            format!(
+                "Inspect the images, use tools where a closer look would change your answer (at most {} calls over {} turns), then call submit_verdict with one disposition per checklist item.",
+                config.budget.tool_calls, config.budget.tool_turns
+            )
+        },
     });
-    let history = vec![Message {
+    let mut history = vec![Message {
         role: MessageRole::User,
         content,
     }];
-    let tools = vec![submission::submit_verdict_tool()];
+
+    let mut calls_used: u32 = 0;
+    let mut turn: u32 = 0;
+    while turn < config.budget.tool_turns {
+        turn += 1;
+        let response = send_turn(
+            config,
+            provider,
+            prepared,
+            &history,
+            &definitions,
+            journal,
+            state,
+            turn,
+        )
+        .await?;
+        history.push(assistant_message(&response.text, &response.tool_calls));
+
+        match classify(&response.stop_reason, &response.tool_calls) {
+            Class::Submission(call) => return finish(prepared, state, journal, call),
+            Class::Mixed => {
+                return Err(Error::ModelOutput(
+                    "submit_verdict must be the only call in its batch (repairs arrive in task 1.8)".into(),
+                ));
+            }
+            Class::NoCall => {
+                return Err(Error::ModelOutput(format!(
+                    "the model ended turn {turn} ({:?}) without calling a tool or submitting (repairs arrive in task 1.8)",
+                    response.stop_reason
+                )));
+            }
+            Class::Truncated => {
+                return Err(Error::ModelOutput(
+                    "the response was truncated (max_tokens); repairs arrive in task 1.8".into(),
+                ));
+            }
+            Class::Batch(calls) => {
+                let remaining = config.budget.tool_calls.saturating_sub(calls_used);
+                if calls.len() as u32 > remaining {
+                    // Execute none; answer every call; go to the final turn.
+                    let results: Vec<ContentBlock> = calls
+                        .iter()
+                        .map(|c| ContentBlock::ToolResult {
+                            tool_use_id: c.id.clone(),
+                            content: format!(
+                                "Not executed: this batch of {} calls exceeds the remaining call budget of {remaining}. Submit your verdict now.",
+                                calls.len()
+                            ),
+                            is_error: true,
+                            images: vec![],
+                        })
+                        .collect();
+                    for c in calls {
+                        journal.append(
+                            "tool_called",
+                            serde_json::json!({ "tool": c.name, "provider_call_id": c.id, "executed": false, "reason": "call budget" }),
+                        )?;
+                    }
+                    history.push(Message {
+                        role: MessageRole::User,
+                        content: results,
+                    });
+                    break;
+                }
+                let mut results: Vec<ContentBlock> = Vec::new();
+                for c in calls {
+                    results.push(execute_call(config, tools, prepared, journal, state, c)?);
+                }
+                calls_used += calls.len() as u32;
+                results.push(ContentBlock::Text {
+                    text: state.checklist.render(&state.instances),
+                });
+                history.push(Message {
+                    role: MessageRole::User,
+                    content: results,
+                });
+                if calls_used >= config.budget.tool_calls {
+                    break;
+                }
+            }
+        }
+    }
+
+    // Final turn (task 1.7b completes the refuse mechanism): the same tool definitions, an
+    // appended instruction, and only submit_verdict is accepted.
+    history.push(Message {
+        role: MessageRole::User,
+        content: vec![ContentBlock::Text {
+            text: format!(
+                "Tool budget exhausted. Only {SUBMIT} will be executed now. Submit your verdict with one disposition per checklist item.\n\n{}",
+                state.checklist.render(&state.instances)
+            ),
+        }],
+    });
+    let response = send_turn(
+        config,
+        provider,
+        prepared,
+        &history,
+        &definitions,
+        journal,
+        state,
+        turn + 1,
+    )
+    .await?;
+    history.push(assistant_message(&response.text, &response.tool_calls));
+    match classify(&response.stop_reason, &response.tool_calls) {
+        Class::Submission(call) => finish(prepared, state, journal, call),
+        other => Err(Error::NoSubmission(format!(
+            "the final turn did not submit ({other:?}); stray-call results and the repair arrive in tasks 1.7b and 1.8"
+        ))),
+    }
+}
+
+#[derive(Debug)]
+enum Class<'a> {
+    Submission(&'a ToolCall),
+    Batch(&'a [ToolCall]),
+    Mixed,
+    NoCall,
+    Truncated,
+}
+
+fn classify<'a>(stop: &StopReason, calls: &'a [ToolCall]) -> Class<'a> {
+    if *stop == StopReason::MaxTokens {
+        return Class::Truncated;
+    }
+    let submits = calls.iter().filter(|c| c.name == SUBMIT).count();
+    match (calls.len(), submits) {
+        (0, _) => Class::NoCall,
+        (1, 1) => Class::Submission(&calls[0]),
+        (_, 0) => Class::Batch(calls),
+        _ => Class::Mixed,
+    }
+}
+
+fn assistant_message(text: &[String], calls: &[ToolCall]) -> Message {
+    let mut content: Vec<ContentBlock> = text
+        .iter()
+        .map(|t| ContentBlock::Text { text: t.clone() })
+        .collect();
+    for c in calls {
+        content.push(ContentBlock::ToolUse {
+            id: c.id.clone(),
+            name: c.name.clone(),
+            arguments: c.arguments.clone(),
+        });
+    }
+    Message {
+        role: MessageRole::Assistant,
+        content,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn send_turn(
+    config: &Config,
+    provider: &dyn Provider,
+    prepared: &Prepared,
+    history: &[Message],
+    definitions: &[ToolDefinition],
+    journal: &mut Journal,
+    state: &mut RunState,
+    turn: u32,
+) -> Result<TurnResponse> {
     let request = TurnRequest {
         system: &prepared.system_prompt,
-        history: &history,
-        tools: &tools,
+        history,
+        tools: definitions,
         max_output_tokens: config.provider.max_output_tokens,
     };
     journal.append(
         "turn_sent",
-        serde_json::json!({ "turn": 1, "tools": tools.iter().map(|t| t.name.clone()).collect::<Vec<_>>(), "images": state.images.len() }),
+        serde_json::json!({ "turn": turn, "tools": definitions.iter().map(|t| t.name.clone()).collect::<Vec<_>>(), "history_messages": history.len() }),
     )?;
     let response = provider.send(request).await?;
     journal.append(
         "turn_received",
         serde_json::json!({
-            "turn": 1,
+            "turn": turn,
             "stop_reason": response.stop_reason,
             "tool_calls": response.tool_calls.iter().map(|c| c.name.clone()).collect::<Vec<_>>(),
             "usage": response.usage,
         }),
     )?;
+    state.turns.push(TurnEntry {
+        turn,
+        stop_reason: response.stop_reason.clone(),
+        tool_calls: response.tool_calls.iter().map(|c| c.name.clone()).collect(),
+        usage: response.usage,
+        provider_request_id: response.provider_request_id.clone(),
+    });
+    Ok(response)
+}
 
-    // Until task 1.7a, exactly one submit_verdict call is accepted and nothing else.
-    let call = match response.tool_calls.as_slice() {
-        [call] if call.name == "submit_verdict" => call,
-        [] => {
-            return Err(Error::NoSubmission(format!(
-                "the model ended the turn ({:?}) without calling submit_verdict",
-                response.stop_reason
-            )));
-        }
-        calls => {
-            return Err(Error::NoSubmission(format!(
-                "expected a single submit_verdict call, got {:?}",
-                calls.iter().map(|c| c.name.as_str()).collect::<Vec<_>>()
-            )));
-        }
+/// Validates and executes one tool call, returning the result block for the model. A model-side
+/// mistake is an error result; a tool failure or bound breach is `error: tool`.
+fn execute_call(
+    config: &Config,
+    tools: &ToolRegistry,
+    prepared: &Prepared,
+    journal: &mut Journal,
+    state: &mut RunState,
+    call: &ToolCall,
+) -> Result<ContentBlock> {
+    let call_id = state.next_call_id();
+    let started = Instant::now();
+    let mut entry = ToolCallEntry {
+        id: call_id.clone(),
+        provider_call_id: call.id.clone(),
+        tool: call.name.clone(),
+        arguments: call.arguments.clone(),
+        status: None,
+        invalid_args: None,
+        duration_ms: 0,
+        added_items: vec![],
+        dropped: vec![],
     };
-    if response.stop_reason == StopReason::MaxTokens {
-        return Err(Error::Provider(
-            "the response was truncated (max_tokens); repairs arrive in task 1.8".into(),
-        ));
+
+    // Model-side mistakes become error results, never operational failures.
+    macro_rules! reject {
+        ($message:expr) => {{
+            let message: String = $message;
+            entry.invalid_args = Some(message.clone());
+            journal.append(
+                "tool_called",
+                serde_json::json!({ "call_id": entry.id, "tool": entry.tool, "executed": false, "invalid_args": message }),
+            )?;
+            state.tool_calls.push(entry);
+            return Ok(ContentBlock::ToolResult {
+                tool_use_id: call.id.clone(),
+                content: format!("invalid arguments: {message}"),
+                is_error: true,
+                images: vec![],
+            });
+        }};
     }
-    let completed: Vec<String> = Vec::new();
+
+    let Some(tool) = tools.get(&call.name) else {
+        reject!(format!("unknown tool {:?}", call.name));
+    };
+    let manifest = tool.manifest().clone();
+    if let ArgCheck::InvalidArgs(m) = tool::check_model_args(&manifest, &call.arguments) {
+        reject!(m);
+    }
+    // Resolve image and frame arguments through the registry; never a path from the model.
+    let mut ctx = DejaviewContext {
+        run_id: state.run_id.clone(),
+        call_id: call_id.clone(),
+        ..Default::default()
+    };
+    for arg in &manifest.image_args {
+        let Some(id) = call.arguments.get(arg).and_then(|v| v.as_str()) else {
+            continue;
+        };
+        let Some(img) = state.images.iter().find(|i| i.id == id).cloned() else {
+            reject!(format!("{arg}: unknown image id {id:?}"));
+        };
+        let path = state.frame_file(&format!("raw:{id}"))?;
+        ctx.images.insert(
+            id.to_string(),
+            ImageHandle {
+                media_type: "image/png".into(),
+                width: img.width,
+                height: img.height,
+                projection: img.projection,
+                path: Some(path.display().to_string()),
+                base64: None,
+            },
+        );
+    }
+    for arg in &manifest.frame_args {
+        let Some(id) = call.arguments.get(arg).and_then(|v| v.as_str()) else {
+            continue;
+        };
+        let Some((root, projection, frame)) = state
+            .registry
+            .get(id)
+            .map(|f| (f.root().to_string(), f.projection(), f.frame().clone()))
+        else {
+            reject!(format!("{arg}: unknown frame id {id:?}"));
+        };
+        let path = match state.frame_file(id) {
+            Ok(p) => p,
+            Err(_) => reject!(format!("{arg}: frame {id:?} has no pixels available")),
+        };
+        let (parent, transform) = match &frame {
+            crate::frames::Frame::Raw { .. } => (None, None),
+            crate::frames::Frame::Aligned {
+                parent,
+                transform_id,
+                ..
+            } => (
+                Some(parent.clone()),
+                Some(serde_json::json!({ "id": transform_id })),
+            ),
+            crate::frames::Frame::Crop {
+                parent, mapping, ..
+            } => (Some(parent.clone()), Some(serde_json::to_value(mapping)?)),
+        };
+        ctx.frames.insert(
+            id.to_string(),
+            FrameHandle {
+                root,
+                projection,
+                parent,
+                transform,
+                pixels: ImageHandle {
+                    media_type: "image/png".into(),
+                    width: 0,
+                    height: 0,
+                    projection,
+                    path: Some(path.display().to_string()),
+                    base64: None,
+                },
+            },
+        );
+    }
+    if let Some(hints) = prepared.hints.get(&manifest.name) {
+        ctx.hints = hints.clone();
+    }
+    journal.append(
+        "tool_called",
+        serde_json::json!({ "call_id": call_id, "tool": manifest.name, "arguments": call.arguments, "executed": true }),
+    )?;
+
+    let mut envelope = tool.call(&call.arguments, &ctx)?;
+    entry.duration_ms = started.elapsed().as_millis() as u64;
+    entry.status = Some(envelope.status);
+    if envelope.status == Status::InvalidArgs {
+        let msg = envelope.summary.clone();
+        reject!(msg);
+    }
+    envelope.check_bounds(&manifest.returns)?;
+
+    // Returned images become crop frames with their pixels stored for later calls.
+    for img in &envelope.images {
+        if state.registry.get(&img.parent).is_none() {
+            return Err(Error::Tool(format!(
+                "{}: returned image parent {:?} is not a frame",
+                manifest.name, img.parent
+            )));
+        }
+        state.registry.add_crop(
+            &img.frame,
+            &img.parent,
+            img.mapping.clone(),
+            img.width,
+            img.height,
+        );
+        if let Some(b64) = &img.base64 {
+            let bytes = image::base64_decode(b64)
+                .map_err(|e| Error::Tool(format!("{}: returned image: {e}", manifest.name)))?;
+            let dir = state.run_dir.join("frames");
+            std::fs::create_dir_all(&dir)?;
+            let ext = if img.media_type == "image/jpeg" {
+                "jpg"
+            } else {
+                "png"
+            };
+            let path = dir.join(format!("{}.{ext}", sanitise(&img.frame)));
+            std::fs::write(&path, bytes)?;
+            state.frame_files.insert(img.frame.clone(), path);
+        }
+    }
+    let ingest = state.checklist.ingest(
+        &call_id,
+        &mut envelope,
+        &manifest,
+        &prepared.resolved,
+        &state.registry,
+        config.budget.evidence_items as usize,
+    )?;
+    for d in &ingest.dropped {
+        journal.append(
+            "evidence_dropped",
+            serde_json::json!({ "call_id": d.call_id, "region_id": d.region_id, "reason": d.reason }),
+        )?;
+    }
+    entry.added_items = ingest.added.clone();
+    entry.dropped = ingest.dropped.iter().map(|d| d.region_id.clone()).collect();
+    if matches!(envelope.status, Status::Ok | Status::MeasuredNothing) {
+        state.completed_calls.push(call_id.clone());
+    }
+    journal.append(
+        "tool_returned",
+        serde_json::json!({ "call_id": call_id, "status": envelope.status, "regions": envelope.regions.len(), "images": envelope.images.len(), "added_items": ingest.added, "duration_ms": entry.duration_ms }),
+    )?;
+    state.tool_calls.push(entry);
+
+    // What the model sees: the envelope minus image bytes, with the checklist ids of its regions.
+    let presentation = serde_json::json!({
+        "call_id": call_id,
+        "status": envelope.status,
+        "summary": envelope.summary,
+        "measurements": envelope.measurements,
+        "regions": envelope.regions.iter().zip(ingest.added.iter()).map(|(r, item)| serde_json::json!({
+            "checklist_item": item, "label": r.label, "score": r.score, "location": r.location
+        })).collect::<Vec<_>>(),
+        "images": envelope.images.iter().map(|i| serde_json::json!({ "frame": i.frame, "parent": i.parent, "mapping": i.mapping })).collect::<Vec<_>>(),
+    });
+    Ok(ContentBlock::ToolResult {
+        tool_use_id: call.id.clone(),
+        content: serde_json::to_string(&presentation)?,
+        is_error: false,
+        images: envelope.images.iter().map(|i| i.frame.clone()).collect(),
+    })
+}
+
+/// Validates the submission and aggregates the verdict.
+fn finish(
+    prepared: &Prepared,
+    state: &mut RunState,
+    journal: &mut Journal,
+    call: &ToolCall,
+) -> Result<Verdict> {
     let sub = submission::parse_and_validate(
         &call.arguments,
         &ValidationContext {
             checklist: &state.checklist,
             resolved: &prepared.resolved,
             registry: &state.registry,
-            completed_calls: &completed,
+            completed_calls: &state.completed_calls,
         },
     )?;
-    journal.append("submission", serde_json::json!({ "call_id": call.id, "items": sub.items.len(), "findings": sub.findings.len() }))?;
+    journal.append(
+        "submission",
+        serde_json::json!({ "provider_call_id": call.id, "items": sub.items.len(), "findings": sub.findings.len() }),
+    )?;
 
-    // Aggregate: one row per mandatory instance each item depends on, strictest kept.
     let mut rows = Vec::new();
     for item in &sub.items {
         let deps = state
@@ -321,7 +828,6 @@ async fn drive(
         });
     }
     for f in &sub.findings {
-        // Findings contribute rows through the mandatory instances they cite on their image.
         let d: aggregate::Disposition = f.disposition.into();
         if d == aggregate::Disposition::Observed {
             continue;
@@ -362,7 +868,7 @@ fn new_decision_dir(out_dir: &Path) -> Result<PathBuf> {
 pub struct RulesSummary {
     pub base: String,
     pub profile: Option<String>,
-    pub versions: std::collections::BTreeMap<String, u32>,
+    pub versions: BTreeMap<String, u32>,
     pub obligations: Vec<obligations::MergedObligation>,
     pub warnings: Vec<String>,
 }
@@ -374,11 +880,18 @@ pub struct Prepared {
     pub resolved: Resolved,
     pub system_prompt: String,
     pub checklist: Checklist,
+    /// Hints per tool, from the merged rules, as JSON for injection.
+    pub hints: BTreeMap<String, serde_json::Value>,
 }
 
 /// Merges and resolves the rules for a job. `[rules]` in the config names the base; without it the
 /// base is the job's use case.
-pub fn resolve_rules(config: &Config, job: &Job, job_base: &Path) -> Result<Prepared> {
+pub fn resolve_rules(
+    config: &Config,
+    job: &Job,
+    job_base: &Path,
+    tools: &ToolRegistry,
+) -> Result<Prepared> {
     let (base, profile, extra_paths): (String, Option<String>, Vec<PathBuf>) = match &config.rules {
         Some(r) => (r.base.clone(), r.profile.clone(), r.extra.clone()),
         None => (job.use_case.clone(), None, Vec::new()),
@@ -394,19 +907,24 @@ pub fn resolve_rules(config: &Config, job: &Job, job_base: &Path) -> Result<Prep
         extra.push(RulesFile::load(&full)?);
         names.push(path.display().to_string());
     }
+    let enabled: Vec<String> = tools.manifests().map(|m| m.name.clone()).collect();
     let merged = obligations::merge(&MergeInput {
         base: &base,
         profile: profile.as_deref(),
         extra: &extra,
         extra_names: &names,
         job: Some(job),
-        enabled_tools: &config.tools.enabled,
+        enabled_tools: &enabled,
     })?;
     let resolved = obligations::resolve(&merged, job)?;
     let images: Vec<(String, crate::job::Role)> =
         job.images.iter().map(|i| (i.id.clone(), i.role)).collect();
     let checklist = Checklist::build(&resolved, &images)?;
-    let system_prompt = render::system_prompt(&resolved, job);
+    let system_prompt = render::system_prompt(&resolved, job, tools.manifests());
+    let mut hints = BTreeMap::new();
+    for (tool, table) in &merged.hints {
+        hints.insert(tool.clone(), serde_json::to_value(table)?);
+    }
     Ok(Prepared {
         summary: RulesSummary {
             base: merged.base.clone(),
@@ -418,5 +936,6 @@ pub fn resolve_rules(config: &Config, job: &Job, job_base: &Path) -> Result<Prep
         resolved,
         system_prompt,
         checklist,
+        hints,
     })
 }

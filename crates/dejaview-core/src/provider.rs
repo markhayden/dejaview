@@ -56,6 +56,9 @@ pub enum ContentBlock {
         tool_use_id: String,
         content: String,
         is_error: bool,
+        /// Frame ids of images returned with the result; the adapter attaches the prepared bytes.
+        #[serde(default)]
+        images: Vec<String>,
     },
 }
 

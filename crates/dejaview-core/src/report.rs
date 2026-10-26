@@ -31,7 +31,10 @@ pub struct Report {
     pub config: serde_json::Value,
     /// The rules as merged (base, profile, versions, obligations with provenance, warnings).
     pub rules: Option<RulesSummary>,
+    pub prompt_version: String,
     pub provider: String,
+    /// Enabled tools as `name@version`, in prompt order.
+    pub tools: Vec<String>,
     /// How many runs the decision asked for, and the runs themselves, in order.
     pub decision_runs: u32,
     pub runs: Vec<RunReport>,
@@ -49,9 +52,35 @@ pub struct RunReport {
     pub images: Vec<CanonicalImage>,
     pub instances: Vec<InstanceEntry>,
     pub checklist: Checklist,
+    pub turns: Vec<TurnEntry>,
+    pub tool_calls: Vec<ToolCallEntry>,
     pub items: Vec<ItemRow>,
     pub verdict: Option<Verdict>,
     pub error: Option<ErrorEntry>,
+}
+
+/// One model turn.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TurnEntry {
+    pub turn: u32,
+    pub stop_reason: crate::provider::StopReason,
+    pub tool_calls: Vec<String>,
+    pub usage: crate::provider::Usage,
+    pub provider_request_id: Option<String>,
+}
+
+/// One tool call as the harness handled it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCallEntry {
+    pub id: String,
+    pub provider_call_id: String,
+    pub tool: String,
+    pub arguments: serde_json::Value,
+    pub status: Option<crate::tool::Status>,
+    pub invalid_args: Option<String>,
+    pub duration_ms: u64,
+    pub added_items: Vec<String>,
+    pub dropped: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

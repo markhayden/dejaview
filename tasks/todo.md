@@ -24,7 +24,7 @@ tag.
 - [x] 1.5b Checklist and evidence binding
 - [x] 1.6a Submission schema and semantic validation
 - [x] 1.6b Aggregation and decision tables
-- [ ] 1.7a State machine: tool turns
+- [x] 1.7a State machine: tool turns
 - [ ] 1.7b State machine: final turn and terminal states → tag `m1.2`
 - [ ] 1.8 Repair protocol and retries
 - [ ] 1.9 Cost ledger

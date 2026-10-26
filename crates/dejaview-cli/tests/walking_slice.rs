@@ -96,6 +96,8 @@ fn held_disposition_passes_with_exit_0() {
         journal_events(&out),
         [
             "resolved",
+            "prepared",
+            "reserved",
             "turn_sent",
             "turn_received",
             "submission",

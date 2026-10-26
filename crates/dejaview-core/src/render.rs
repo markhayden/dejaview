@@ -5,7 +5,10 @@
 use crate::job::Job;
 use crate::obligations::{Kind, Resolved};
 
-pub const PROMPT_VERSION: &str = "v1-draft";
+pub const PROMPT_VERSION: &str = "v1";
+
+/// The versioned prompt template, embedded at build time.
+pub const TEMPLATE: &str = include_str!("../../../prompts/v1.md");
 
 /// The numbered Obligations section: rules first, then job requirements, each with its targets
 /// (and evidence) named, kinds in words; then the brief in a delimited data block; then the
@@ -121,18 +124,49 @@ const ALLOWED_CHANGE_ASSERTS: &str = "\nWhen you mark an item `allowed_change`, 
 cited exemption's condition holds, and that nothing about that item changed beyond what the \
 exemption permits. Name the exemption in `allowed_by`.\n";
 
-/// The system prompt: role, the Obligations section, and how to answer.
-pub fn system_prompt(resolved: &Resolved, job: &Job) -> String {
-    let mut s = String::from(
-        "You judge whether an image meets its obligations. Tools supply evidence; you decide what \
-         each piece of evidence means; the harness computes the verdict from your dispositions, \
-         never from your overall opinion.\n\n",
-    );
-    s.push_str(&obligations_section(resolved, job));
-    s.push_str(
-        "\nAnswer with the submit_verdict tool: exactly one disposition per checklist item \
-         (violation, held, allowed_change, hidden, cant_tell) with a confidence, a reason, and a \
-         location for every violation.\n",
-    );
-    s
+/// The Tools section: each enabled tool in registry order with its guidance. Empty when there
+/// are no tools besides submit_verdict.
+pub fn tools_section<'a>(manifests: impl Iterator<Item = &'a crate::tool::Manifest>) -> String {
+    let mut lines = Vec::new();
+    for m in manifests {
+        let mut block = format!(
+            "- {} ({:?}, about {}s): {}\n  When to use: {}\n  When not to use: {}\n  Output: {}",
+            m.name,
+            m.cost.tier,
+            m.cost.seconds,
+            m.purpose,
+            m.when_to_use,
+            m.when_not_to_use,
+            m.output_guidance
+        );
+        if !m.preconditions.trim().is_empty() {
+            block.push_str(&format!("\n  Prerequisites: {}", m.preconditions));
+        }
+        if !m.requires.is_empty() {
+            block.push_str(&format!("\n  Requires: {}", m.requires.join(", ")));
+        }
+        if !m.pairs_with.is_empty() {
+            block.push_str(&format!("\n  Pairs with: {}", m.pairs_with.join(", ")));
+        }
+        lines.push(block);
+    }
+    if lines.is_empty() {
+        return String::new();
+    }
+    format!(
+        "\nTools. Use them to look closer before deciding; every call is logged. Refer to images and frames by their ids.\n{}\n",
+        lines.join("\n")
+    )
+}
+
+/// The system prompt from the versioned template: role, the Obligations section, the Tools
+/// section, and how to answer.
+pub fn system_prompt<'a>(
+    resolved: &Resolved,
+    job: &Job,
+    manifests: impl Iterator<Item = &'a crate::tool::Manifest>,
+) -> String {
+    TEMPLATE
+        .replace("{{obligations}}", &obligations_section(resolved, job))
+        .replace("{{tools}}", &tools_section(manifests))
 }

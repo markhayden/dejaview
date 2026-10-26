@@ -101,7 +101,7 @@ fn an_expanded_secret_appears_in_no_output_path() {
         .args([
             "check",
             "--config",
-            "fixtures/config/full.toml",
+            "fixtures/config/secret.toml",
             "--job",
             "fixtures/jobs/pair.toml",
             "--provider-script",

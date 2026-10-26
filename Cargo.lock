@@ -269,6 +269,7 @@ dependencies = [
 name = "dejaview-core"
 version = "0.1.0"
 dependencies = [
+ "dejaview-testkit",
  "image",
  "jsonschema",
  "schemars",
@@ -276,6 +277,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "thiserror",
+ "tokio",
  "toml",
 ]
 

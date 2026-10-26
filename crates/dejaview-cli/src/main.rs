@@ -7,6 +7,7 @@ use clap::{Parser, Subcommand};
 use dejaview_core::config::Config;
 use dejaview_core::job::Job;
 use dejaview_core::provider::Provider;
+use dejaview_core::tool::{Tool, ToolRegistry};
 
 const VERSION: &str = concat!(
     env!("CARGO_PKG_VERSION"),
@@ -25,6 +26,8 @@ struct Cli {
     command: Option<Command>,
 }
 
+// Parsed once per process; the size difference between subcommands is irrelevant here.
+#[allow(clippy::large_enum_variant)]
 #[derive(Subcommand)]
 enum Command {
     /// Judge one image job and print the verdict.
@@ -119,6 +122,10 @@ struct CheckArgs {
     #[cfg(feature = "testkit")]
     #[arg(long)]
     provider_script: Option<PathBuf>,
+    /// Scripted envelopes for the fake `fake_regions` tool, for tests and debugging only.
+    #[cfg(feature = "testkit")]
+    #[arg(long)]
+    tool_script: Option<PathBuf>,
 }
 
 fn main() {
@@ -154,8 +161,15 @@ fn check(args: &CheckArgs) -> i32 {
             return EXIT_USAGE;
         }
     };
+    let tools = match build_tools(args, &config) {
+        Ok(t) => t,
+        Err(message) => {
+            eprintln!("dejaview: {message}");
+            return EXIT_USAGE;
+        }
+    };
     if args.dry_run {
-        return match dejaview_core::run::resolve_rules(&config, &job, Path::new(".")) {
+        return match dejaview_core::run::resolve_rules(&config, &job, Path::new("."), &tools) {
             Ok(p) => {
                 println!("{}", p.system_prompt);
                 println!("Instances:");
@@ -214,6 +228,7 @@ fn check(args: &CheckArgs) -> i32 {
         &job,
         job_base,
         provider.as_ref(),
+        &tools,
         &out_dir,
         VERSION,
     ));
@@ -437,4 +452,31 @@ fn tools_list(args: &ToolsListArgs) -> i32 {
         );
     }
     0
+}
+
+/// The tools available to this build, then narrowed to the config's enabled list.
+fn build_tools(args: &CheckArgs, config: &Config) -> Result<ToolRegistry, String> {
+    let available: Vec<Box<dyn Tool>> = available_tools(args)?;
+    ToolRegistry::new(available, &config.tools.enabled, &config.tools.order)
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(feature = "testkit")]
+fn available_tools(args: &CheckArgs) -> Result<Vec<Box<dyn Tool>>, String> {
+    let mut out: Vec<Box<dyn Tool>> = Vec::new();
+    match &args.tool_script {
+        Some(path) => out.push(Box::new(
+            dejaview_testkit::ScriptedTool::fake_regions_from_path(path)
+                .map_err(|e| e.to_string())?,
+        )),
+        None => out.push(Box::new(dejaview_testkit::ScriptedTool::fake_regions(
+            Vec::new(),
+        ))),
+    }
+    Ok(out)
+}
+
+#[cfg(not(feature = "testkit"))]
+fn available_tools(_args: &CheckArgs) -> Result<Vec<Box<dyn Tool>>, String> {
+    Ok(Vec::new())
 }

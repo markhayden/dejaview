@@ -5,7 +5,9 @@ use std::collections::VecDeque;
 use std::path::Path;
 use std::sync::Mutex;
 
-use dejaview_core::provider::{Provider, SendFuture, TurnRequest, TurnResponse};
+use dejaview_core::provider::{
+    Message, Provider, SendFuture, ToolDefinition, TurnRequest, TurnResponse,
+};
 
 use crate::{Error, Result};
 
@@ -15,6 +17,17 @@ pub struct ScriptedProvider {
     turns: Mutex<VecDeque<TurnResponse>>,
     /// Every request's history length, for tests that assert the loop's shape.
     pub seen_history_lengths: Mutex<Vec<usize>>,
+    /// Every request as sent, for tests that assert the provider history is append-only.
+    pub recorded: Mutex<Vec<RecordedRequest>>,
+}
+
+/// A request as the scripted provider saw it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RecordedRequest {
+    pub system: String,
+    pub history: Vec<Message>,
+    pub tools: Vec<ToolDefinition>,
+    pub max_output_tokens: u32,
 }
 
 impl ScriptedProvider {
@@ -22,6 +35,7 @@ impl ScriptedProvider {
         ScriptedProvider {
             turns: Mutex::new(turns.into()),
             seen_history_lengths: Mutex::new(Vec::new()),
+            recorded: Mutex::new(Vec::new()),
         }
     }
 
@@ -44,6 +58,14 @@ impl Provider for ScriptedProvider {
         Box::pin(async move {
             if let Ok(mut seen) = self.seen_history_lengths.lock() {
                 seen.push(req.history.len());
+            }
+            if let Ok(mut rec) = self.recorded.lock() {
+                rec.push(RecordedRequest {
+                    system: req.system.to_string(),
+                    history: req.history.to_vec(),
+                    tools: req.tools.to_vec(),
+                    max_output_tokens: req.max_output_tokens,
+                });
             }
             let next = self.turns.lock().ok().and_then(|mut t| t.pop_front());
             next.ok_or_else(|| {

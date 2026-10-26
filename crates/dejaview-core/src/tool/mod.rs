@@ -4,6 +4,7 @@
 
 pub mod envelope;
 pub mod manifest;
+pub mod registry;
 
 use std::collections::BTreeMap;
 
@@ -11,6 +12,7 @@ use serde::{Deserialize, Serialize};
 
 pub use envelope::{Envelope, Status};
 pub use manifest::{Bounds, CostTier, Manifest};
+pub use registry::ToolRegistry;
 
 use crate::Result;
 

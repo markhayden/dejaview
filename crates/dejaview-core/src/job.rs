@@ -112,6 +112,90 @@ impl Job {
     pub fn candidate(&self) -> Option<&ImageSpec> {
         self.images.iter().find(|i| i.role == Role::Candidate)
     }
+
+    /// Builds a job from the CLI shorthand: `--candidate`, optional `--source`, repeated
+    /// `--ref label=path` (ids `ref:<label>`), `--brief`, `--use-case`.
+    pub fn from_shorthand(
+        use_case: &str,
+        candidate: PathBuf,
+        source: Option<PathBuf>,
+        refs: &[(String, PathBuf)],
+        brief: Option<String>,
+    ) -> Result<Job> {
+        let mut images = vec![ImageSpec {
+            id: "candidate".into(),
+            role: Role::Candidate,
+            label: None,
+            source: ImageSource::Path { path: candidate },
+            projection: None,
+        }];
+        if let Some(path) = source {
+            images.push(ImageSpec {
+                id: "source".into(),
+                role: Role::Source,
+                label: None,
+                source: ImageSource::Path { path },
+                projection: None,
+            });
+        }
+        for (label, path) in refs {
+            images.push(ImageSpec {
+                id: format!("ref:{label}"),
+                role: Role::Reference,
+                label: Some(label.clone()),
+                source: ImageSource::Path { path: path.clone() },
+                projection: None,
+            });
+        }
+        let job = Job {
+            use_case: use_case.to_string(),
+            brief,
+            images,
+        };
+        job.validate()?;
+        Ok(job)
+    }
+
+    /// A report-safe view of the job: base64 payloads are replaced by their byte count.
+    pub fn summary(&self) -> JobSummary {
+        JobSummary {
+            use_case: self.use_case.clone(),
+            brief: self.brief.clone(),
+            images: self
+                .images
+                .iter()
+                .map(|i| ImageSummary {
+                    id: i.id.clone(),
+                    role: i.role,
+                    label: i.label.clone(),
+                    source: match &i.source {
+                        ImageSource::Path { path } => format!("path:{}", path.display()),
+                        ImageSource::Base64 { base64, media_type } => {
+                            format!("base64:{media_type}:{} chars", base64.len())
+                        }
+                    },
+                    projection: i.projection,
+                })
+                .collect(),
+        }
+    }
+}
+
+/// The job as written into a report.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct JobSummary {
+    pub use_case: String,
+    pub brief: Option<String>,
+    pub images: Vec<ImageSummary>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ImageSummary {
+    pub id: String,
+    pub role: Role,
+    pub label: Option<String>,
+    pub source: String,
+    pub projection: Option<Projection>,
 }
 
 #[cfg(test)]

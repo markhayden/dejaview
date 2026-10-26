@@ -8,8 +8,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::aggregate::{self, Row, Verdict};
 use crate::checklist::{self, ChecklistItem};
 use crate::config::Config;
-use crate::image::{self, CanonicalImage, DecodeBounds};
-use crate::job::Job;
+use crate::image::{self, CanonicalImage};
+use crate::job::{Job, JobSummary};
 use crate::journal::Journal;
 use crate::obligations::{self, Instance};
 use crate::provider::{ContentBlock, Message, MessageRole, Provider, StopReason, TurnRequest};
@@ -40,7 +40,7 @@ pub async fn check(
 ) -> Result<Outcome> {
     let run_dir = new_run_dir(out_dir)?;
     let mut journal = Journal::create(&run_dir)?;
-    let mut state = RunState::new(job, provider, harness_version);
+    let mut state = RunState::new(config, job, provider, harness_version);
 
     let result = drive(config, job, job_base, provider, &mut journal, &mut state).await;
     let outcome = match result {
@@ -78,6 +78,8 @@ pub async fn check(
 
 struct RunState {
     use_case: String,
+    job: JobSummary,
+    config: serde_json::Value,
     provider_id: String,
     harness_version: String,
     images: Vec<CanonicalImage>,
@@ -88,9 +90,11 @@ struct RunState {
 }
 
 impl RunState {
-    fn new(job: &Job, provider: &dyn Provider, harness_version: &str) -> RunState {
+    fn new(config: &Config, job: &Job, provider: &dyn Provider, harness_version: &str) -> RunState {
         RunState {
             use_case: job.use_case.clone(),
+            job: job.summary(),
+            config: config.redacted_json(),
             provider_id: provider.id().to_string(),
             harness_version: harness_version.to_string(),
             images: Vec::new(),
@@ -106,6 +110,8 @@ impl RunState {
             report_version: REPORT_VERSION,
             harness_version: self.harness_version.clone(),
             use_case: self.use_case.clone(),
+            job: self.job.clone(),
+            config: self.config.clone(),
             images: self.images.clone(),
             instances: self
                 .instances
@@ -126,7 +132,7 @@ impl RunState {
 }
 
 async fn drive(
-    _config: &Config,
+    config: &Config,
     job: &Job,
     job_base: &Path,
     provider: &dyn Provider,
@@ -134,7 +140,7 @@ async fn drive(
     state: &mut RunState,
 ) -> Result<Verdict> {
     // Resolve.
-    let bounds = DecodeBounds::default();
+    let bounds = config.images.decode_bounds();
     state.images = job
         .images
         .iter()

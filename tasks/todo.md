@@ -17,7 +17,7 @@ tag.
 ## M1 Skeleton
 - [x] 1.1 Walking slice → tag `m1.1`
 - [x] 1.2 Canonical images and frames registry
-- [ ] 1.3 Config loading, validation, shorthand job
+- [x] 1.3 Config loading, validation, shorthand job
 - [ ] 1.4a Obligation model, merge, validation
 - [ ] 1.4b Instances, rendering, shipped rule sets
 - [ ] 1.5a Manifest and envelope types, fake tool

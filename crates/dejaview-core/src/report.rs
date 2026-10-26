@@ -10,6 +10,7 @@ use crate::Result;
 use crate::aggregate::{Confidence, Disposition, Row, Verdict};
 use crate::checklist::ChecklistItem;
 use crate::image::CanonicalImage;
+use crate::job::JobSummary;
 use crate::obligations::Instance;
 use crate::submission::Location;
 
@@ -20,6 +21,10 @@ pub struct Report {
     pub report_version: u32,
     pub harness_version: String,
     pub use_case: String,
+    /// The job as resolved (base64 payloads summarised).
+    pub job: JobSummary,
+    /// The config as resolved, with every expanded secret redacted.
+    pub config: serde_json::Value,
     pub images: Vec<CanonicalImage>,
     pub instances: Vec<InstanceEntry>,
     pub checklist: Vec<ChecklistItem>,

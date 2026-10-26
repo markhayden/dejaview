@@ -36,9 +36,27 @@ struct CheckArgs {
     /// Path to the config file.
     #[arg(long)]
     config: PathBuf,
+    /// Override one config value: `--set budget.tool_turns=2` (repeatable).
+    #[arg(long = "set", value_name = "PATH=VALUE")]
+    overrides: Vec<String>,
     /// Path to a job file. Relative image paths in it resolve against the current directory.
-    #[arg(long)]
-    job: PathBuf,
+    #[arg(long, conflicts_with_all = ["candidate", "source", "reference", "brief", "use_case"])]
+    job: Option<PathBuf>,
+    /// Shorthand job: the candidate image.
+    #[arg(long, requires = "use_case")]
+    candidate: Option<PathBuf>,
+    /// Shorthand job: the source image the candidate was made from.
+    #[arg(long, requires = "candidate")]
+    source: Option<PathBuf>,
+    /// Shorthand job: a reference image as `label=path` (repeatable); its id becomes `ref:<label>`.
+    #[arg(long = "ref", value_name = "LABEL=PATH", requires = "candidate")]
+    reference: Vec<String>,
+    /// Shorthand job: the free-text brief.
+    #[arg(long, requires = "candidate")]
+    brief: Option<String>,
+    /// Shorthand job: the use case, for example `source-fidelity`.
+    #[arg(long, requires = "candidate")]
+    use_case: Option<String>,
     /// Output directory for run directories; overrides `[output] dir`.
     #[arg(long)]
     out: Option<PathBuf>,
@@ -61,14 +79,14 @@ fn main() {
 }
 
 fn check(args: &CheckArgs) -> i32 {
-    let config = match Config::load(&args.config) {
+    let config = match Config::load_with_overrides(&args.config, &args.overrides) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("dejaview: {e}");
             return EXIT_USAGE;
         }
     };
-    let job = match Job::load(&args.job) {
+    let job = match load_job(args) {
         Ok(j) => j,
         Err(e) => {
             eprintln!("dejaview: {e}");
@@ -115,16 +133,53 @@ fn check(args: &CheckArgs) -> i32 {
                         .unwrap_or_default()
                         .trim_matches('"')
                 ),
-                (None, Some(e)) => eprintln!("error: {e}"),
+                (None, Some(e)) => eprintln!("error: {}", redacted(&e.to_string(), &config)),
                 (None, None) => eprintln!("error: run ended without a verdict or an error"),
             }
             eprintln!("run: {}", o.run_dir.display());
             o.exit_code
         }
         Err(e) => {
-            eprintln!("dejaview: {e}");
+            eprintln!("dejaview: {}", redacted(&e.to_string(), &config));
             dejaview_core::run::EXIT_ERROR
         }
+    }
+}
+
+/// Error text never carries an expanded secret.
+fn redacted(text: &str, config: &Config) -> String {
+    let mut out = text.to_string();
+    for s in &config.secrets {
+        if !s.is_empty() {
+            out = out.replace(s, "[redacted]");
+        }
+    }
+    out
+}
+
+fn load_job(args: &CheckArgs) -> Result<Job, String> {
+    match (&args.job, &args.candidate) {
+        (Some(path), None) => Job::load(path).map_err(|e| e.to_string()),
+        (None, Some(candidate)) => {
+            let use_case = args.use_case.as_deref().unwrap_or("source-fidelity");
+            let mut refs = Vec::new();
+            for r in &args.reference {
+                let (label, path) = r
+                    .split_once('=')
+                    .ok_or_else(|| format!("--ref {r:?} must be label=path"))?;
+                refs.push((label.to_string(), PathBuf::from(path)));
+            }
+            Job::from_shorthand(
+                use_case,
+                candidate.clone(),
+                args.source.clone(),
+                &refs,
+                args.brief.clone(),
+            )
+            .map_err(|e| e.to_string())
+        }
+        (None, None) => Err("pass --job <file> or the shorthand --candidate … --use-case …".into()),
+        (Some(_), Some(_)) => Err("--job and --candidate are exclusive".into()),
     }
 }
 

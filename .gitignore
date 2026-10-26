@@ -1,0 +1,12 @@
+# build and run outputs
+/target/
+/eval-out/
+/dejaview-out/
+*.local.toml
+.venv/
+__pycache__/
+*.pyc
+
+# never commit secrets or private material
+.env
+*.key

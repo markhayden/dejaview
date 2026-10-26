@@ -12,7 +12,7 @@ tag.
 - [x] 0.2 CI, lint, pre-commit hook, ignore rules
 - [x] 0.3 Docs skeleton, review checklist, README sections
 - [x] 0.4 Owner readiness document
-- [ ] Checkpoint M0 → tag `m0`
+- [x] Checkpoint M0 → tag `m0` (2026-10-26)
 
 ## M1 Skeleton
 - [ ] 1.1 Walking slice → tag `m1.1`

@@ -1,0 +1,492 @@
+[
+  {
+    "status": "ok",
+    "summary": "many",
+    "measurements": [],
+    "regions": [
+      {
+        "id": "r0",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.0,
+            0.0,
+            0.005,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 0",
+        "score": 0.5
+      },
+      {
+        "id": "r1",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.01,
+            0.0,
+            0.015,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 1",
+        "score": 0.5
+      },
+      {
+        "id": "r2",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.02,
+            0.0,
+            0.025,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 2",
+        "score": 0.5
+      },
+      {
+        "id": "r3",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.03,
+            0.0,
+            0.034999999999999996,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 3",
+        "score": 0.5
+      },
+      {
+        "id": "r4",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.04,
+            0.0,
+            0.045,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 4",
+        "score": 0.5
+      },
+      {
+        "id": "r5",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.05,
+            0.0,
+            0.055,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 5",
+        "score": 0.5
+      },
+      {
+        "id": "r6",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.06,
+            0.0,
+            0.065,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 6",
+        "score": 0.5
+      },
+      {
+        "id": "r7",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.07,
+            0.0,
+            0.07500000000000001,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 7",
+        "score": 0.5
+      },
+      {
+        "id": "r8",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.08,
+            0.0,
+            0.085,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 8",
+        "score": 0.5
+      },
+      {
+        "id": "r9",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.09,
+            0.0,
+            0.095,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 9",
+        "score": 0.5
+      },
+      {
+        "id": "r10",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.1,
+            0.0,
+            0.10500000000000001,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 10",
+        "score": 0.5
+      },
+      {
+        "id": "r11",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.11,
+            0.0,
+            0.115,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 11",
+        "score": 0.5
+      },
+      {
+        "id": "r12",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.12,
+            0.0,
+            0.125,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 12",
+        "score": 0.5
+      },
+      {
+        "id": "r13",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.13,
+            0.0,
+            0.135,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 13",
+        "score": 0.5
+      },
+      {
+        "id": "r14",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.14,
+            0.0,
+            0.14500000000000002,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 14",
+        "score": 0.5
+      },
+      {
+        "id": "r15",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.15,
+            0.0,
+            0.155,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 15",
+        "score": 0.5
+      },
+      {
+        "id": "r16",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.16,
+            0.0,
+            0.165,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 16",
+        "score": 0.5
+      },
+      {
+        "id": "r17",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.17,
+            0.0,
+            0.17500000000000002,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 17",
+        "score": 0.5
+      },
+      {
+        "id": "r18",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.18,
+            0.0,
+            0.185,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 18",
+        "score": 0.5
+      },
+      {
+        "id": "r19",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.19,
+            0.0,
+            0.195,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 19",
+        "score": 0.5
+      },
+      {
+        "id": "r20",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.2,
+            0.0,
+            0.20500000000000002,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 20",
+        "score": 0.5
+      },
+      {
+        "id": "r21",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.21,
+            0.0,
+            0.215,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 21",
+        "score": 0.5
+      },
+      {
+        "id": "r22",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.22,
+            0.0,
+            0.225,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 22",
+        "score": 0.5
+      },
+      {
+        "id": "r23",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.23,
+            0.0,
+            0.23500000000000001,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 23",
+        "score": 0.5
+      },
+      {
+        "id": "r24",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.24,
+            0.0,
+            0.245,
+            0.01
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "region 24",
+        "score": 0.5
+      }
+    ],
+    "images": [],
+    "transforms": [],
+    "provenance": {
+      "tool": "fake_regions",
+      "version": "0.0.1",
+      "duration_ms": 1,
+      "lock_digest": null
+    }
+  }
+]

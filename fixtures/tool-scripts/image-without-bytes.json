@@ -1,0 +1,32 @@
+[
+  {
+    "status": "ok",
+    "summary": "scripted regions",
+    "measurements": [],
+    "regions": [],
+    "images": [
+      {
+        "frame": "crop:call:1:0",
+        "parent": "raw:candidate",
+        "mapping": {
+          "bbox": [
+            0.0,
+            0.0,
+            0.5,
+            0.5
+          ]
+        },
+        "media_type": "image/png",
+        "width": 32,
+        "height": 24
+      }
+    ],
+    "transforms": [],
+    "provenance": {
+      "tool": "fake_regions",
+      "version": "0.0.1",
+      "duration_ms": 1,
+      "lock_digest": null
+    }
+  }
+]

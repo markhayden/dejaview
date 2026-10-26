@@ -1,0 +1,16 @@
+[
+  {
+    "status": "measured_nothing",
+    "summary": "scripted measured_nothing",
+    "measurements": [],
+    "regions": [],
+    "images": [],
+    "transforms": [],
+    "provenance": {
+      "tool": "fake_regions",
+      "version": "0.0.1",
+      "duration_ms": 1,
+      "lock_digest": null
+    }
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "tool_calls": [
+      {
+        "id": "c1",
+        "name": "fake_regions",
+        "arguments": {
+          "image": "candidate"
+        }
+      }
+    ],
+    "stop_reason": "tool_use"
+  }
+]

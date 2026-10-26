@@ -1,0 +1,14 @@
+# A source-fidelity pair: the candidate is judged against the source.
+[job]
+use_case = "source-fidelity"
+brief = "Restyle the scene; keep the structure."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "fixtures/images/candidate-64x48.png" }
+
+[[job.images]]
+id = "source"
+role = "source"
+source = { path = "fixtures/images/source-64x48.png" }

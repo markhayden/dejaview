@@ -55,6 +55,8 @@ jobs:
           if [ -f tools/python/pyproject.toml ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; fi
       - if: steps.pack.outputs.present == 'true'
         uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
       - if: steps.pack.outputs.present == 'true'
         run: uv sync --frozen
         working-directory: tools/python
@@ -64,3 +66,31 @@ jobs:
       - if: steps.pack.outputs.present == 'true'
         run: uv run --frozen --offline --no-sync pytest
         working-directory: tools/python
+      # The provisioning proof: build the bundle, fetch and build the Rust side with the network,
+      # then install and launch the pack with no network namespace at all (`unshare -rn`).
+      - if: steps.pack.outputs.present == 'true'
+        name: Install Rust toolchain from rust-toolchain.toml
+        run: |
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustup show active-toolchain || rustup toolchain install
+      - if: steps.pack.outputs.present == 'true' && !env.ACT
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: provisioning
+      - if: steps.pack.outputs.present == 'true'
+        name: Build the provisioning bundle
+        run: scripts/build-bundle.sh
+      - if: steps.pack.outputs.present == 'true'
+        name: Build the provisioning test with the network
+        run: cargo test -p dejaview-tools --test provisioning --no-run
+      # act's container cannot create namespaces; there the same install and call run without one.
+      - if: steps.pack.outputs.present == 'true' && !env.ACT
+        name: Install and launch the pack without a network
+        run: unshare -rn env UV_OFFLINE=1 UV_PYTHON_DOWNLOADS=never cargo test --offline -p dejaview-tools --test provisioning -- --ignored
+      - if: steps.pack.outputs.present == 'true' && env.ACT
+        name: Install and launch the pack (no namespace under act)
+        run: env UV_OFFLINE=1 UV_PYTHON_DOWNLOADS=never cargo test --offline -p dejaview-tools --test provisioning -- --ignored

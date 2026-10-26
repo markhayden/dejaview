@@ -1,0 +1,37 @@
+# Base rule set: brief compliance. The image contains what was asked for and nothing it should
+# not. The job requirements carry the specifics (objects, counts, colours, text, exclusions).
+[rules]
+use_case = "brief-compliance"
+version = 1
+requires_roles = ["candidate"]
+default_evidence_kinds = ["text_region", "class_difference"]
+
+[[rule]]
+id = "BC1"
+kind = "must_hold"
+scope = ["candidate"]
+text = "Every object, count, colour and piece of text the job requirements ask for is present as asked."
+
+[[rule]]
+id = "BC2"
+kind = "must_not"
+scope = ["candidate"]
+text = "Anything the job requirements forbid: stray logos, watermarks, people or text that was not asked for."
+
+[[rule]]
+id = "BC3"
+kind = "must_hold"
+scope = ["candidate"]
+evidence_kinds = ["text_region"]
+text = "Text the requirements specify is spelled exactly as given."
+
+[[rule]]
+id = "BC4"
+kind = "allowed"
+waives = []
+text = "Composition, style and incidental detail the requirements do not mention may be anything."
+
+[[rule]]
+id = "BC5"
+kind = "observe"
+text = "Any other notable content is noted with its location."

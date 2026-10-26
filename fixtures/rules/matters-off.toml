@@ -1,0 +1,12 @@
+# Consumer rules: SF2 still holds but its uncertainty never makes the verdict unsure.
+[rules]
+use_case = "source-fidelity"
+version = 2
+
+[[rule]]
+id = "SF2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+matters = false
+text = "The candidate is derived from the source: same scene, same camera, same projection."

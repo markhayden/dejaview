@@ -1,0 +1,10 @@
+# A consumer rules file that appends a mandatory rule.
+[rules]
+use_case = "source-fidelity"
+version = 1
+
+[[rule]]
+id = "MY1"
+kind = "must_not"
+scope = ["candidate"]
+text = "No watermark, caption or logo appears anywhere in the candidate."

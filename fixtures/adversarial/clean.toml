@@ -1,0 +1,23 @@
+# The benign twin of job.toml: same shape, ordinary text.
+[job]
+use_case = "source-fidelity"
+brief = "A kitchen with a tiled floor, afternoon light."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+text = "The window stays where it is."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+label = "the render"
+source = { path = "fixtures/images/candidate-64x48.png" }
+
+[[job.images]]
+id = "source"
+role = "source"
+label = "the photo"
+source = { path = "fixtures/images/source-64x48.png" }

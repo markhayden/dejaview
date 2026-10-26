@@ -1,0 +1,55 @@
+# The full config example from SPEC.md "Config", with a fake profile so it runs offline.
+[provider]
+profile = "fake"
+model = "fake-model"
+controls = { effort = "high" }
+max_output_tokens = 16000
+
+[images]
+max_decode_pixels = 50_000_000
+max_decode_bytes = 67_108_864
+max_long_edge = 1568
+
+[rules]
+base = "source-fidelity"
+profile = "architecture"
+extra = ["fixtures/rules/mine.toml"]
+
+[tools]
+enabled = ["view", "align", "regions", "classes"]
+order = ["align", "regions", "view", "classes"]
+
+[tools.packs.python]
+package = "dejaview-tools"
+version = "0.1.0"
+env = ["DEJAVIEW_MODEL_DIR"]
+startup_timeout_s = 120
+shared = false
+
+[budget]
+tool_turns = 4
+tool_calls = 8
+evidence_items = 24
+repairs = 1
+repair_output_tokens = 32000
+retries = 3
+decision_runs = 1
+spend_cap_usd = 2.00
+request_timeout_s = 300
+tool_timeout_s = 120
+
+[policy]
+on_unsure = "pass"
+on_error = "review"
+
+[cache]
+dir = "~/.cache/dejaview"
+read = true
+write = true
+
+[privacy]
+cloud_calls = true
+account = "fake:${DEJAVIEW_TEST_ACCOUNT}"
+
+[output]
+dir = "./dejaview-out"

@@ -1,0 +1,1338 @@
+{
+  "$defs": {
+    "ArtifactRef": {
+      "additionalProperties": false,
+      "description": "A reference to a stored artifact, as journal events and the report carry it.",
+      "properties": {
+        "bytes": {
+          "description": "Stored size.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "full_sha256": {
+          "description": "SHA-256 of the full body when it was truncated.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha256": {
+          "description": "SHA-256 of the stored bytes; the file name under `artifacts/`.",
+          "type": "string"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sha256",
+        "bytes",
+        "truncated"
+      ],
+      "type": "object"
+    },
+    "CacheStatus": {
+      "additionalProperties": false,
+      "description": "How the cache figured in a decision, as the header and report record it.",
+      "properties": {
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source": {
+          "description": "On a hit: the decision directory the result came from.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "description": "`off` (no `[cache] dir`, or the rules did not resolve), `miss`, `hit` or `bypass`\n(an evaluation, which never reads).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "type": "object"
+    },
+    "CanonicalImage": {
+      "additionalProperties": false,
+      "description": "A loaded job image.",
+      "properties": {
+        "canonical_sha256": {
+          "description": "SHA-256 of the canonical pixels (8-bit RGB, row-major, after orientation), lowercase hex.",
+          "type": "string"
+        },
+        "has_icc_profile": {
+          "description": "Whether the file carried an ICC profile (recorded, not applied).",
+          "type": "boolean"
+        },
+        "height": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projection": {
+          "$ref": "#/$defs/Projection"
+        },
+        "role": {
+          "$ref": "#/$defs/Role"
+        },
+        "sha256": {
+          "description": "SHA-256 of the original bytes, lowercase hex.",
+          "type": "string"
+        },
+        "warnings": {
+          "description": "Non-fatal notes, for example the 2:1 aspect ratio treated as flat.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "width": {
+          "description": "Dimensions after orientation normalisation.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "width",
+        "height",
+        "sha256",
+        "canonical_sha256",
+        "projection",
+        "has_icc_profile",
+        "warnings"
+      ],
+      "type": "object"
+    },
+    "Checklist": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/ChecklistItem"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "type": "object"
+    },
+    "ChecklistItem": {
+      "additionalProperties": false,
+      "description": "One checklist item with its code-owned fields.",
+      "properties": {
+        "id": {
+          "description": "`chk:ob:<obligation>@<target>`, `chk:ref:<image>` or `chk:ev:<call>:<n>`.",
+          "type": "string"
+        },
+        "instance_ids": {
+          "description": "Instance ids this item depends on; every one is mandatory.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "label": {
+          "description": "The region's label from the tool, for rendering.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Location"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For evidence items: the region's location as returned, and mapped to the root frame."
+        },
+        "overlaps": {
+          "description": "Evidence items on the same root image whose raw-coordinate IoU exceeds the overlap floor.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "root_image": {
+          "description": "The image the item is about (the target for static items; the region's root for evidence).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "root_location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Location"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "instance_ids",
+        "overlaps"
+      ],
+      "type": "object"
+    },
+    "Confidence": {
+      "enum": [
+        "confident",
+        "tentative"
+      ],
+      "type": "string"
+    },
+    "CostSummary": {
+      "additionalProperties": false,
+      "description": "Money for the decision (SPEC \"Cost ledger\"), derived from the journals.",
+      "properties": {
+        "attempts": {
+          "description": "Billable attempts made.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cap_usd": {
+          "format": "double",
+          "type": "number"
+        },
+        "envelope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Envelope"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The planned envelope, `None` when it could not be planned."
+        },
+        "overrun_usd": {
+          "description": "Spend beyond the envelope (bounds are estimates).",
+          "format": "double",
+          "type": "number"
+        },
+        "released_usd": {
+          "description": "What the envelope gave back.",
+          "format": "double",
+          "type": "number"
+        },
+        "spent_usd": {
+          "description": "Settled usage plus every failed attempt charged at its bound.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "cap_usd",
+        "spent_usd",
+        "released_usd",
+        "overrun_usd",
+        "attempts"
+      ],
+      "type": "object"
+    },
+    "Decision": {
+      "additionalProperties": false,
+      "description": "The combined result.",
+      "properties": {
+        "agree": {
+          "description": "For two runs that both passed: whether they agreed. `None` otherwise.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "disagreements": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "error": {
+          "type": "boolean"
+        },
+        "verdict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Verdict"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The combined verdict, `None` when the decision is an error."
+        }
+      },
+      "required": [
+        "error",
+        "disagreements"
+      ],
+      "type": "object"
+    },
+    "Disposition": {
+      "oneOf": [
+        {
+          "enum": [
+            "violation",
+            "held",
+            "allowed_change",
+            "hidden",
+            "cant_tell"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "observed",
+          "description": "Findings only: an observation under an `observe` obligation.",
+          "type": "string"
+        }
+      ]
+    },
+    "Envelope": {
+      "additionalProperties": false,
+      "description": "The decision envelope.",
+      "properties": {
+        "attempts": {
+          "description": "Billable attempts across the decision.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "decision_runs": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "requests": {
+          "description": "One run's requests, in order; every run is planned the same.",
+          "items": {
+            "$ref": "#/$defs/PlannedRequest"
+          },
+          "type": "array"
+        },
+        "usd": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "usd",
+        "decision_runs",
+        "requests",
+        "attempts"
+      ],
+      "type": "object"
+    },
+    "ErrorEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "class": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "class",
+        "message"
+      ],
+      "type": "object"
+    },
+    "ImageSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Projection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "role": {
+          "$ref": "#/$defs/Role"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "source"
+      ],
+      "type": "object"
+    },
+    "Instance": {
+      "description": "One obligation resolved to one target image: `SF2@candidate`.",
+      "properties": {
+        "evidence": {
+          "description": "Image ids consulted to judge this instance.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "evidence_kinds": {
+          "description": "Tool evidence kinds whose regions bear on this instance.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "hidden_ok": {
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/$defs/Kind"
+        },
+        "matters": {
+          "type": "boolean"
+        },
+        "obligation_id": {
+          "type": "string"
+        },
+        "provenance": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "obligation_id",
+        "target",
+        "kind",
+        "matters",
+        "hidden_ok",
+        "text",
+        "evidence",
+        "evidence_kinds",
+        "provenance"
+      ],
+      "type": "object"
+    },
+    "InstanceEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "instance": {
+          "$ref": "#/$defs/Instance"
+        }
+      },
+      "required": [
+        "id",
+        "instance"
+      ],
+      "type": "object"
+    },
+    "ItemRow": {
+      "additionalProperties": false,
+      "description": "A dispositioned checklist item with its aggregation row.",
+      "properties": {
+        "allowed_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confidence": {
+          "$ref": "#/$defs/Confidence"
+        },
+        "disposition": {
+          "$ref": "#/$defs/Disposition"
+        },
+        "id": {
+          "type": "string"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Location"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "row": {
+          "$ref": "#/$defs/Row"
+        }
+      },
+      "required": [
+        "id",
+        "disposition",
+        "confidence",
+        "reason",
+        "row"
+      ],
+      "type": "object"
+    },
+    "JobSummary": {
+      "additionalProperties": false,
+      "description": "The job as written into a report.",
+      "properties": {
+        "brief": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "images": {
+          "items": {
+            "$ref": "#/$defs/ImageSummary"
+          },
+          "type": "array"
+        },
+        "use_case": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "use_case",
+        "images"
+      ],
+      "type": "object"
+    },
+    "Kind": {
+      "description": "What an obligation does in aggregation.",
+      "enum": [
+        "must_hold",
+        "must_not",
+        "allowed",
+        "observe"
+      ],
+      "type": "string"
+    },
+    "Location": {
+      "additionalProperties": false,
+      "description": "A location as a tagged record with nullable fields (see SPEC \"Frames and locations\").",
+      "properties": {
+        "bbox": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "fov": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "frame": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/LocationKind"
+        },
+        "pitch": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "polygon": {
+          "items": {
+            "items": {
+              "format": "double",
+              "type": "number"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "type": "array"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "yaw": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "frame",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "LocationKind": {
+      "enum": [
+        "bbox",
+        "polygon",
+        "view",
+        "whole_image",
+        "absent"
+      ],
+      "type": "string"
+    },
+    "MergedObligation": {
+      "description": "An obligation after merge, with where it came from.",
+      "properties": {
+        "condition": {
+          "default": null,
+          "description": "Exemptions only: the condition under which the exemption applies.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "disabled": {
+          "default": false,
+          "description": "Drops an obligation of this id from the merge.",
+          "type": "boolean"
+        },
+        "evidence": {
+          "default": null,
+          "description": "Image roles or ids consulted to judge it; omitted means every source and reference.",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "evidence_kinds": {
+          "default": null,
+          "description": "Tool evidence kinds whose regions bear on this; omitted means the set's default.",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "hidden_ok": {
+          "default": false,
+          "description": "Mandatory kinds only: `hidden` is recorded instead of unsure.",
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/Kind"
+        },
+        "matters": {
+          "default": null,
+          "description": "Controls uncertainty only. Defaults to true for mandatory kinds; ignored for other kinds.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "provenance": {
+          "description": "`base:<name>`, `profile:<name>`, `file:<path>` or `job`.",
+          "type": "string"
+        },
+        "scope": {
+          "default": null,
+          "description": "Image roles or ids whose correctness this judges; omitted means `candidate`.",
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "text": {
+          "default": "",
+          "type": "string"
+        },
+        "waives": {
+          "default": [],
+          "description": "Exemptions only: the mandatory obligation ids this may waive (may be empty).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "provenance"
+      ],
+      "type": "object"
+    },
+    "PlannedRequest": {
+      "additionalProperties": false,
+      "description": "One planned request of the envelope.",
+      "properties": {
+        "attempts": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "bound_usd": {
+          "description": "The bound of one attempt.",
+          "format": "double",
+          "type": "number"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "shape": {
+          "$ref": "#/$defs/RequestShape"
+        }
+      },
+      "required": [
+        "kind",
+        "shape",
+        "attempts",
+        "bound_usd"
+      ],
+      "type": "object"
+    },
+    "PolicyConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "on_error": {
+          "$ref": "#/$defs/PolicyOutcome",
+          "default": "review"
+        },
+        "on_unsure": {
+          "$ref": "#/$defs/PolicyOutcome",
+          "default": "review"
+        }
+      },
+      "type": "object"
+    },
+    "PolicyOutcome": {
+      "enum": [
+        "fail",
+        "pass",
+        "review"
+      ],
+      "type": "string"
+    },
+    "Projection": {
+      "description": "The image's projection. Detection rules arrive in task 1.2; `flat` is the default.",
+      "enum": [
+        "flat",
+        "equirectangular"
+      ],
+      "type": "string"
+    },
+    "RepairEntry": {
+      "additionalProperties": false,
+      "description": "One repair (SPEC \"Repair protocol\").",
+      "properties": {
+        "after_turn": {
+          "description": "The turn number whose response was repaired.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "form": {
+          "description": "`rejected` (the response stayed in history, error results answered it) or `reissue` (the\nresponse was excluded and the request sent again).",
+          "type": "string"
+        },
+        "reason": {
+          "description": "`invalid_submission`, `mixed_batch`, `stray_call`, `truncated`, `refusal` or `no_call`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "form",
+        "reason",
+        "after_turn"
+      ],
+      "type": "object"
+    },
+    "RequestShape": {
+      "additionalProperties": false,
+      "description": "The shape of a request for bounding its cost.",
+      "properties": {
+        "images": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "input_tokens": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "output_tokens": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "input_tokens",
+        "output_tokens",
+        "images"
+      ],
+      "type": "object"
+    },
+    "Role": {
+      "description": "What an image is for. Exactly one candidate; at most one source; any number of references.",
+      "enum": [
+        "candidate",
+        "source",
+        "reference"
+      ],
+      "type": "string"
+    },
+    "Row": {
+      "description": "One aggregation row. Ordered so that `max` is the strictest.",
+      "enum": [
+        "recorded",
+        "unsure",
+        "fail"
+      ],
+      "type": "string"
+    },
+    "RulesSummary": {
+      "additionalProperties": false,
+      "description": "What the rules resolved to, for the report and the cache key.",
+      "properties": {
+        "base": {
+          "type": "string"
+        },
+        "obligations": {
+          "items": {
+            "$ref": "#/$defs/MergedObligation"
+          },
+          "type": "array"
+        },
+        "profile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "versions": {
+          "additionalProperties": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "base",
+        "versions",
+        "obligations",
+        "warnings"
+      ],
+      "type": "object"
+    },
+    "RunReport": {
+      "additionalProperties": false,
+      "description": "One run's report.",
+      "properties": {
+        "checklist": {
+          "$ref": "#/$defs/Checklist",
+          "description": "The checklist as it stood at the end (static items plus every evidence item added)."
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ErrorEntry"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "finding_rows": {
+          "description": "Aggregation rows of the submission's findings (observed findings produce none).",
+          "items": {
+            "$ref": "#/$defs/Row"
+          },
+          "type": "array"
+        },
+        "images": {
+          "items": {
+            "$ref": "#/$defs/CanonicalImage"
+          },
+          "type": "array"
+        },
+        "images_sent": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ArtifactRef"
+          },
+          "description": "Every image the model saw, by frame id: the job images as sent and every image a tool\nreturned.",
+          "type": "object"
+        },
+        "instances": {
+          "items": {
+            "$ref": "#/$defs/InstanceEntry"
+          },
+          "type": "array"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/ItemRow"
+          },
+          "type": "array"
+        },
+        "repairs": {
+          "description": "Repairs taken, in order (at most `budget.repairs`).",
+          "items": {
+            "$ref": "#/$defs/RepairEntry"
+          },
+          "type": "array"
+        },
+        "run": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "terminal": {
+          "description": "`verdict`, `error`, `cancelled` or `incomplete`.",
+          "type": "string"
+        },
+        "tool_calls": {
+          "items": {
+            "$ref": "#/$defs/ToolCallEntry"
+          },
+          "type": "array"
+        },
+        "turns": {
+          "items": {
+            "$ref": "#/$defs/TurnEntry"
+          },
+          "type": "array"
+        },
+        "verdict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Verdict"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "run",
+        "terminal",
+        "images",
+        "images_sent",
+        "instances",
+        "checklist",
+        "turns",
+        "tool_calls",
+        "repairs",
+        "items",
+        "finding_rows"
+      ],
+      "type": "object"
+    },
+    "Status": {
+      "enum": [
+        "ok",
+        "measured_nothing",
+        "not_applicable",
+        "invalid_args"
+      ],
+      "type": "string"
+    },
+    "StopReason": {
+      "oneOf": [
+        {
+          "enum": [
+            "end_turn",
+            "tool_use",
+            "max_tokens",
+            "refusal"
+          ],
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "other": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "other"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ToolCallEntry": {
+      "additionalProperties": false,
+      "description": "One tool call the model made: executed, rejected for its arguments, or refused (call budget,\nfinal turn). A refused call has no harness id; its `id` is the provider's.",
+      "properties": {
+        "added_items": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "arguments": true,
+        "dropped": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "duration_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "envelope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The structured result in full; `None` when the call was not executed."
+        },
+        "executed": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "invalid_args": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider_call_id": {
+          "type": "string"
+        },
+        "reason": {
+          "description": "Why a call was refused without execution (`call budget`, `final_turn`).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Status"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tool": {
+          "type": "string"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "provider_call_id",
+        "tool",
+        "executed",
+        "arguments",
+        "duration_ms",
+        "added_items",
+        "dropped"
+      ],
+      "type": "object"
+    },
+    "TurnEntry": {
+      "additionalProperties": false,
+      "description": "One model turn: a request, and its response if one came back.",
+      "properties": {
+        "attempts": {
+          "description": "Billable attempts (1 plus transport retries).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "bound_usd": {
+          "description": "The bound of one attempt at catalog prices.",
+          "format": "double",
+          "type": "number"
+        },
+        "cost_usd": {
+          "description": "Settled usage plus every failed attempt charged at its bound.",
+          "format": "double",
+          "type": "number"
+        },
+        "entered_history": {
+          "description": "Whether the response entered provider history (false for an excluded or unanswered turn).",
+          "type": "boolean"
+        },
+        "max_output_tokens": {
+          "description": "The output allowance of the request (raised to `repair_output_tokens` on a reissue).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "provider_request_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "request": {
+          "$ref": "#/$defs/ArtifactRef",
+          "description": "The model-visible request body, redacted and bounded."
+        },
+        "response": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The model-visible response body, redacted and bounded."
+        },
+        "stop_reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StopReason"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`None` while no response came back."
+        },
+        "tool_calls": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "turn": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        }
+      },
+      "required": [
+        "turn",
+        "max_output_tokens",
+        "bound_usd",
+        "request",
+        "tool_calls",
+        "usage",
+        "attempts",
+        "cost_usd",
+        "entered_history"
+      ],
+      "type": "object"
+    },
+    "Usage": {
+      "properties": {
+        "input_tokens": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "output_tokens": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "input_tokens",
+        "output_tokens"
+      ],
+      "type": "object"
+    },
+    "Verdict": {
+      "enum": [
+        "pass",
+        "fail",
+        "unsure"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The decision-level report.",
+  "properties": {
+    "cache": {
+      "$ref": "#/$defs/CacheStatus"
+    },
+    "config": true,
+    "cost": {
+      "$ref": "#/$defs/CostSummary",
+      "description": "The decision envelope and what it came to."
+    },
+    "decision": {
+      "$ref": "#/$defs/Decision"
+    },
+    "decision_runs": {
+      "description": "How many runs the decision asked for, and the runs found, in order.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "exit_code": {
+      "format": "int32",
+      "type": "integer"
+    },
+    "harness_version": {
+      "type": "string"
+    },
+    "job": {
+      "$ref": "#/$defs/JobSummary"
+    },
+    "policy": {
+      "$ref": "#/$defs/PolicyConfig"
+    },
+    "prompt_version": {
+      "type": "string"
+    },
+    "provider": {
+      "type": "string"
+    },
+    "report_version": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "rules": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RulesSummary"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "runs": {
+      "items": {
+        "$ref": "#/$defs/RunReport"
+      },
+      "type": "array"
+    },
+    "tools": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "use_case": {
+      "type": "string"
+    },
+    "verdict": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Verdict"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The combined verdict, `None` when the decision is an error."
+    }
+  },
+  "required": [
+    "report_version",
+    "harness_version",
+    "use_case",
+    "job",
+    "config",
+    "prompt_version",
+    "provider",
+    "tools",
+    "decision_runs",
+    "runs",
+    "decision",
+    "policy",
+    "exit_code",
+    "cost",
+    "cache"
+  ],
+  "title": "Report",
+  "type": "object"
+}

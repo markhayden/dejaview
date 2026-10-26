@@ -1,0 +1,394 @@
+{
+  "$defs": {
+    "BudgetConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "decision_runs": {
+          "default": 1,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "evidence_items": {
+          "default": 24,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "repair_output_tokens": {
+          "default": 32000,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "repairs": {
+          "default": 1,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "request_timeout_s": {
+          "default": 300,
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retries": {
+          "default": 3,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "spend_cap_usd": {
+          "default": 2.0,
+          "format": "double",
+          "type": "number"
+        },
+        "tool_calls": {
+          "default": 8,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tool_timeout_s": {
+          "default": 120,
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tool_turns": {
+          "default": 4,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "CacheConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "dir": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "read": {
+          "default": true,
+          "type": "boolean"
+        },
+        "write": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "ImagesConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "max_decode_bytes": {
+          "default": 67108864,
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_decode_pixels": {
+          "default": 50000000,
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_long_edge": {
+          "default": null,
+          "description": "May only lower the catalog's native size (checked in 2.3).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "OutputConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "dir": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "dir"
+      ],
+      "type": "object"
+    },
+    "PackConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "args": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "command": {
+          "default": null,
+          "description": "An executable to run as the pack's MCP server instead of a provisioned bundle, with its\narguments; for tests and local development.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "env": {
+          "default": [],
+          "description": "Extra environment variables passed through to the pack. Credential names are refused.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "package": {
+          "default": null,
+          "description": "The provisioned bundle, by package and version (`dejaview tools setup` installs it).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "shared": {
+          "default": false,
+          "type": "boolean"
+        },
+        "startup_timeout_s": {
+          "default": 120,
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "version": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "PolicyConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "on_error": {
+          "$ref": "#/$defs/PolicyOutcome",
+          "default": "review"
+        },
+        "on_unsure": {
+          "$ref": "#/$defs/PolicyOutcome",
+          "default": "review"
+        }
+      },
+      "type": "object"
+    },
+    "PolicyOutcome": {
+      "enum": [
+        "fail",
+        "pass",
+        "review"
+      ],
+      "type": "string"
+    },
+    "PrivacyConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "account": {
+          "description": "The provider or gateway account the operator attests to, for example `anthropic:org-xxxx`.",
+          "type": "string"
+        },
+        "cloud_calls": {
+          "description": "Must be true: dejaview sends images and text to the configured provider.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "cloud_calls",
+        "account"
+      ],
+      "type": "object"
+    },
+    "ProviderConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "controls": {
+          "additionalProperties": true,
+          "default": {},
+          "description": "Provider-specific controls (effort, thinking level), validated against the catalog in 2.1.",
+          "type": "object"
+        },
+        "max_output_tokens": {
+          "default": 16000,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "model": {
+          "description": "A model id present in the catalog.",
+          "type": "string"
+        },
+        "profile": {
+          "description": "An endpoint profile id (`anthropic`, `google-ai-studio`, `openai`, a user profile, or\n`fake` for tests).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profile",
+        "model"
+      ],
+      "type": "object"
+    },
+    "RulesConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "description": "A shipped base rule set, for example `source-fidelity`.",
+          "type": "string"
+        },
+        "extra": {
+          "default": [],
+          "description": "Consumer rules files, applied in order after the base and profile.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "profile": {
+          "default": null,
+          "description": "An optional shipped profile of that base, for example `architecture`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "base"
+      ],
+      "type": "object"
+    },
+    "ToolsConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "order": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "packs": {
+          "additionalProperties": {
+            "$ref": "#/$defs/PackConfig"
+          },
+          "default": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "budget": {
+      "$ref": "#/$defs/BudgetConfig",
+      "default": {
+        "decision_runs": 1,
+        "evidence_items": 24,
+        "repair_output_tokens": 32000,
+        "repairs": 1,
+        "request_timeout_s": 300,
+        "retries": 3,
+        "spend_cap_usd": 2.0,
+        "tool_calls": 8,
+        "tool_timeout_s": 120,
+        "tool_turns": 4
+      }
+    },
+    "cache": {
+      "$ref": "#/$defs/CacheConfig",
+      "default": {
+        "dir": null,
+        "read": true,
+        "write": true
+      }
+    },
+    "config_version": {
+      "default": 1,
+      "description": "The config schema version (`CONFIG_VERSION`); absent means the current one.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "images": {
+      "$ref": "#/$defs/ImagesConfig",
+      "default": {
+        "max_decode_bytes": 67108864,
+        "max_decode_pixels": 50000000,
+        "max_long_edge": null
+      }
+    },
+    "output": {
+      "$ref": "#/$defs/OutputConfig"
+    },
+    "policy": {
+      "$ref": "#/$defs/PolicyConfig",
+      "default": {
+        "on_error": "review",
+        "on_unsure": "review"
+      }
+    },
+    "privacy": {
+      "$ref": "#/$defs/PrivacyConfig"
+    },
+    "provider": {
+      "$ref": "#/$defs/ProviderConfig"
+    },
+    "rules": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RulesConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "tools": {
+      "$ref": "#/$defs/ToolsConfig",
+      "default": {
+        "enabled": [],
+        "order": [],
+        "packs": {}
+      }
+    }
+  },
+  "required": [
+    "provider",
+    "privacy",
+    "output"
+  ],
+  "title": "Config",
+  "type": "object"
+}

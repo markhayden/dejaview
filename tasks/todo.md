@@ -15,27 +15,27 @@ tag.
 - [x] Checkpoint M0 → tag `m0` (2026-10-26)
 
 ## M1 Skeleton
-- [ ] 1.1 Walking slice → tag `m1.1`
-- [ ] 1.2 Canonical images and frames registry
-- [ ] 1.3 Config loading, validation, shorthand job
-- [ ] 1.4a Obligation model, merge, validation
-- [ ] 1.4b Instances, rendering, shipped rule sets
-- [ ] 1.5a Manifest and envelope types, fake tool
-- [ ] 1.5b Checklist and evidence binding
-- [ ] 1.6a Submission schema and semantic validation
-- [ ] 1.6b Aggregation and decision tables
-- [ ] 1.7a State machine: tool turns
-- [ ] 1.7b State machine: final turn and terminal states → tag `m1.2`
-- [ ] 1.8 Repair protocol and retries
-- [ ] 1.9 Cost ledger
-- [ ] 1.10a Journal and artifact durability
-- [ ] 1.10b Report, schema, rebuild, prune
-- [ ] 1.11 Cache at the decision boundary
-- [ ] 1.12 Isolation, environment filter, exit codes
-- [ ] 1.13 Minimal MCP client against a fake server
-- [ ] 1.14 Minimal provisioning bundle proof
-- [ ] 1.15 Statistics contract frozen (ADR 0016 RNG)
-- [ ] Checkpoint M1 → tag `m1`
+- [x] 1.1 Walking slice → tag `m1.1`
+- [x] 1.2 Canonical images and frames registry
+- [x] 1.3 Config loading, validation, shorthand job
+- [x] 1.4a Obligation model, merge, validation
+- [x] 1.4b Instances, rendering, shipped rule sets
+- [x] 1.5a Manifest and envelope types, fake tool
+- [x] 1.5b Checklist and evidence binding
+- [x] 1.6a Submission schema and semantic validation
+- [x] 1.6b Aggregation and decision tables
+- [x] 1.7a State machine: tool turns
+- [x] 1.7b State machine: final turn and terminal states → tag `m1.2`
+- [x] 1.8 Repair protocol and retries
+- [x] 1.9 Cost ledger
+- [x] 1.10a Journal and artifact durability
+- [x] 1.10b Report, schema, rebuild, prune
+- [x] 1.11 Cache at the decision boundary
+- [x] 1.12 Isolation, environment filter, exit codes
+- [x] 1.13 Minimal MCP client against a fake server
+- [x] 1.14 Minimal provisioning bundle proof
+- [x] 1.15 Statistics contract frozen (ADR 0016 RNG)
+- [x] Checkpoint M1 → tag `m1` (2026-10-26; `just check` under a minute, docs filled, review and coverage passes applied: docs/reviews/m1-checkpoint.md)
 
 ## M2 Provider adapters
 - [ ] 2.1 Model catalog and capability validation

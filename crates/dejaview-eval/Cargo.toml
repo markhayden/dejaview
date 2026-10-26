@@ -12,6 +12,10 @@ thiserror = { workspace = true }
 dejaview-core = { workspace = true }
 dejaview-providers = { workspace = true }
 dejaview-tools = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
 
 [lints]
 workspace = true

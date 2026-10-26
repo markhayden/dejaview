@@ -1,0 +1,4 @@
+# Clippy configuration. The spec forbids unwrap outside tests; inside tests it is the honest way
+# to fail loudly, so the lint is relaxed there.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true

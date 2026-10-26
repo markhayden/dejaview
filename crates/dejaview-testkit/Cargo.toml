@@ -10,6 +10,13 @@ rust-version.workspace = true
 [dependencies]
 thiserror = { workspace = true }
 dejaview-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+
+[[bin]]
+name = "dejaview-testkit-mcp"
+path = "src/bin/mcp.rs"
 
 [lints]
 workspace = true

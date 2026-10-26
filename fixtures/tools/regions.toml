@@ -1,0 +1,47 @@
+# The manifest example from SPEC.md "Manifest", with the schema tables inline.
+[tool]
+manifest_version = 1
+name = "regions"
+version = "1.0.0"
+purpose = "Finds regions that changed between an aligned pair, with high recall."
+when_to_use = "After align succeeds on a source and candidate, before judging structure."
+when_not_to_use = "Without a source image, or on a pair align could not register."
+output_guidance = "Each region is a pointer, not a verdict. Inspect regions with view before deciding."
+cost = { tier = "expensive", seconds = 25 }
+requires = ["align"]
+pairs_with = ["view", "classes"]
+image_args = ["image"]
+frame_args = ["against"]
+accepts_hints = ["regions"]
+evidence_kind = "change_region"
+returns = { max_images = 1, max_long_edge = 1024, max_image_bytes = 2_000_000, max_summary_bytes = 2048, max_regions = 12, max_region_label_bytes = 120, max_measurements = 8, max_transforms = 0, max_envelope_bytes = 65_536 }
+frames_out = ["crop"]
+concurrent = false
+preconditions = "`against` must be an aligned frame of the source relative to `image`."
+
+[tool.model_schema]
+type = "object"
+additionalProperties = false
+required = ["image", "against"]
+[tool.model_schema.properties.image]
+type = "string"
+description = "The image id to find changes in (usually the candidate)."
+[tool.model_schema.properties.against]
+type = "string"
+description = "An aligned frame id of the source relative to `image`."
+
+[tool.input_schema]
+type = "object"
+additionalProperties = false
+required = ["image", "against", "_dejaview"]
+[tool.input_schema.properties.image]
+type = "string"
+[tool.input_schema.properties.against]
+type = "string"
+[tool.input_schema.properties._dejaview]
+type = "object"
+
+[tool.output_schema]
+type = "object"
+[tool.output_schema.properties.measurements]
+type = "array"

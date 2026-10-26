@@ -1,0 +1,64 @@
+[
+  {
+    "tool_calls": [
+      {
+        "id": "c_submit",
+        "name": "submit_verdict",
+        "arguments": {
+          "schema_version": 1,
+          "items": [
+            {
+              "id": "chk:ob:SF1@candidate",
+              "disposition": "held",
+              "confidence": "confident",
+              "reason": "scripted",
+              "allowed_by": null,
+              "location": null,
+              "evidence": []
+            },
+            {
+              "id": "chk:ob:SF2@candidate",
+              "disposition": "held",
+              "confidence": "confident",
+              "reason": "scripted",
+              "allowed_by": null,
+              "location": null,
+              "evidence": []
+            }
+          ],
+          "findings": [
+            {
+              "obligation_ids": [
+                "SF1"
+              ],
+              "disposition": "violation",
+              "confidence": "confident",
+              "reason": "scripted",
+              "allowed_by": null,
+              "location": {
+                "frame": "raw:candidate",
+                "kind": "bbox",
+                "bbox": [
+                  0.1,
+                  0.1,
+                  0.3,
+                  0.3
+                ],
+                "polygon": null,
+                "yaw": null,
+                "pitch": null,
+                "fov": null
+              },
+              "evidence": []
+            }
+          ],
+          "opinion": {
+            "verdict": "pass",
+            "reason": "r"
+          }
+        }
+      }
+    ],
+    "stop_reason": "tool_use"
+  }
+]

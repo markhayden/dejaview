@@ -104,7 +104,7 @@ environment variable.
 | 1 | Language and packaging | Rust. Cargo workspace: core library, thin CLI, room for server and Lambda crates. Release binaries for macOS arm64 and Linux x86_64/arm64, plus `cargo install`. | Small static binary for sidecars; the `image` crate for deterministic pixel tools; WASM stays open. TypeScript was the runner-up for hosting velocity. |
 | 2 | Tool protocol | One registry, two transports: in-process Rust built-ins behind a `Tool` trait, and MCP over stdio for external packs. | Pixel tools stay cheap; ML tools stay Python; MCP gives listing and schemas for free. |
 | 3 | Tool self-description | One manifest for every tool, rendered twice: schemas to the provider as native tool definitions, guidance into a Tools section of the system prompt by a versioned template. | Adding a tool is all it takes for the model to use it. |
-| 4 | Config | TOML, one file per job type. CLI flags override single values. Secrets only from the environment. | Rust-native, comments, the prototype already used it. |
+| 4 | Config | TOML, one file per job type. `--set path=value` overrides single values. Secrets only from the environment. | Rust-native, comments, the prototype already used it. |
 | 5 | Rules | Numbered plain-language obligations in TOML with id, kind, `matters`, `hidden_ok`, scope and, for exemptions, what they waive. Base sets ship in the binary; consumer files override by id, disable, or append. | Findings cite ids so code can aggregate by kind. |
 | 6 | Verdict schema | Checklist plus findings. Every checklist item gets a disposition; the verdict is computed in code from code-owned obligation instances. | Silence cannot hide a missing disposition. |
 | 7 | Evaluation sets | Manifest in repo, images elsewhere by SHA-256. Public images in a `dejaview-evalsets` repository; private sets by path. Blind labels sealed and held by the owner. | Review before publishing; honest gates. |
@@ -228,7 +228,8 @@ projection = "flat"           # optional override
 ```
 
 Roles: `candidate` (exactly one), `source` (the original an edit was made from; at most one),
-`reference` (any number). Image ids are the only way a tool or the model refers to an image; the
+`reference` (any number). Image ids are plain tokens (ASCII letters, digits and `_ . : / -`) and the only way a tool or
+the model refers to an image; the
 harness resolves them through the job registry and never accepts a path or URL from the model.
 
 Each image is decoded once with bounded dimensions (`images.max_decode_pixels`, default 50 MP)
@@ -607,8 +608,8 @@ only to the exit code; the report carries the raw verdict and the policy outcome
 
 Every run writes an append-only **journal** (`journal.jsonl`) from the first event, so a failure
 at any step leaves a durable record: `resolved`, `prepared`, `reserved`, `turn_sent`,
-`turn_received`, `turn_excluded`, `tool_called`, `tool_returned`, `evidence_dropped`, `repair`,
-`submission`, `verdict`, `error`, `cancelled`. Every artifact a journal event references is
+`turn_received`, `retry`, `attempt_failed`, `turn_excluded`, `tool_called`, `tool_returned`,
+`evidence_dropped`, `repair`, `submission`, `verdict`, `error`, `cancelled`. Every artifact a journal event references is
 written and fsynced before the event is appended. Artifacts in `artifacts/` by content hash:
 
 - model-visible request and response bodies per turn, redacted (auth headers never stored; image
@@ -619,8 +620,13 @@ written and fsynced before the event is appended. Artifacts in `artifacts/` by c
 
 SIGINT or SIGTERM during a run appends `cancelled` with the state reached and exits 3.
 
-The **report** (`report.json`, `report_version` pinned) is derived from the journal at the end,
-or by `dejaview report rebuild` from a partial journal: the job as resolved (ids, roles, labels,
+A decision directory (`decision-<unix ms>-<pid>/`) holds `decision.json` (the header: everything
+the report needs that no run journal carries, including the planned envelope; written before the
+first run), one `run-<n>/` per run with its journal, artifacts and frames, and `report.json`.
+
+The **report** (`report.json`, `report_version` pinned) is derived from the header and the
+journals at the end, or by `dejaview report rebuild` from a partial journal, whose terminal status
+is then `incomplete`: the job as resolved (ids, roles, labels,
 hashes, dimensions, projection, prepared sizes); merged obligations with provenance and instances;
 checklist with its growth and drops; every turn (stop reason, usage, cost, provider request id,
 artifact hashes, whether it entered provider history); every tool call (id, tool, version,
@@ -1089,8 +1095,8 @@ visual artifacts and no diagnostic evidence or evidence items.
 the bundle by relative path; the `uv.lock` generated for that provisioning project; the wheel;
 `MODEL.md`; and `bundle.toml` with the SHA-256 of each file and the declared Python version.
 `dejaview tools setup --config dejaview.toml` downloads the bundle named by
-`[tools.packs.<name>] version`, verifies every digest, unpacks it into
-`$XDG_DATA_HOME/dejaview/tools/<name>-<version>/`, runs `uv sync --frozen --no-dev` there with
+`[tools.packs.<name>] package` and `version` (`--bundle <dir>` installs a local one), verifies
+every digest, unpacks it into `$XDG_DATA_HOME/dejaview/tools/<package>-<version>/`, runs `uv sync --frozen --no-dev` there with
 the declared Python (Python downloads allowed during setup only), then runs the pack's `fetch`
 entry point to download and verify model artifacts into `$XDG_CACHE_HOME/dejaview/models`. The
 harness launches `<dir>/.venv/bin/dejaview-tools serve` directly with `UV_OFFLINE=1` and
@@ -1109,6 +1115,8 @@ the parity tolerance against stored outputs. No test or run downloads anything.
 ## Config
 
 ```toml
+config_version = 1                      # optional; the current schema version when absent
+
 [provider]
 profile = "anthropic"
 model = "claude-opus-5-5"
@@ -1130,8 +1138,8 @@ enabled = ["view", "align", "regions", "classes"]
 order = ["align", "regions", "view", "classes"]
 
 [tools.packs.python]
-package = "dejaview-tools"
-version = "0.1.0"
+package = "dejaview-tools"              # a provisioned bundle, by package and version, or instead:
+version = "0.1.0"                       # command = "./server", args = []  (an executable to run, for tests)
 env = ["DEJAVIEW_MODEL_DIR"]            # extra variables passed through, credential names refused
 startup_timeout_s = 120
 shared = false
@@ -1153,7 +1161,7 @@ on_unsure = "pass"                      # fail | pass | review ; exit code only
 on_error = "review"
 
 [cache]
-dir = "~/.cache/dejaview"
+dir = "~/.cache/dejaview"              # caching is off until a dir is set
 read = true
 write = true
 

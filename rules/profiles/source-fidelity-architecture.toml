@@ -1,0 +1,27 @@
+# Profile of source fidelity for staged venue photography: permanent structure must hold; dressing
+# may change and may cover structure. The furniture exemption waives nothing: a consumer permits a
+# specific structural change with a job requirement of kind `allowed` that waives SF1 and states its
+# condition.
+[rules]
+use_case = "source-fidelity"
+profile = "architecture"
+extends = "source-fidelity"
+version = 1
+
+[[rule]]
+id = "SF1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+hidden_ok = true
+text = "Permanent structure (walls, floors, ceilings, columns, pools, roads, built landmarks) keeps its shape, position and extent relative to the source."
+
+[[rule]]
+id = "SF3"
+kind = "allowed"
+waives = []
+text = "Furniture, people, vehicles, decoration, textiles, lighting and vegetation may change, appear or disappear."
+
+[hints.regions]
+preserve = ["wall", "floor", "ceiling", "column", "swimming pool", "building", "road"]
+ignore = ["chair", "table", "person", "plant", "curtain", "lamp", "car"]

@@ -1,0 +1,14 @@
+# Minimal config with the fake regions tool enabled (tests only).
+[provider]
+profile = "fake"
+model = "fake-model"
+
+[tools]
+enabled = ["fake_regions"]
+
+[privacy]
+cloud_calls = true
+account = "fake:test"
+
+[output]
+dir = "./dejaview-out"

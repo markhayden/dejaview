@@ -1,0 +1,12 @@
+# Consumer rules: SF1 may be hidden behind something else without making the verdict unsure.
+[rules]
+use_case = "source-fidelity"
+version = 2
+
+[[rule]]
+id = "SF1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+hidden_ok = true
+text = "Every protected subject keeps its identity, shape, position and extent relative to the source."

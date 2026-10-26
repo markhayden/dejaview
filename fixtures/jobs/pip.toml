@@ -1,0 +1,38 @@
+# The spec's reference-consistency example: Pip the dog on a starship bridge, two references, two
+# requirements (one of them an exemption that waives RC3 under a condition).
+[job]
+use_case = "reference-consistency"
+brief = "A golden retriever named Pip on the bridge of a starship, evening light."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:pip"]
+text = "Pip's white chest patch is visible and the same shape as in the reference."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "allowed"
+waives = ["RC3"]
+scope = ["candidate"]
+evidence = ["ref:pip"]
+condition = "The clothing is a uniform worn over the body and the body shape under it is unchanged."
+text = "Pip may wear a uniform; clothing over the body is an allowed change."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "fixtures/images/candidate-64x48.png" }
+
+[[job.images]]
+id = "ref:pip"
+role = "reference"
+label = "Pip, the dog"
+source = { path = "fixtures/images/source-64x48.png" }
+
+[[job.images]]
+id = "ref:bridge"
+role = "reference"
+label = "the bridge set"
+source = { path = "fixtures/images/two-to-one-128x64.png" }

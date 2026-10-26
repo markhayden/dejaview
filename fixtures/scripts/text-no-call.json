@@ -1,0 +1,16 @@
+[
+  {
+    "tool_calls": [],
+    "stop_reason": "end_turn",
+    "text": [
+      "I think it is fine."
+    ]
+  },
+  {
+    "tool_calls": [],
+    "stop_reason": "end_turn",
+    "text": [
+      "I think it is fine."
+    ]
+  }
+]

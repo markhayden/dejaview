@@ -1,0 +1,18 @@
+# Source fidelity with the architectural profile and the regions tool enabled (hints kept).
+[provider]
+profile = "fake"
+model = "fake-model"
+
+[rules]
+base = "source-fidelity"
+profile = "architecture"
+
+[tools]
+enabled = ["regions"]
+
+[privacy]
+cloud_calls = true
+account = "fake:test"
+
+[output]
+dir = "./dejaview-out"

@@ -9,7 +9,7 @@ dist_version := "0.32.0"
 bootstrap:
     cargo install cargo-deny --version {{deny_version}} --locked
     cargo install cargo-dist --version {{dist_version}} --locked
-    @command -v uv >/dev/null || echo "uv not found: install from https://docs.astral.sh/uv/ before M1 task 1.14"
+    @command -v uv >/dev/null || echo "uv not found: install from https://docs.astral.sh/uv/ (the Python tool pack needs it)"
 
 # Everything a commit must pass: fmt, clippy and tests in both feature configurations, deny, graph.
 check: fmt-check clippy test deny graph hooks-test checks-test
@@ -39,6 +39,18 @@ graph:
 # Usage: just check-filter dejaview-core -- image frames
 check-filter package *filters:
     scripts/check-filter.sh {{package}} {{filters}}
+
+# The Python tool pack: lint, format check and tests (needs uv; network on the first `uv sync`).
+python-check:
+    cd tools/python && uv sync --frozen && uv run --frozen --offline --no-sync ruff check . && uv run --frozen --offline --no-sync ruff format --check . && uv run --frozen --offline --no-sync pytest -q
+
+# Build the pack's provisioning bundle into tools/python/dist/bundle-<version>/.
+bundle:
+    scripts/build-bundle.sh
+
+# Install the built bundle into a clean directory and call the pack through MCP (needs uv).
+provisioning-test: bundle
+    cargo test -p dejaview-tools --test provisioning -- --ignored
 
 # Install the git hooks (task 0.2).
 hooks:

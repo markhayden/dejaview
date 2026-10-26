@@ -4,6 +4,7 @@
 
 pub mod aggregate;
 pub mod artifacts;
+pub mod cache;
 pub mod checklist;
 pub mod config;
 pub mod decision;

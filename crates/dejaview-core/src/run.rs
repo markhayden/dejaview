@@ -2,7 +2,7 @@
 //! final turn, aggregate, record. A decision is one or two independent runs combined (`decision`).
 //! Every step is journaled as a typed event (`events`); the report is derived from the journal
 //! (`report::Report::rebuild`), so what the run holds in memory is only what the loop needs.
-//! Task 1.11 adds the cache at the decision boundary.
+//! The cache is consulted once per decision, before the first run (`cache`).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -12,6 +12,7 @@ use schemars::JsonSchema;
 
 use crate::aggregate::{self, Verdict};
 use crate::artifacts::{ArtifactRef, ArtifactStore};
+use crate::cache::{Cache, CacheStatus, KeyInput};
 use crate::checklist::Checklist;
 use crate::config::Config;
 use crate::decision::Decision;
@@ -43,6 +44,7 @@ pub struct Outcome {
     /// The first run's error, when the decision is an error.
     pub error: Option<String>,
     pub exit_code: i32,
+    pub cache: CacheStatus,
 }
 
 /// Exit code for a decision that ended in an error under the default policy.
@@ -59,6 +61,8 @@ pub struct Services<'a> {
     pub shared_ledger: Option<&'a dyn Ledger>,
     /// Cooperative cancellation (SIGINT, SIGTERM): the run appends `cancelled` and ends.
     pub cancel: Option<&'a Cancel>,
+    /// An evaluation run: never reads the cache (its records must be fresh).
+    pub evaluation: bool,
     /// Test knob: fail the first run's journal append at this sequence number, as if the process
     /// had died between an artifact write and its event.
     pub fail_journal_at: Option<u64>,
@@ -71,6 +75,7 @@ impl<'a> Services<'a> {
             tools,
             shared_ledger: None,
             cancel: None,
+            evaluation: false,
             fail_journal_at: None,
         }
     }
@@ -143,22 +148,47 @@ pub async fn check(
         return Err(Error::Config("decision_runs must be 1 or 2".into()));
     }
     let dir = new_decision_dir(out_dir)?;
-    let prepared = resolve_rules(config, job, job_base, tools);
-    let job_ledger = CapLedger::new(config.budget.spend_cap_usd);
-    let envelope = match (&prepared, provider.pricing()) {
-        (Ok(p), Some(pricing)) => Some(ledger::plan(config, &plan_input(p, job, tools), pricing)),
-        (Ok(_), None) => Some(Err(Error::Budget(
-            "the provider cannot bound request costs; refusing to run".into(),
-        ))),
-        (Err(_), _) => None,
-    };
-    DecisionHeader {
+    let setup = setup(config, job, job_base, tools);
+
+    // The cache, once per decision: a hit returns the whole cached decision before any request.
+    let cache = Cache::from_config(&config.cache)?;
+    let mut cache_status = CacheStatus::off();
+    if let (Ok(s), Some(cache)) = (&setup, &cache) {
+        let key = KeyInput::gather(
+            config,
+            job,
+            &s.images,
+            &s.prepared,
+            tools,
+            provider.id(),
+            harness_version,
+        )
+        .key()?;
+        cache_status = CacheStatus {
+            status: if services.evaluation {
+                "bypass"
+            } else {
+                "miss"
+            }
+            .into(),
+            key: Some(key.clone()),
+            source: None,
+        };
+        if config.cache.read
+            && !services.evaluation
+            && let Some(entry) = cache.lookup(&key)?
+        {
+            cache_status.status = "hit".into();
+            cache_status.source = Some(entry.decision_dir.clone());
+        }
+    }
+    let header = DecisionHeader {
         report_version: REPORT_VERSION,
         harness_version: harness_version.to_string(),
         use_case: job.use_case.clone(),
         job: job.summary(),
         config: config.redacted_json(),
-        rules: prepared.as_ref().ok().map(|p| p.summary.clone()),
+        rules: setup.as_ref().ok().map(|s| s.prepared.summary.clone()),
         prompt_version: render::PROMPT_VERSION.to_string(),
         provider: provider.id().to_string(),
         tools: tools
@@ -168,7 +198,31 @@ pub async fn check(
         decision_runs: config.budget.decision_runs,
         policy: config.policy.clone(),
         cap_usd: config.budget.spend_cap_usd,
+        envelope: None,
+        cache: cache_status.clone(),
+    };
+    if cache_status.is_hit() {
+        header.write(&dir)?;
+        let report = Report::rebuild(&dir)?;
+        report.write(&dir)?;
+        return Ok(outcome(dir, report));
+    }
+
+    let job_ledger = CapLedger::new(config.budget.spend_cap_usd);
+    let envelope = match (&setup, provider.pricing()) {
+        (Ok(s), Some(pricing)) => Some(ledger::plan(
+            config,
+            &plan_input(&s.prepared, job, tools),
+            pricing,
+        )),
+        (Ok(_), None) => Some(Err(Error::Budget(
+            "the provider cannot bound request costs; refusing to run".into(),
+        ))),
+        (Err(_), _) => None,
+    };
+    DecisionHeader {
         envelope: envelope.as_ref().and_then(|e| e.as_ref().ok().cloned()),
+        ..header
     }
     .write(&dir)?;
 
@@ -183,10 +237,7 @@ pub async fn check(
     for n in 1..=config.budget.decision_runs {
         let run_dir = dir.join(format!("run-{n}"));
         std::fs::create_dir(&run_dir)?;
-        run_once(
-            config, job, job_base, services, &prepared, &run_dir, n, &mut money,
-        )
-        .await?;
+        run_once(config, services, &setup, &run_dir, n, &mut money).await?;
     }
     if let Some(account) = money.account.take() {
         let closing = account.close();
@@ -198,7 +249,19 @@ pub async fn check(
 
     let report = Report::rebuild(&dir)?;
     report.write(&dir)?;
-    Ok(Outcome {
+    // Written once, after every run, only when none errored.
+    if let (Some(cache), Some(key)) = (&cache, &cache_status.key)
+        && config.cache.write
+        && report.verdict.is_some()
+        && report.runs.iter().all(|r| r.error.is_none())
+    {
+        cache.store(key, &dir)?;
+    }
+    Ok(outcome(dir, report))
+}
+
+fn outcome(dir: PathBuf, report: Report) -> Outcome {
+    Outcome {
         dir,
         error: report
             .runs
@@ -206,18 +269,34 @@ pub async fn check(
             .find_map(|r| r.error.as_ref().map(|e| e.message.clone())),
         exit_code: report.exit_code,
         decision: report.decision,
-    })
+        cache: report.cache,
+    }
+}
+
+/// What every run of a decision shares: the resolved rules and the decoded images.
+pub struct Setup {
+    pub prepared: Prepared,
+    pub images: Vec<CanonicalImage>,
+}
+
+/// Resolves the rules and decodes the images once per decision.
+pub fn setup(config: &Config, job: &Job, job_base: &Path, tools: &ToolRegistry) -> Result<Setup> {
+    let prepared = resolve_rules(config, job, job_base, tools)?;
+    let bounds = config.images.decode_bounds();
+    let images = job
+        .images
+        .iter()
+        .map(|spec| image::load(spec, job_base, &bounds))
+        .collect::<Result<Vec<_>>>()?;
+    Ok(Setup { prepared, images })
 }
 
 /// One run of the state machine, recorded in its journal. Never fails for run-level reasons:
 /// those become the run's terminal event; only I/O on the journal propagates.
-#[allow(clippy::too_many_arguments)]
 async fn run_once(
     config: &Config,
-    job: &Job,
-    job_base: &Path,
     services: &Services<'_>,
-    prepared: &Result<Prepared>,
+    setup: &Result<Setup>,
     run_dir: &Path,
     n: u32,
     money: &mut Money<'_>,
@@ -229,20 +308,10 @@ async fn run_once(
         journal.fail_at(seq);
     }
     let mut state = RunState::new(run_dir, n, &config.secrets)?;
-    let result = match prepared {
-        Ok(p) => {
-            drive(
-                config,
-                job,
-                job_base,
-                services,
-                p,
-                &mut journal,
-                &mut state,
-                money,
-            )
-            .await
-        }
+    let result = match setup {
+        Ok(s) => drive(config, services, s, &mut journal, &mut state, money).await,
+        // The rules or an image failed to resolve; the class is the error's own.
+        Err(Error::Image(m)) => Err(Error::Image(m.clone())),
         Err(e) => Err(Error::Config(e.to_string())),
     };
     match result {
@@ -452,26 +521,19 @@ fn not_executed(call: &ToolCall, reason: &str) -> Event {
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn drive(
     config: &Config,
-    job: &Job,
-    job_base: &Path,
     services: &Services<'_>,
-    prepared: &Prepared,
+    setup: &Setup,
     journal: &mut Journal,
     state: &mut RunState,
     money: &mut Money<'_>,
 ) -> Result<Verdict> {
     let provider = services.provider;
     let tools = services.tools;
-    // Resolve.
-    let bounds = config.images.decode_bounds();
-    state.images = job
-        .images
-        .iter()
-        .map(|spec| image::load(spec, job_base, &bounds))
-        .collect::<Result<Vec<_>>>()?;
+    let prepared = &setup.prepared;
+    // Resolve: the shared images and rules become this run's state.
+    state.images = setup.images.clone();
     state.instances = prepared.resolved.instances.clone();
     state.checklist = prepared.checklist.clone();
     for img in &state.images {

@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::aggregate::{Confidence, Disposition, Row, Verdict};
 use crate::artifacts::ArtifactRef;
+use crate::cache::CacheStatus;
 use crate::checklist::Checklist;
 use crate::config::PolicyConfig;
 use crate::decision::{self, Decision, DecisionItem, RunSummary};
@@ -61,6 +62,8 @@ pub struct DecisionHeader {
     pub cap_usd: f64,
     /// The planned decision envelope; `None` when it could not be planned.
     pub envelope: Option<Envelope>,
+    /// How the cache figured: on a hit, `source` names the decision this one is a copy of.
+    pub cache: CacheStatus,
 }
 
 impl DecisionHeader {
@@ -104,6 +107,7 @@ pub struct Report {
     pub exit_code: i32,
     /// The decision envelope and what it came to.
     pub cost: CostSummary,
+    pub cache: CacheStatus,
 }
 
 /// Money for the decision (SPEC "Cost ledger"), derived from the journals.
@@ -413,6 +417,18 @@ impl Report {
     /// complete or partial. Missing runs make the decision an error.
     pub fn rebuild(dir: &Path) -> Result<Report> {
         let header = DecisionHeader::read(dir)?;
+        if header.cache.is_hit() {
+            // A hit holds no runs of its own: the decision is the source's, with this cache status.
+            let source = header.cache.source.clone().ok_or_else(|| {
+                Error::Io(std::io::Error::other(format!(
+                    "{}: a cache hit without a source",
+                    dir.join(HEADER_FILE).display()
+                )))
+            })?;
+            let mut report = Report::rebuild(&source)?;
+            report.cache = header.cache;
+            return Ok(report);
+        }
         let mut runs = Vec::new();
         let mut envelope: Option<Envelope> = header.envelope.clone();
         for n in 1..=header.decision_runs {
@@ -486,6 +502,7 @@ impl Report {
             policy: header.policy,
             exit_code,
             cost,
+            cache: header.cache,
         })
     }
 

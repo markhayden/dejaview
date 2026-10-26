@@ -30,7 +30,7 @@ tag.
 - [x] 1.9 Cost ledger
 - [x] 1.10a Journal and artifact durability
 - [x] 1.10b Report, schema, rebuild, prune
-- [ ] 1.11 Cache at the decision boundary
+- [x] 1.11 Cache at the decision boundary
 - [ ] 1.12 Isolation, environment filter, exit codes
 - [ ] 1.13 Minimal MCP client against a fake server
 - [ ] 1.14 Minimal provisioning bundle proof

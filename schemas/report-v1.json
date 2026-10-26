@@ -32,6 +32,33 @@
       ],
       "type": "object"
     },
+    "CacheStatus": {
+      "additionalProperties": false,
+      "description": "How the cache figured in a decision, as the header and report record it.",
+      "properties": {
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source": {
+          "description": "On a hit: the decision directory the result came from.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "description": "`off` (no `[cache] dir`, or the rules did not resolve), `miss`, `hit` or `bypass`\n(an evaluation, which never reads).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "type": "object"
+    },
     "CanonicalImage": {
       "additionalProperties": false,
       "description": "A loaded job image.",
@@ -1186,6 +1213,9 @@
   "additionalProperties": false,
   "description": "The decision-level report.",
   "properties": {
+    "cache": {
+      "$ref": "#/$defs/CacheStatus"
+    },
     "config": true,
     "cost": {
       "$ref": "#/$defs/CostSummary",
@@ -1275,7 +1305,8 @@
     "decision",
     "policy",
     "exit_code",
-    "cost"
+    "cost",
+    "cache"
   ],
   "title": "Report",
   "type": "object"

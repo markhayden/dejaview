@@ -247,6 +247,16 @@ fn check(args: &CheckArgs) -> i32 {
                 (None, Some(e)) => eprintln!("error: {}", redacted(e, &config)),
                 (None, None) => eprintln!("error: run ended without a verdict or an error"),
             }
+            if o.cache.is_hit() {
+                eprintln!(
+                    "cache: hit (source: {})",
+                    o.cache
+                        .source
+                        .as_deref()
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_default()
+                );
+            }
             eprintln!("decision: {}", o.dir.display());
             o.exit_code
         }

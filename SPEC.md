@@ -1160,7 +1160,7 @@ on_unsure = "pass"                      # fail | pass | review ; exit code only
 on_error = "review"
 
 [cache]
-dir = "~/.cache/dejaview"
+dir = "~/.cache/dejaview"              # caching is off until a dir is set
 read = true
 write = true
 

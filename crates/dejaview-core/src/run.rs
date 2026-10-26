@@ -1,37 +1,40 @@
-//! The run: resolve the job, show it to the model, take the submission, aggregate, record. Task
-//! 1.1 is the walking slice: one turn, one submission. Tool turns, the final turn, repairs, the
-//! ledger and the cache arrive in tasks 1.7a to 1.11.
+//! The run: resolve the job, show it to the model, take the submission, aggregate, record. A
+//! decision is one or two independent runs combined (`decision`). Tool turns, the final turn,
+//! repairs, the ledger and the cache arrive in tasks 1.7a to 1.11.
 
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::aggregate::{self, Row, Verdict};
+use crate::aggregate::{self, Verdict};
 use crate::checklist::Checklist;
 use crate::config::Config;
+use crate::decision::{self, Decision, DecisionItem, RunSummary};
 use crate::frames::Registry;
 use crate::image::{self, CanonicalImage};
-use crate::job::{Job, JobSummary};
+use crate::job::Job;
 use crate::journal::Journal;
 use crate::obligations::{self, Instance, MergeInput, Resolved, RulesFile};
 use crate::provider::{ContentBlock, Message, MessageRole, Provider, StopReason, TurnRequest};
 use crate::render;
-use crate::report::{ErrorEntry, InstanceEntry, ItemRow, REPORT_VERSION, Report};
+use crate::report::{ErrorEntry, InstanceEntry, ItemRow, REPORT_VERSION, Report, RunReport};
 use crate::submission::{self, ValidationContext};
 use crate::{Error, Result};
 
-/// What `check` produced: a verdict or an error, and where the run directory is.
+/// What `check` produced: a decision and where its directory is.
 #[derive(Debug)]
 pub struct Outcome {
-    pub run_dir: PathBuf,
-    pub verdict: Option<Verdict>,
-    pub error: Option<Error>,
+    pub dir: PathBuf,
+    pub decision: Decision,
+    /// The first run's error, when the decision is an error.
+    pub error: Option<String>,
     pub exit_code: i32,
 }
 
-/// Exit code for a run that ended in an error.
+/// Exit code for a decision that ended in an error under the default policy.
 pub const EXIT_ERROR: i32 = 3;
 
-/// Runs one check end to end and writes its journal and report under `out_dir`.
+/// Runs one decision (`budget.decision_runs` independent runs) and writes its report under
+/// `out_dir/<decision dir>/`, with each run's journal under `run-<n>/`.
 pub async fn check(
     config: &Config,
     job: &Job,
@@ -40,104 +43,134 @@ pub async fn check(
     out_dir: &Path,
     harness_version: &str,
 ) -> Result<Outcome> {
-    let run_dir = new_run_dir(out_dir)?;
-    let mut journal = Journal::create(&run_dir)?;
-    let mut state = RunState::new(config, job, provider, harness_version);
+    let dir = new_decision_dir(out_dir)?;
+    let prepared = resolve_rules(config, job, job_base);
 
-    let result = drive(config, job, job_base, provider, &mut journal, &mut state).await;
-    let outcome = match result {
-        Ok(verdict) => {
-            journal.append("verdict", serde_json::json!({ "verdict": verdict }))?;
-            Outcome {
-                run_dir: run_dir.clone(),
-                verdict: Some(verdict),
-                error: None,
-                exit_code: verdict.exit_code(),
-            }
+    let mut runs: Vec<RunReport> = Vec::new();
+    let mut summaries: Vec<RunSummary> = Vec::new();
+    let mut first_error: Option<String> = None;
+    for n in 1..=config.budget.decision_runs {
+        let run_dir = dir.join(format!("run-{n}"));
+        std::fs::create_dir(&run_dir)?;
+        let (report, summary, error) =
+            run_once(config, job, job_base, provider, &prepared, &run_dir, n).await?;
+        if first_error.is_none() {
+            first_error = error;
+        }
+        runs.push(report);
+        summaries.push(summary);
+    }
+
+    let decision = match summaries.as_slice() {
+        [one] => decision::single(one),
+        [a, b] => decision::combine(a, b),
+        _ => return Err(Error::Config("decision_runs must be 1 or 2".into())),
+    };
+    let exit_code = decision::exit_code(decision.verdict, &config.policy);
+    let rules_summary = prepared.as_ref().ok().map(|p| p.summary.clone());
+    let report = Report {
+        report_version: REPORT_VERSION,
+        harness_version: harness_version.to_string(),
+        use_case: job.use_case.clone(),
+        job: job.summary(),
+        config: config.redacted_json(),
+        rules: rules_summary,
+        provider: provider.id().to_string(),
+        decision_runs: config.budget.decision_runs,
+        runs,
+        decision: decision.clone(),
+        verdict: decision.verdict,
+        policy: config.policy.clone(),
+        exit_code,
+    };
+    report.write(&dir)?;
+    Ok(Outcome {
+        dir,
+        decision,
+        error: first_error,
+        exit_code,
+    })
+}
+
+/// One run of the state machine. Never fails for run-level reasons: those become the run's error
+/// entry; only I/O on the journal propagates.
+async fn run_once(
+    config: &Config,
+    job: &Job,
+    job_base: &Path,
+    provider: &dyn Provider,
+    prepared: &Result<Prepared>,
+    run_dir: &Path,
+    n: u32,
+) -> Result<(RunReport, RunSummary, Option<String>)> {
+    let mut journal = Journal::create(run_dir)?;
+    let mut state = RunState::default();
+    let result = match prepared {
+        Ok(p) => drive(config, job, job_base, provider, p, &mut journal, &mut state).await,
+        Err(e) => Err(Error::Config(e.to_string())),
+    };
+    let (verdict, error) = match result {
+        Ok(v) => {
+            journal.append("verdict", serde_json::json!({ "verdict": v }))?;
+            (Some(v), None)
         }
         Err(e) => {
             journal.append(
                 "error",
                 serde_json::json!({ "class": e.class(), "message": e.to_string() }),
             )?;
-            state.error = Some(ErrorEntry {
-                class: e.class().into(),
-                message: e.to_string(),
-            });
-            Outcome {
-                run_dir: run_dir.clone(),
-                verdict: None,
-                error: Some(e),
-                exit_code: EXIT_ERROR,
-            }
+            (None, Some(e))
         }
     };
-    state
-        .report(outcome.verdict, outcome.exit_code)
-        .write(&run_dir)?;
-    Ok(outcome)
+    let error_text = error.as_ref().map(ToString::to_string);
+    let report = RunReport {
+        run: n,
+        images: state.images.clone(),
+        instances: state
+            .instances
+            .iter()
+            .map(|i| InstanceEntry {
+                id: i.id(),
+                instance: i.clone(),
+            })
+            .collect(),
+        checklist: state.checklist.clone(),
+        items: state.items.clone(),
+        verdict,
+        error: error.map(|e| ErrorEntry {
+            class: e.class().into(),
+            message: e.to_string(),
+        }),
+    };
+    let summary = RunSummary {
+        verdict,
+        items: state
+            .items
+            .iter()
+            .map(|row| {
+                let entry = state.checklist.get(&row.id);
+                DecisionItem {
+                    id: row.id.clone(),
+                    disposition: row.disposition,
+                    confidence: row.confidence,
+                    allowed_by: row.allowed_by.clone(),
+                    root_image: entry.and_then(|c| c.root_image.clone()),
+                    instance_ids: entry.map(|c| c.instance_ids.clone()).unwrap_or_default(),
+                    root_location: entry.and_then(|c| c.root_location.clone()),
+                }
+            })
+            .collect(),
+    };
+    Ok((report, summary, error_text))
 }
 
+#[derive(Default)]
 struct RunState {
-    use_case: String,
-    job: JobSummary,
-    config: serde_json::Value,
-    rules: Option<RulesSummary>,
-    resolved: Option<Resolved>,
-    provider_id: String,
-    harness_version: String,
     images: Vec<CanonicalImage>,
     instances: Vec<Instance>,
     checklist: Checklist,
     registry: Registry,
     items: Vec<ItemRow>,
-    error: Option<ErrorEntry>,
-}
-
-impl RunState {
-    fn new(config: &Config, job: &Job, provider: &dyn Provider, harness_version: &str) -> RunState {
-        RunState {
-            use_case: job.use_case.clone(),
-            job: job.summary(),
-            config: config.redacted_json(),
-            rules: None,
-            resolved: None,
-            provider_id: provider.id().to_string(),
-            harness_version: harness_version.to_string(),
-            images: Vec::new(),
-            instances: Vec::new(),
-            checklist: Checklist::default(),
-            registry: Registry::new(),
-            items: Vec::new(),
-            error: None,
-        }
-    }
-
-    fn report(&self, verdict: Option<Verdict>, exit_code: i32) -> Report {
-        Report {
-            report_version: REPORT_VERSION,
-            harness_version: self.harness_version.clone(),
-            use_case: self.use_case.clone(),
-            job: self.job.clone(),
-            config: self.config.clone(),
-            rules: self.rules.clone(),
-            images: self.images.clone(),
-            instances: self
-                .instances
-                .iter()
-                .map(|i| InstanceEntry {
-                    id: i.id(),
-                    instance: i.clone(),
-                })
-                .collect(),
-            checklist: self.checklist.clone(),
-            items: self.items.clone(),
-            provider: self.provider_id.clone(),
-            verdict,
-            error: self.error.clone(),
-            exit_code,
-        }
-    }
 }
 
 async fn drive(
@@ -145,6 +178,7 @@ async fn drive(
     job: &Job,
     job_base: &Path,
     provider: &dyn Provider,
+    prepared: &Prepared,
     journal: &mut Journal,
     state: &mut RunState,
 ) -> Result<Verdict> {
@@ -155,10 +189,7 @@ async fn drive(
         .iter()
         .map(|spec| image::load(spec, job_base, &bounds))
         .collect::<Result<Vec<_>>>()?;
-    let prepared = resolve_rules(config, job, job_base)?;
-    state.rules = Some(prepared.summary.clone());
     state.instances = prepared.resolved.instances.clone();
-    state.resolved = Some(prepared.resolved);
     state.checklist = prepared.checklist.clone();
     for img in &state.images {
         state
@@ -168,23 +199,18 @@ async fn drive(
     journal.append(
         "resolved",
         serde_json::json!({
-            "images": state.images.iter().map(|i| serde_json::json!({"id": i.id, "role": i.role, "sha256": i.sha256, "width": i.width, "height": i.height})).collect::<Vec<_>>(),
+            "images": state.images.iter().map(|i| serde_json::json!({"id": i.id, "role": i.role, "sha256": i.sha256, "canonical_sha256": i.canonical_sha256, "width": i.width, "height": i.height, "projection": i.projection, "warnings": i.warnings})).collect::<Vec<_>>(),
             "instances": state.instances.iter().map(Instance::id).collect::<Vec<_>>(),
             "checklist": state.checklist.ids().collect::<Vec<_>>(),
         }),
     )?;
 
     // First look: every image, the checklist, the instruction to submit.
-    let system = match &state.resolved {
-        Some(r) => render::system_prompt(r, job),
-        None => String::new(),
-    };
-    let mut content: Vec<ContentBlock> = state
-        .images
-        .iter()
-        .map(|img| ContentBlock::Text {
+    let mut content: Vec<ContentBlock> = Vec::new();
+    for img in &state.images {
+        content.push(ContentBlock::Text {
             text: format!(
-                "Image `{}` (role {:?}{}, frame raw:{}, {}x{}).",
+                "Image `{}` (role {:?}{}, frame raw:{}, {}x{}, {:?}).",
                 img.id,
                 img.role,
                 img.label
@@ -193,18 +219,14 @@ async fn drive(
                     .unwrap_or_default(),
                 img.id,
                 img.width,
-                img.height
+                img.height,
+                img.projection
             ),
-        })
-        .flat_map(|label| {
-            [
-                label.clone(),
-                ContentBlock::Image {
-                    image_id: image_id_of(&label),
-                },
-            ]
-        })
-        .collect();
+        });
+        content.push(ContentBlock::Image {
+            image_id: img.id.clone(),
+        });
+    }
     content.push(ContentBlock::Text {
         text: state.checklist.render(&state.instances),
     });
@@ -219,10 +241,10 @@ async fn drive(
     }];
     let tools = vec![submission::submit_verdict_tool()];
     let request = TurnRequest {
-        system: &system,
+        system: &prepared.system_prompt,
         history: &history,
         tools: &tools,
-        max_output_tokens: 16_000,
+        max_output_tokens: config.provider.max_output_tokens,
     };
     journal.append(
         "turn_sent",
@@ -239,7 +261,7 @@ async fn drive(
         }),
     )?;
 
-    // The walking slice accepts exactly one submit_verdict call and nothing else.
+    // Until task 1.7a, exactly one submit_verdict call is accepted and nothing else.
     let call = match response.tool_calls.as_slice() {
         [call] if call.name == "submit_verdict" => call,
         [] => {
@@ -261,18 +283,15 @@ async fn drive(
         ));
     }
     let completed: Vec<String> = Vec::new();
-    let sub = match &state.resolved {
-        Some(resolved) => submission::parse_and_validate(
-            &call.arguments,
-            &ValidationContext {
-                checklist: &state.checklist,
-                resolved,
-                registry: &state.registry,
-                completed_calls: &completed,
-            },
-        )?,
-        None => return Err(Error::Submission("internal: rules not resolved".into())),
-    };
+    let sub = submission::parse_and_validate(
+        &call.arguments,
+        &ValidationContext {
+            checklist: &state.checklist,
+            resolved: &prepared.resolved,
+            registry: &state.registry,
+            completed_calls: &completed,
+        },
+    )?;
     journal.append("submission", serde_json::json!({ "call_id": call.id, "items": sub.items.len(), "findings": sub.findings.len() }))?;
 
     // Aggregate: one row per mandatory instance each item depends on, strictest kept.
@@ -296,29 +315,44 @@ async fn drive(
             disposition: item.disposition,
             confidence: item.confidence,
             reason: item.reason.clone(),
+            allowed_by: item.allowed_by.clone(),
             location: item.location.clone(),
             row,
         });
     }
-    let rows: Vec<Row> = rows;
+    for f in &sub.findings {
+        // Findings contribute rows through the mandatory instances they cite on their image.
+        let d: aggregate::Disposition = f.disposition.into();
+        if d == aggregate::Disposition::Observed {
+            continue;
+        }
+        let root = state.registry.to_root(&f.location).ok().and_then(|m| {
+            state
+                .registry
+                .get(&m.location.frame)
+                .map(|fr| fr.root().to_string())
+        });
+        let row = aggregate::strictest(
+            state
+                .instances
+                .iter()
+                .filter(|i| {
+                    f.obligation_ids.contains(&i.obligation_id) && Some(&i.target) == root.as_ref()
+                })
+                .map(|i| aggregate::row(i, d, f.confidence)),
+        );
+        rows.push(row);
+    }
     Ok(aggregate::verdict(&rows))
 }
 
-/// Recovers the image id from the label block built above. Kept local to the walking slice.
-fn image_id_of(label: &ContentBlock) -> String {
-    match label {
-        ContentBlock::Text { text } => text.split('`').nth(1).unwrap_or_default().to_string(),
-        _ => String::new(),
-    }
-}
-
-fn new_run_dir(out_dir: &Path) -> Result<PathBuf> {
+fn new_decision_dir(out_dir: &Path) -> Result<PathBuf> {
     std::fs::create_dir_all(out_dir)?;
     let unix_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0);
-    let dir = out_dir.join(format!("run-{unix_ms}-{}", std::process::id()));
+    let dir = out_dir.join(format!("decision-{unix_ms}-{}", std::process::id()));
     std::fs::create_dir(&dir)?;
     Ok(dir)
 }

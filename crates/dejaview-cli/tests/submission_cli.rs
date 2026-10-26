@@ -53,5 +53,5 @@ fn a_submission_missing_an_item_is_a_submission_error() {
     let report: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(run_dir.join("report.json")).unwrap())
             .unwrap();
-    assert_eq!(report["error"]["class"], "submission_invalid");
+    assert_eq!(report["runs"][0]["error"]["class"], "submission_invalid");
 }

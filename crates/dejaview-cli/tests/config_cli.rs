@@ -170,7 +170,7 @@ fn shorthand_job_equals_the_job_file() {
         "resolved jobs differ:\n{}\n{}",
         ra["job"], rb["job"]
     );
-    assert_eq!(ra["images"], rb["images"]);
+    assert_eq!(ra["runs"][0]["images"], rb["runs"][0]["images"]);
 }
 
 #[test]

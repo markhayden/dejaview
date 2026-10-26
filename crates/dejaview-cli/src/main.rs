@@ -219,17 +219,17 @@ fn check(args: &CheckArgs) -> i32 {
     ));
     match outcome {
         Ok(o) => {
-            match (&o.verdict, &o.error) {
+            match (&o.decision.verdict, &o.error) {
                 (Some(v), _) => println!(
                     "{}",
                     serde_json::to_string(v)
                         .unwrap_or_default()
                         .trim_matches('"')
                 ),
-                (None, Some(e)) => eprintln!("error: {}", redacted(&e.to_string(), &config)),
+                (None, Some(e)) => eprintln!("error: {}", redacted(e, &config)),
                 (None, None) => eprintln!("error: run ended without a verdict or an error"),
             }
-            eprintln!("run: {}", o.run_dir.display());
+            eprintln!("decision: {}", o.dir.display());
             o.exit_code
         }
         Err(e) => {

@@ -59,7 +59,7 @@ fn exif_rotated_candidate_reports_upright_dimensions_and_both_hashes() {
         String::from_utf8_lossy(&o.stderr)
     );
     let r = report(&out);
-    let candidate = r["images"]
+    let candidate = r["runs"][0]["images"]
         .as_array()
         .unwrap()
         .iter()
@@ -85,6 +85,6 @@ fn oversized_candidate_is_refused_as_a_resolve_error_naming_the_bound() {
     let stderr = String::from_utf8_lossy(&o.stderr);
     assert!(stderr.contains("50000000"), "names the bound: {stderr}");
     let r = report(&out);
-    assert_eq!(r["error"]["class"], "resolve");
+    assert_eq!(r["runs"][0]["error"]["class"], "resolve");
     assert!(r["verdict"].is_null());
 }

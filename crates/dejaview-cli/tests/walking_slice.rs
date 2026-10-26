@@ -49,7 +49,7 @@ fn journal_events(out: &Path) -> Vec<String> {
         .map(|e| e.unwrap().path())
         .find(|p| p.is_dir())
         .unwrap();
-    let text = std::fs::read_to_string(run_dir.join("journal.jsonl")).expect("journal.jsonl");
+    let text = std::fs::read_to_string(run_dir.join("run-1/journal.jsonl")).expect("journal.jsonl");
     text.lines()
         .map(|l| {
             serde_json::from_str::<serde_json::Value>(l).unwrap()["event"]
@@ -73,7 +73,7 @@ fn held_disposition_passes_with_exit_0() {
     let r = report(&out);
     assert_eq!(r["report_version"], 1);
     assert_eq!(r["verdict"], "pass");
-    let ids: Vec<&str> = r["instances"]
+    let ids: Vec<&str> = r["runs"][0]["instances"]
         .as_array()
         .unwrap()
         .iter()
@@ -84,7 +84,7 @@ fn held_disposition_passes_with_exit_0() {
         ["SF1@candidate", "SF2@candidate"],
         "the shipped source-fidelity base resolves two instances"
     );
-    let sf2 = r["items"]
+    let sf2 = r["runs"][0]["items"]
         .as_array()
         .unwrap()
         .iter()
@@ -116,7 +116,7 @@ fn confident_violation_fails_with_exit_1() {
     );
     let r = report(&out);
     assert_eq!(r["verdict"], "fail");
-    let sf2 = r["items"]
+    let sf2 = r["runs"][0]["items"]
         .as_array()
         .unwrap()
         .iter()
@@ -137,7 +137,7 @@ fn report_is_derived_from_an_append_only_journal() {
         .map(|e| e.unwrap().path())
         .find(|p| p.is_dir())
         .unwrap();
-    let text = std::fs::read_to_string(run_dir.join("journal.jsonl")).unwrap();
+    let text = std::fs::read_to_string(run_dir.join("run-1/journal.jsonl")).unwrap();
     let seqs: Vec<u64> = text
         .lines()
         .map(|l| {

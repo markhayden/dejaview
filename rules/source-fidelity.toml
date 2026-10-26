@@ -1,0 +1,34 @@
+# Base rule set: source fidelity. An edited or re-generated image kept what mattered in the
+# original. The job's requirements name the protected subjects and the allowed edits; this base
+# supplies the obligations every source-fidelity job shares. Version is part of the cache key.
+[rules]
+use_case = "source-fidelity"
+version = 1
+requires_roles = ["candidate", "source"]
+default_evidence_kinds = ["change_region", "class_difference", "alignment_failure"]
+
+[[rule]]
+id = "SF1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+text = "Every protected subject or feature named in the job requirements keeps its identity, shape, position and extent relative to the source."
+
+[[rule]]
+id = "SF2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+evidence_kinds = ["alignment_failure"]
+text = "The candidate is derived from the source: same scene, same camera, same projection; nothing rotated, stretched or cropped away."
+
+[[rule]]
+id = "SF3"
+kind = "allowed"
+waives = []
+text = "Changes the job requirements list as allowed are not violations. Cite the requirement that allows them."
+
+[[rule]]
+id = "SF4"
+kind = "observe"
+text = "Any other change is noted with its location."

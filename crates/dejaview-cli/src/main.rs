@@ -29,6 +29,33 @@ struct Cli {
 enum Command {
     /// Judge one image job and print the verdict.
     Check(CheckArgs),
+    /// Inspect rules.
+    Rules(RulesArgs),
+}
+
+#[derive(clap::Args)]
+struct RulesArgs {
+    #[command(subcommand)]
+    command: RulesCommand,
+}
+
+#[derive(Subcommand)]
+enum RulesCommand {
+    /// Print the merged obligations for a config (and optionally a job) with provenance.
+    Show(RulesShowArgs),
+}
+
+#[derive(clap::Args)]
+struct RulesShowArgs {
+    /// Path to the config file; `[rules]` names the base, profile and extra files.
+    #[arg(long)]
+    config: PathBuf,
+    /// Optional job file, so scope, evidence and required roles are checked against it.
+    #[arg(long)]
+    job: Option<PathBuf>,
+    /// Print JSON instead of the table.
+    #[arg(long)]
+    json: bool,
 }
 
 #[derive(clap::Args)]
@@ -74,6 +101,9 @@ fn main() {
             EXIT_USAGE
         }
         Some(Command::Check(args)) => check(&args),
+        Some(Command::Rules(RulesArgs {
+            command: RulesCommand::Show(args),
+        })) => rules_show(&args),
     };
     std::process::exit(code);
 }
@@ -199,4 +229,85 @@ fn select_provider(args: &CheckArgs) -> Result<Box<dyn Provider>, String> {
 #[cfg(not(feature = "testkit"))]
 fn select_provider(_args: &CheckArgs) -> Result<Box<dyn Provider>, String> {
     Err("no provider adapter is available yet (adapters arrive in M2)".into())
+}
+
+fn rules_show(args: &RulesShowArgs) -> i32 {
+    use dejaview_core::obligations::{MergeInput, RulesFile, merge};
+    let config = match Config::load(&args.config) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("dejaview: {e}");
+            return EXIT_USAGE;
+        }
+    };
+    let Some(rules) = &config.rules else {
+        eprintln!("dejaview: the config has no [rules] section");
+        return EXIT_USAGE;
+    };
+    let job = match &args.job {
+        Some(path) => match Job::load(path) {
+            Ok(j) => Some(j),
+            Err(e) => {
+                eprintln!("dejaview: {e}");
+                return EXIT_USAGE;
+            }
+        },
+        None => None,
+    };
+    let mut extra = Vec::new();
+    let mut names = Vec::new();
+    for path in &rules.extra {
+        match RulesFile::load(path) {
+            Ok(f) => {
+                extra.push(f);
+                names.push(path.display().to_string());
+            }
+            Err(e) => {
+                eprintln!("dejaview: {e}");
+                return EXIT_USAGE;
+            }
+        }
+    }
+    let merged = merge(&MergeInput {
+        base: &rules.base,
+        profile: rules.profile.as_deref(),
+        extra: &extra,
+        extra_names: &names,
+        job: job.as_ref(),
+        enabled_tools: &config.tools.enabled,
+    });
+    match merged {
+        Ok(m) => {
+            if args.json {
+                println!("{}", serde_json::to_string_pretty(&m).unwrap_or_default());
+            } else {
+                println!(
+                    "use case: {}  base: {}  profile: {}",
+                    m.use_case,
+                    m.base,
+                    m.profile.as_deref().unwrap_or("-")
+                );
+                for o in &m.obligations {
+                    let ob = &o.obligation;
+                    println!(
+                        "{:<5} {:<10} matters={:<5} hidden_ok={:<5} [{}] {}",
+                        ob.id,
+                        format!("{:?}", ob.kind).to_lowercase(),
+                        ob.matters(),
+                        ob.hidden_ok,
+                        o.provenance,
+                        ob.text
+                    );
+                }
+                for w in &m.warnings {
+                    eprintln!("warning: {w}");
+                }
+            }
+            0
+        }
+        Err(e) => {
+            eprintln!("dejaview: {e}");
+            EXIT_USAGE
+        }
+    }
 }

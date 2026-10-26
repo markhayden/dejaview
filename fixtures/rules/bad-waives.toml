@@ -1,0 +1,10 @@
+[rules]
+use_case = "source-fidelity"
+version = 1
+
+[[rule]]
+id = "MY1"
+kind = "allowed"
+waives = ["ZZ9"]
+condition = "never"
+text = "Waives something that does not exist."

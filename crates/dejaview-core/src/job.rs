@@ -20,6 +20,9 @@ pub struct Job {
     pub use_case: String,
     #[serde(default)]
     pub brief: Option<String>,
+    /// Structured obligations with the same semantics as rules; ids `RQ<n>`.
+    #[serde(default)]
+    pub requirements: Vec<crate::obligations::Obligation>,
     #[serde(default)]
     pub images: Vec<ImageSpec>,
 }
@@ -150,6 +153,7 @@ impl Job {
         let job = Job {
             use_case: use_case.to_string(),
             brief,
+            requirements: Vec::new(),
             images,
         };
         job.validate()?;
@@ -206,6 +210,7 @@ mod tests {
         Job {
             use_case: "source-fidelity".into(),
             brief: None,
+            requirements: Vec::new(),
             images: roles
                 .iter()
                 .map(|(id, role)| ImageSpec {

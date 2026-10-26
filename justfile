@@ -51,3 +51,9 @@ hooks-test:
 # Prove the repository checks (crate graph, filter) fail when they should.
 checks-test:
     scripts/test-checks.sh
+
+# Run the GitHub Actions CI workflow locally in Docker with act (brew install act). First run pulls
+# the runner image and builds from scratch; later runs reuse the image.
+# Pass a job name to run one job: `just ci-local rust`.
+ci-local job="":
+    act push {{ if job == "" { "" } else { "-j " + job } }} -P ubuntu-latest=catthehacker/ubuntu:act-latest --container-architecture linux/amd64 --rm

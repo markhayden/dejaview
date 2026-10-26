@@ -32,3 +32,11 @@ The six package names (`dejaview`, `dejaview-core`, `dejaview-providers`, `dejav
 fallback name is needed. Publication order and the registry install check are task 2.10a.
 
 `cargo-dist` installs an executable named `dist` (run `dist --version`), used from task 2.10b.
+
+## Running CI locally
+
+`brew install act` once, then `just ci-local` runs the GitHub Actions workflow in a Linux
+container on this machine, before anything is pushed. It validates the workflow file, installs
+the pinned toolchain and tools as the runner would, and runs `just check` under GNU tools rather
+than the macOS ones. GitHub's cache action and runner image specifics are the only parts it does
+not reproduce.

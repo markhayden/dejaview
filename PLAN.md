@@ -106,7 +106,9 @@ branches `mN/<task>` merged into the milestone branch when two tasks are in flig
 a later milestone never starts before the earlier milestone merges; owner labelling happens
 outside git and may overlap. A milestone merges into `main` with a merge commit (no squash) after
 the owner's review and the checkpoint checklist passes. Nothing is pushed by the agent; the owner
-pushes.
+pushes. The owner's preference (2026-10-26): branches stay on the owner's machine and `main` is
+pushed only at tagged checkpoints, so the public repository shows reviewed, working states; CI is
+run locally with `just ci-local` before any push.
 
 **Commits.** Conventional Commits with a scope. Every commit on a milestone branch leaves
 `just check` green, which runs `cargo fmt --all -- --check`, `cargo clippy --workspace
@@ -117,7 +119,8 @@ spec, plan, README and docs are updated in the same commit as the change they de
 Attribution lines follow the repository's conventions. Secrets, private images and
 `docs/brief.md` never enter a commit.
 
-**Checkpoints and tags.** When a milestone's checkpoint checklist passes and the owner approves,
+**Checkpoints and tags.** Every later checkpoint also requires `just ci-local` green. When a
+milestone's checkpoint checklist passes and the owner approves,
 the merge commit on `main` is tagged `mN` (annotated, with the checklist and the versions of
 external artifacts: evalsets repository commit, model artifact hashes, published package
 versions). Intermediate tags `mN.k` mark task groups on the milestone branch.
@@ -224,7 +227,8 @@ Generators and licence are deferred to 3.2a. Blank entries name the task they bl
 **Dependencies.** None. **Files.** `docs/owner-decisions.md`. **Size.** S; owner time.
 
 ### Checkpoint M0
-- [ ] `just check` and CI green; hooks installed; README accurate; owner decisions recorded.
+- [ ] `just check` green locally and on a fresh clone; `just ci-local` (the GitHub workflow run in
+      Docker with act) green; hooks installed; README accurate; owner decisions recorded.
 - [ ] Owner review; merge; tag `m0`.
 
 ## Milestone M1: Skeleton

@@ -16,9 +16,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # rustup reads the exact version pinned in rust-toolchain.toml and installs clippy and rustfmt.
+      # GitHub's runner image ships rustup; the act image used by `just ci-local` does not, so
+      # install it when missing.
       - name: Install Rust toolchain from rust-toolchain.toml
-        run: rustup show active-toolchain || rustup toolchain install
+        run: |
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustup show active-toolchain || rustup toolchain install
+      # Cache is a GitHub-only optimisation; act cannot run this Node action under emulation.
       - uses: Swatinem/rust-cache@v2
+        if: ${{ !env.ACT }}
       - name: Install pinned helper tools
         uses: taiki-e/install-action@v2
         with:
@@ -35,14 +45,22 @@ jobs:
   python:
     name: python tool pack
     runs-on: ubuntu-latest
-    # The pack arrives in M1 task 1.14; until then this job is skipped.
-    if: ${{ hashFiles('tools/python/pyproject.toml') != '' }}
-    defaults:
-      run:
-        working-directory: tools/python
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-      - run: uv sync --frozen
-      - run: uv run --frozen --offline --no-sync ruff check . && uv run --frozen --offline --no-sync ruff format --check .
-      - run: uv run --frozen --offline --no-sync pytest
+      # The pack arrives in M1 task 1.14; until then every later step is skipped. (hashFiles is
+      # only valid in step-level conditions, so the detection is a step.)
+      - id: pack
+        name: Detect the Python tool pack
+        run: |
+          if [ -f tools/python/pyproject.toml ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; fi
+      - if: steps.pack.outputs.present == 'true'
+        uses: astral-sh/setup-uv@v6
+      - if: steps.pack.outputs.present == 'true'
+        run: uv sync --frozen
+        working-directory: tools/python
+      - if: steps.pack.outputs.present == 'true'
+        run: uv run --frozen --offline --no-sync ruff check . && uv run --frozen --offline --no-sync ruff format --check .
+        working-directory: tools/python
+      - if: steps.pack.outputs.present == 'true'
+        run: uv run --frozen --offline --no-sync pytest
+        working-directory: tools/python

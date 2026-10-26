@@ -2,11 +2,12 @@
 //! This is the spec's table under "Aggregation", one row per mandatory instance, strictest row
 //! kept. The model's text never reaches these functions.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::obligations::Instance;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Disposition {
     Violation,
@@ -18,7 +19,7 @@ pub enum Disposition {
     Observed,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Confidence {
     Confident,

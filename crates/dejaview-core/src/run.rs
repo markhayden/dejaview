@@ -8,6 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::aggregate::{self, Row, Verdict};
 use crate::checklist::Checklist;
 use crate::config::Config;
+use crate::frames::Registry;
 use crate::image::{self, CanonicalImage};
 use crate::job::{Job, JobSummary};
 use crate::journal::Journal;
@@ -15,7 +16,7 @@ use crate::obligations::{self, Instance, MergeInput, Resolved, RulesFile};
 use crate::provider::{ContentBlock, Message, MessageRole, Provider, StopReason, TurnRequest};
 use crate::render;
 use crate::report::{ErrorEntry, InstanceEntry, ItemRow, REPORT_VERSION, Report};
-use crate::submission;
+use crate::submission::{self, ValidationContext};
 use crate::{Error, Result};
 
 /// What `check` produced: a verdict or an error, and where the run directory is.
@@ -88,6 +89,7 @@ struct RunState {
     images: Vec<CanonicalImage>,
     instances: Vec<Instance>,
     checklist: Checklist,
+    registry: Registry,
     items: Vec<ItemRow>,
     error: Option<ErrorEntry>,
 }
@@ -105,6 +107,7 @@ impl RunState {
             images: Vec::new(),
             instances: Vec::new(),
             checklist: Checklist::default(),
+            registry: Registry::new(),
             items: Vec::new(),
             error: None,
         }
@@ -157,6 +160,11 @@ async fn drive(
     state.instances = prepared.resolved.instances.clone();
     state.resolved = Some(prepared.resolved);
     state.checklist = prepared.checklist.clone();
+    for img in &state.images {
+        state
+            .registry
+            .add_raw(&img.id, img.width, img.height, img.projection);
+    }
     journal.append(
         "resolved",
         serde_json::json!({
@@ -252,7 +260,19 @@ async fn drive(
             "the response was truncated (max_tokens); repairs arrive in task 1.8".into(),
         ));
     }
-    let sub = submission::parse_and_validate(&call.arguments, &state.checklist)?;
+    let completed: Vec<String> = Vec::new();
+    let sub = match &state.resolved {
+        Some(resolved) => submission::parse_and_validate(
+            &call.arguments,
+            &ValidationContext {
+                checklist: &state.checklist,
+                resolved,
+                registry: &state.registry,
+                completed_calls: &completed,
+            },
+        )?,
+        None => return Err(Error::Submission("internal: rules not resolved".into())),
+    };
     journal.append("submission", serde_json::json!({ "call_id": call.id, "items": sub.items.len(), "findings": sub.findings.len() }))?;
 
     // Aggregate: one row per mandatory instance each item depends on, strictest kept.

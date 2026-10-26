@@ -9,10 +9,10 @@ use serde::{Deserialize, Serialize};
 use crate::Result;
 use crate::aggregate::{Confidence, Disposition, Row, Verdict};
 use crate::checklist::Checklist;
+use crate::frames::Location;
 use crate::image::CanonicalImage;
 use crate::job::JobSummary;
 use crate::obligations::Instance;
-use crate::submission::Location;
 
 pub const REPORT_VERSION: u32 = 1;
 

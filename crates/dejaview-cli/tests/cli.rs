@@ -1,6 +1,8 @@
 //! Smoke tests for the binary. These run against the executable Cargo built for this test run,
 //! so with the `testkit` feature off they prove a feature-off binary rejects the scripted flag,
 //! and with it on they prove the flag exists.
+// Integration tests: unwrap is the honest way to fail loudly here.
+#![allow(clippy::unwrap_used)]
 
 use std::process::Command;
 

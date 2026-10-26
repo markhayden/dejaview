@@ -231,6 +231,7 @@ fn check(args: &CheckArgs) -> i32 {
         &tools,
         &out_dir,
         VERSION,
+        None,
     ));
     match outcome {
         Ok(o) => {

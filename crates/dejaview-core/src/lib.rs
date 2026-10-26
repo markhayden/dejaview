@@ -10,6 +10,7 @@ pub mod frames;
 pub mod image;
 pub mod job;
 pub mod journal;
+pub mod ledger;
 pub mod obligations;
 pub mod provider;
 pub mod render;

@@ -4,7 +4,7 @@
 pub mod provider;
 pub mod tool;
 
-pub use provider::{ScriptTurn, ScriptedProvider};
+pub use provider::{FAKE_PRICES, ScriptTurn, ScriptedProvider};
 pub use tool::ScriptedTool;
 
 /// Errors this crate produces.

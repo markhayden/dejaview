@@ -119,6 +119,11 @@ pub trait Provider: Send + Sync {
     fn id(&self) -> &str;
     /// Sends one turn and returns the model's response.
     fn send<'a>(&'a self, req: TurnRequest<'a>) -> SendFuture<'a>;
+    /// The model's prices and token estimates for the ledger; `None` means no request can be
+    /// bounded, and the run is refused before any request.
+    fn pricing(&self) -> Option<&dyn crate::ledger::Pricing> {
+        None
+    }
 }
 
 #[cfg(test)]

@@ -43,6 +43,21 @@ pub struct Report {
     pub verdict: Option<Verdict>,
     pub policy: PolicyConfig,
     pub exit_code: i32,
+    /// The decision envelope and what it came to.
+    pub cost: CostSummary,
+}
+
+/// Money for the decision (SPEC "Cost ledger").
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CostSummary {
+    /// The planned envelope, `None` when the rules did not resolve.
+    pub envelope: Option<crate::ledger::Envelope>,
+    pub cap_usd: f64,
+    pub spent_usd: f64,
+    pub released_usd: f64,
+    pub overrun_usd: f64,
+    /// Billable attempts made.
+    pub attempts: u32,
 }
 
 /// One run's report.
@@ -73,6 +88,10 @@ pub struct TurnEntry {
     pub max_output_tokens: u32,
     /// Billable attempts the request took (1 plus transport retries).
     pub attempts: u32,
+    /// The bound of one attempt at catalog prices, and what the turn came to (settled usage plus
+    /// every failed attempt charged at its bound).
+    pub bound_usd: f64,
+    pub cost_usd: f64,
     /// Whether the response entered provider history (false for an excluded turn).
     pub entered_history: bool,
 }

@@ -2,7 +2,7 @@
 //! final turn, aggregate, record. A decision is one or two independent runs combined (`decision`).
 //! Task 1.7a: tool turns with batch validation, the call budget, result ingestion. Task 1.7b: the
 //! final turn's refuse mechanism and every terminal error class. Task 1.8: both repair forms and
-//! transport retries. Tasks 1.9 to 1.11: ledger, journal artifacts, cache.
+//! transport retries. Task 1.9: the cost ledger. Tasks 1.10 and 1.11: journal artifacts, cache.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -16,6 +16,7 @@ use crate::frames::Registry;
 use crate::image::{self, CanonicalImage};
 use crate::job::Job;
 use crate::journal::Journal;
+use crate::ledger::{self, Account, CapLedger, Ledger, Pricing, RequestShape};
 use crate::obligations::{self, Instance, MergeInput, Resolved, RulesFile};
 use crate::provider::{
     ContentBlock, Message, MessageRole, Provider, StopReason, ToolCall, ToolDefinition,
@@ -23,8 +24,8 @@ use crate::provider::{
 };
 use crate::render;
 use crate::report::{
-    ErrorEntry, InstanceEntry, ItemRow, REPORT_VERSION, RepairEntry, Report, RunReport,
-    ToolCallEntry, TurnEntry,
+    CostSummary, ErrorEntry, InstanceEntry, ItemRow, REPORT_VERSION, RepairEntry, Report,
+    RunReport, ToolCallEntry, TurnEntry,
 };
 use crate::retry;
 use crate::submission::{self, ValidationContext};
@@ -50,7 +51,10 @@ pub const EXIT_ERROR: i32 = 3;
 pub const SUBMIT: &str = "submit_verdict";
 
 /// Runs one decision (`budget.decision_runs` independent runs) and writes its report under
-/// `out_dir/<decision dir>/`, with each run's journal under `run-<n>/`.
+/// `out_dir/<decision dir>/`, with each run's journal under `run-<n>/`. The decision envelope is
+/// reserved against a per-job ledger capped at `budget.spend_cap_usd` and, when given, a `shared`
+/// ledger (the evaluation's).
+#[allow(clippy::too_many_arguments)]
 pub async fn check(
     config: &Config,
     job: &Job,
@@ -59,9 +63,25 @@ pub async fn check(
     tools: &ToolRegistry,
     out_dir: &Path,
     harness_version: &str,
+    shared: Option<&dyn Ledger>,
 ) -> Result<Outcome> {
     let dir = new_decision_dir(out_dir)?;
     let prepared = resolve_rules(config, job, job_base, tools);
+    let job_ledger = CapLedger::new(config.budget.spend_cap_usd);
+    let envelope = match (&prepared, provider.pricing()) {
+        (Ok(p), Some(pricing)) => Some(ledger::plan(config, &plan_input(p, job, tools), pricing)),
+        (Ok(_), None) => Some(Err(Error::Budget(
+            "the provider cannot bound request costs; refusing to run".into(),
+        ))),
+        (Err(_), _) => None,
+    };
+    let mut money = Money {
+        envelope: &envelope,
+        pricing: provider.pricing(),
+        job_ledger: &job_ledger,
+        shared,
+        account: None,
+    };
 
     let mut runs: Vec<RunReport> = Vec::new();
     let mut summaries: Vec<RunSummary> = Vec::new();
@@ -70,7 +90,7 @@ pub async fn check(
         let run_dir = dir.join(format!("run-{n}"));
         std::fs::create_dir(&run_dir)?;
         let (report, summary, error) = run_once(
-            config, job, job_base, provider, tools, &prepared, &run_dir, n,
+            config, job, job_base, provider, tools, &prepared, &run_dir, n, &mut money,
         )
         .await?;
         if first_error.is_none() {
@@ -79,6 +99,34 @@ pub async fn check(
         runs.push(report);
         summaries.push(summary);
     }
+    let attempts = runs
+        .iter()
+        .flat_map(|r| r.turns.iter())
+        .map(|t| t.attempts)
+        .sum();
+    let cost = match money.account.take() {
+        Some(account) => {
+            let closing = account.close();
+            job_ledger.settle(closing.envelope_usd, closing.spent_usd);
+            if let Some(s) = shared {
+                s.settle(closing.envelope_usd, closing.spent_usd);
+            }
+            CostSummary {
+                envelope: envelope.as_ref().and_then(|e| e.as_ref().ok().cloned()),
+                cap_usd: config.budget.spend_cap_usd,
+                spent_usd: closing.spent_usd,
+                released_usd: closing.released_usd,
+                overrun_usd: closing.overrun_usd,
+                attempts,
+            }
+        }
+        None => CostSummary {
+            envelope: envelope.as_ref().and_then(|e| e.as_ref().ok().cloned()),
+            cap_usd: config.budget.spend_cap_usd,
+            attempts,
+            ..CostSummary::default()
+        },
+    };
 
     let decision = match summaries.as_slice() {
         [one] => decision::single(one),
@@ -106,6 +154,7 @@ pub async fn check(
         verdict: decision.verdict,
         policy: config.policy.clone(),
         exit_code,
+        cost,
     };
     report.write(&dir)?;
     Ok(Outcome {
@@ -128,6 +177,7 @@ async fn run_once(
     prepared: &Result<Prepared>,
     run_dir: &Path,
     n: u32,
+    money: &mut Money<'_>,
 ) -> Result<(RunReport, RunSummary, Option<String>)> {
     let mut journal = Journal::create(run_dir)?;
     let mut state = RunState::new(run_dir, n);
@@ -142,6 +192,7 @@ async fn run_once(
                 p,
                 &mut journal,
                 &mut state,
+                money,
             )
             .await
         }
@@ -203,6 +254,86 @@ async fn run_once(
             .collect(),
     };
     Ok((report, summary, error_text))
+}
+
+/// The decision's money: the planned envelope, the ledgers it is reserved against, and the
+/// account once reserved (by the first run).
+struct Money<'a> {
+    envelope: &'a Option<Result<ledger::Envelope>>,
+    pricing: Option<&'a dyn Pricing>,
+    job_ledger: &'a CapLedger,
+    shared: Option<&'a dyn Ledger>,
+    account: Option<Account>,
+}
+
+/// What the envelope plan needs from the resolved rules, the job and the tools.
+fn plan_input(prepared: &Prepared, job: &Job, tools: &ToolRegistry) -> ledger::PlanInput {
+    let checklist_bytes = prepared
+        .checklist
+        .render(&prepared.resolved.instances)
+        .len() as u64;
+    let tools_bytes: u64 = tools
+        .manifests()
+        .map(|m| {
+            serde_json::to_string(&m.tool_definition())
+                .map(|s| s.len() as u64)
+                .unwrap_or(0)
+        })
+        .sum::<u64>()
+        + serde_json::to_string(&submission::submit_verdict_tool())
+            .map(|s| s.len() as u64)
+            .unwrap_or(0);
+    ledger::PlanInput {
+        system_bytes: prepared.system_prompt.len() as u64,
+        tools_bytes,
+        // Per image: its label line; then the checklist and the instruction.
+        first_look_bytes: job.images.len() as u64 * 160 + checklist_bytes + 400,
+        checklist_bytes,
+        job_images: job.images.len() as u64,
+        tool_envelope_bytes: tools
+            .manifests()
+            .map(|m| m.returns.max_envelope_bytes)
+            .max()
+            .unwrap_or(0),
+        tool_images: tools
+            .manifests()
+            .map(|m| u64::from(m.returns.max_images))
+            .max()
+            .unwrap_or(0),
+    }
+}
+
+/// The shape of a request as sent, for its attempt's bound.
+fn shape_of(request: &TurnRequest<'_>) -> RequestShape {
+    let mut bytes = request.system.len() as u64
+        + serde_json::to_string(request.tools)
+            .map(|s| s.len() as u64)
+            .unwrap_or(0);
+    let mut images: u64 = 0;
+    for m in request.history {
+        for b in &m.content {
+            match b {
+                ContentBlock::Text { text } => bytes += text.len() as u64,
+                ContentBlock::Image { .. } => images += 1,
+                ContentBlock::ToolUse {
+                    name, arguments, ..
+                } => bytes += name.len() as u64 + arguments.to_string().len() as u64,
+                ContentBlock::ToolResult {
+                    content,
+                    images: imgs,
+                    ..
+                } => {
+                    bytes += content.len() as u64;
+                    images += imgs.len() as u64;
+                }
+            }
+        }
+    }
+    RequestShape {
+        input_tokens: ledger::estimated_tokens(bytes),
+        output_tokens: u64::from(request.max_output_tokens),
+        images,
+    }
 }
 
 struct RunState {
@@ -298,6 +429,7 @@ async fn drive(
     prepared: &Prepared,
     journal: &mut Journal,
     state: &mut RunState,
+    money: &mut Money<'_>,
 ) -> Result<Verdict> {
     // Resolve.
     let bounds = config.images.decode_bounds();
@@ -322,16 +454,46 @@ async fn drive(
             "tools": tools.manifests().map(|m| m.name.clone()).collect::<Vec<_>>(),
         }),
     )?;
-    // Prepare and reserve are stubs until tasks 2.3 and 1.9; the events exist so the journal's
-    // shape is final.
+    // Prepare is a stub until task 2.3; the event exists so the journal's shape is final.
     journal.append(
         "prepared",
         serde_json::json!({ "prep_version": "canonical", "images": state.images.len() }),
     )?;
+
+    // Reserve: the decision envelope, once per decision, before any request.
+    let envelope = match money.envelope {
+        Some(Ok(e)) => e,
+        Some(Err(e)) => return Err(Error::Budget(e.to_string())),
+        None => return Err(Error::Budget("no envelope was planned".into())),
+    };
+    let Some(pricing) = money.pricing else {
+        return Err(Error::Budget(
+            "the provider cannot bound request costs".into(),
+        ));
+    };
+    if money.account.is_none() {
+        money.job_ledger.reserve(envelope.usd)?;
+        if let Some(shared) = money.shared
+            && let Err(e) = shared.reserve(envelope.usd)
+        {
+            money.job_ledger.settle(envelope.usd, 0.0);
+            return Err(e);
+        }
+        money.account = Some(Account::new(envelope.usd));
+    }
     journal.append(
         "reserved",
-        serde_json::json!({ "envelope_usd": null, "cap_usd": config.budget.spend_cap_usd }),
+        serde_json::json!({
+            "envelope_usd": envelope.usd,
+            "cap_usd": config.budget.spend_cap_usd,
+            "shared_cap_usd": money.shared.map(Ledger::cap),
+            "requests_per_run": envelope.requests.len(),
+            "attempts": envelope.attempts,
+        }),
     )?;
+    let Some(account) = money.account.as_mut() else {
+        return Err(Error::Budget("the envelope was not reserved".into()));
+    };
 
     // Tool definitions are declared once and never change for the conversation.
     let mut definitions: Vec<ToolDefinition> =
@@ -391,6 +553,8 @@ async fn drive(
             allowance,
             journal,
             state,
+            pricing,
+            account,
         )
         .await?;
         allowance = config.provider.max_output_tokens;
@@ -510,6 +674,8 @@ async fn drive(
             allowance,
             journal,
             state,
+            pricing,
+            account,
         )
         .await?;
         allowance = config.provider.max_output_tokens;
@@ -741,6 +907,8 @@ async fn send_turn(
     max_output_tokens: u32,
     journal: &mut Journal,
     state: &mut RunState,
+    pricing: &dyn Pricing,
+    account: &mut Account,
 ) -> Result<TurnResponse> {
     let turn = state.turns.len() as u32 + 1;
     let request = TurnRequest {
@@ -749,14 +917,20 @@ async fn send_turn(
         tools: definitions,
         max_output_tokens,
     };
+    let bound_usd = pricing.bound(&shape_of(&request))?;
     journal.append(
         "turn_sent",
-        serde_json::json!({ "turn": turn, "tools": definitions.iter().map(|t| t.name.clone()).collect::<Vec<_>>(), "history_messages": history.len(), "max_output_tokens": max_output_tokens }),
+        serde_json::json!({ "turn": turn, "tools": definitions.iter().map(|t| t.name.clone()).collect::<Vec<_>>(), "history_messages": history.len(), "max_output_tokens": max_output_tokens, "bound_usd": bound_usd }),
     )?;
+    // A failed attempt's usage is unknown: its hold is charged at the bound.
+    let mut charged_usd = 0.0;
     let mut on_retry = |a: &retry::Attempt| -> Result<()> {
+        let hold = account.hold(bound_usd);
+        account.charge(hold);
+        charged_usd += bound_usd;
         journal.append(
             "retry",
-            serde_json::json!({ "turn": turn, "attempt": a.attempt, "status": a.status, "delay_ms": a.delay.as_millis() as u64, "error": a.message }),
+            serde_json::json!({ "turn": turn, "attempt": a.attempt, "status": a.status, "delay_ms": a.delay.as_millis() as u64, "error": a.message, "charged_usd": bound_usd }),
         )
     };
     let sent = retry::send_with_retries(
@@ -770,6 +944,10 @@ async fn send_turn(
     )
     .await?;
     let response = sent.response;
+    let hold = account.hold(bound_usd);
+    let settled_usd = pricing.cost(&response.usage);
+    account.settle(hold, settled_usd);
+    let cost_usd = settled_usd + charged_usd;
     journal.append(
         "turn_received",
         serde_json::json!({
@@ -778,6 +956,7 @@ async fn send_turn(
             "tool_calls": response.tool_calls.iter().map(|c| c.name.clone()).collect::<Vec<_>>(),
             "usage": response.usage,
             "attempts": sent.attempts,
+            "cost_usd": cost_usd,
         }),
     )?;
     state.turns.push(TurnEntry {
@@ -788,6 +967,8 @@ async fn send_turn(
         provider_request_id: response.provider_request_id.clone(),
         max_output_tokens,
         attempts: sent.attempts,
+        bound_usd,
+        cost_usd,
         entered_history: true,
     });
     Ok(response)

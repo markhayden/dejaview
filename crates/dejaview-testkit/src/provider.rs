@@ -7,6 +7,7 @@ use std::path::Path;
 use std::sync::Mutex;
 use std::time::Duration;
 
+use dejaview_core::ledger::{Prices, Pricing};
 use dejaview_core::provider::{
     Message, Provider, SendFuture, ToolDefinition, TurnRequest, TurnResponse,
 };
@@ -38,6 +39,14 @@ struct ScriptError {
     #[serde(default)]
     message: Option<String>,
 }
+
+/// The stub catalog entry the scripted provider prices with: cheap enough that the default
+/// envelope fits the default cap, dear enough that a one-cent cap refuses it.
+pub const FAKE_PRICES: Prices = Prices {
+    input_per_million: 0.10,
+    output_per_million: 0.40,
+    per_image: 0.0002,
+};
 
 /// Replays a list of scripted turns in order. Exhausting the script is a provider error, which
 /// is what a test wants when the harness asks for more turns than expected.
@@ -108,6 +117,10 @@ impl ScriptedProvider {
 impl Provider for ScriptedProvider {
     fn id(&self) -> &str {
         "scripted"
+    }
+
+    fn pricing(&self) -> Option<&dyn Pricing> {
+        Some(&FAKE_PRICES)
     }
 
     fn send<'a>(&'a self, req: TurnRequest<'a>) -> SendFuture<'a> {

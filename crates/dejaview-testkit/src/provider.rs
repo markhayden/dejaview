@@ -49,6 +49,13 @@ impl ScriptedProvider {
     }
 }
 
+impl ScriptedProvider {
+    /// Turns not yet consumed.
+    pub fn remaining(&self) -> usize {
+        self.turns.lock().map(|t| t.len()).unwrap_or(0)
+    }
+}
+
 impl Provider for ScriptedProvider {
     fn id(&self) -> &str {
         "scripted"

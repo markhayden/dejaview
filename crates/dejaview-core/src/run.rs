@@ -392,7 +392,7 @@ async fn drive(
 
         match classify(&response.stop_reason, &response.tool_calls) {
             Class::Submission(call) => return finish(prepared, state, journal, call),
-            Class::Mixed => {
+            Class::MixedCalls(_) => {
                 return Err(Error::ModelOutput(
                     "submit_verdict must be the only call in its batch (repairs arrive in task 1.8)".into(),
                 ));
@@ -455,15 +455,14 @@ async fn drive(
         }
     }
 
-    // Final turn (task 1.7b completes the refuse mechanism): the same tool definitions, an
-    // appended instruction, and only submit_verdict is accepted.
+    // Final turn, `refuse` mechanism: the same frozen tool definitions, an appended instruction,
+    // and only submit_verdict is executed. A stray call is answered with a provider-native error
+    // result; the single repair (task 1.8) may then ask once more, otherwise the run ends
+    // `error: no_submission`.
     history.push(Message {
         role: MessageRole::User,
         content: vec![ContentBlock::Text {
-            text: format!(
-                "Tool budget exhausted. Only {SUBMIT} will be executed now. Submit your verdict with one disposition per checklist item.\n\n{}",
-                state.checklist.render(&state.instances)
-            ),
+            text: final_turn_instruction(state),
         }],
     });
     let response = send_turn(
@@ -480,17 +479,56 @@ async fn drive(
     history.push(assistant_message(&response.text, &response.tool_calls));
     match classify(&response.stop_reason, &response.tool_calls) {
         Class::Submission(call) => finish(prepared, state, journal, call),
-        other => Err(Error::NoSubmission(format!(
-            "the final turn did not submit ({other:?}); stray-call results and the repair arrive in tasks 1.7b and 1.8"
+        Class::Batch(calls) | Class::MixedCalls(calls) => {
+            let results: Vec<ContentBlock> = calls
+                .iter()
+                .map(|c| ContentBlock::ToolResult {
+                    tool_use_id: c.id.clone(),
+                    content: format!("Not available: only {SUBMIT} is executed on the final turn. Submit your verdict now."),
+                    is_error: true,
+                    images: vec![],
+                })
+                .collect();
+            for c in calls {
+                journal.append(
+                    "tool_called",
+                    serde_json::json!({ "tool": c.name, "provider_call_id": c.id, "executed": false, "reason": "final_turn" }),
+                )?;
+            }
+            history.push(Message {
+                role: MessageRole::User,
+                content: results,
+            });
+            Err(Error::NoSubmission(format!(
+                "the final turn called {:?} instead of submitting; the repair arrives in task 1.8",
+                calls.iter().map(|c| c.name.as_str()).collect::<Vec<_>>()
+            )))
+        }
+        Class::NoCall => Err(Error::NoSubmission(format!(
+            "the final turn ended ({:?}) without a submission",
+            response.stop_reason
         ))),
+        Class::Truncated => Err(Error::NoSubmission(
+            "the final turn's response was truncated".into(),
+        )),
     }
+}
+
+/// The appended final-turn instruction, with the full checklist.
+fn final_turn_instruction(state: &RunState) -> String {
+    format!(
+        "Tool budget exhausted. Only {SUBMIT} will be executed now; any other call is answered with an error. \
+         Submit your verdict with exactly one disposition per checklist item.\n\n{}",
+        state.checklist.render(&state.instances)
+    )
 }
 
 #[derive(Debug)]
 enum Class<'a> {
     Submission(&'a ToolCall),
     Batch(&'a [ToolCall]),
-    Mixed,
+    /// A batch that mixes submit_verdict with other calls.
+    MixedCalls(&'a [ToolCall]),
     NoCall,
     Truncated,
 }
@@ -504,7 +542,7 @@ fn classify<'a>(stop: &StopReason, calls: &'a [ToolCall]) -> Class<'a> {
         (0, _) => Class::NoCall,
         (1, 1) => Class::Submission(&calls[0]),
         (_, 0) => Class::Batch(calls),
-        _ => Class::Mixed,
+        _ => Class::MixedCalls(calls),
     }
 }
 

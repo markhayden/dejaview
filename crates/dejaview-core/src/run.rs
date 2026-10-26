@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::aggregate::{self, Row, Verdict};
-use crate::checklist::{self, ChecklistItem};
+use crate::checklist::Checklist;
 use crate::config::Config;
 use crate::image::{self, CanonicalImage};
 use crate::job::{Job, JobSummary};
@@ -87,7 +87,7 @@ struct RunState {
     harness_version: String,
     images: Vec<CanonicalImage>,
     instances: Vec<Instance>,
-    checklist: Vec<ChecklistItem>,
+    checklist: Checklist,
     items: Vec<ItemRow>,
     error: Option<ErrorEntry>,
 }
@@ -104,7 +104,7 @@ impl RunState {
             harness_version: harness_version.to_string(),
             images: Vec::new(),
             instances: Vec::new(),
-            checklist: Vec::new(),
+            checklist: Checklist::default(),
             items: Vec::new(),
             error: None,
         }
@@ -156,13 +156,13 @@ async fn drive(
     state.rules = Some(prepared.summary.clone());
     state.instances = prepared.resolved.instances.clone();
     state.resolved = Some(prepared.resolved);
-    state.checklist = checklist::build(&state.instances);
+    state.checklist = prepared.checklist.clone();
     journal.append(
         "resolved",
         serde_json::json!({
             "images": state.images.iter().map(|i| serde_json::json!({"id": i.id, "role": i.role, "sha256": i.sha256, "width": i.width, "height": i.height})).collect::<Vec<_>>(),
             "instances": state.instances.iter().map(Instance::id).collect::<Vec<_>>(),
-            "checklist": state.checklist.iter().map(|c| c.id.clone()).collect::<Vec<_>>(),
+            "checklist": state.checklist.ids().collect::<Vec<_>>(),
         }),
     )?;
 
@@ -198,7 +198,7 @@ async fn drive(
         })
         .collect();
     content.push(ContentBlock::Text {
-        text: checklist::render(&state.checklist, &state.instances),
+        text: state.checklist.render(&state.instances),
     });
     content.push(ContentBlock::Text {
         text:
@@ -260,8 +260,7 @@ async fn drive(
     for item in &sub.items {
         let deps = state
             .checklist
-            .iter()
-            .find(|c| c.id == item.id)
+            .get(&item.id)
             .map(|c| c.instance_ids.clone())
             .unwrap_or_default();
         let row = aggregate::strictest(
@@ -320,7 +319,7 @@ pub struct Prepared {
     pub summary: RulesSummary,
     pub resolved: Resolved,
     pub system_prompt: String,
-    pub checklist: Vec<ChecklistItem>,
+    pub checklist: Checklist,
 }
 
 /// Merges and resolves the rules for a job. `[rules]` in the config names the base; without it the
@@ -350,7 +349,9 @@ pub fn resolve_rules(config: &Config, job: &Job, job_base: &Path) -> Result<Prep
         enabled_tools: &config.tools.enabled,
     })?;
     let resolved = obligations::resolve(&merged, job)?;
-    let checklist = checklist::build(&resolved.instances);
+    let images: Vec<(String, crate::job::Role)> =
+        job.images.iter().map(|i| (i.id.clone(), i.role)).collect();
+    let checklist = Checklist::build(&resolved, &images)?;
     let system_prompt = render::system_prompt(&resolved, job);
     Ok(Prepared {
         summary: RulesSummary {

@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::aggregate::{Confidence, Disposition};
-use crate::checklist::ChecklistItem;
+use crate::checklist::Checklist;
 use crate::provider::ToolDefinition;
 use crate::{Error, Result};
 
@@ -86,7 +86,7 @@ pub fn submit_verdict_tool() -> ToolDefinition {
 /// Parses and validates a submission against the current checklist.
 pub fn parse_and_validate(
     arguments: &serde_json::Value,
-    checklist: &[ChecklistItem],
+    checklist: &Checklist,
 ) -> Result<Submission> {
     let sub: Submission = serde_json::from_value(arguments.clone())
         .map_err(|e| Error::Submission(format!("does not match the submission schema: {e}")))?;
@@ -96,7 +96,7 @@ pub fn parse_and_validate(
             sub.schema_version
         )));
     }
-    let mut counts: HashMap<&str, usize> = checklist.iter().map(|c| (c.id.as_str(), 0)).collect();
+    let mut counts: HashMap<&str, usize> = checklist.ids().map(|id| (id, 0)).collect();
     for item in &sub.items {
         match counts.get_mut(item.id.as_str()) {
             Some(n) => *n += 1,
@@ -128,11 +128,18 @@ pub fn parse_and_validate(
 mod tests {
     use super::*;
 
-    fn checklist() -> Vec<ChecklistItem> {
-        vec![ChecklistItem {
-            id: "chk:ob:SF2@candidate".into(),
-            instance_ids: vec!["SF2@candidate".into()],
-        }]
+    fn checklist() -> Checklist {
+        Checklist {
+            items: vec![crate::checklist::ChecklistItem {
+                id: "chk:ob:SF2@candidate".into(),
+                instance_ids: vec!["SF2@candidate".into()],
+                root_image: Some("candidate".into()),
+                location: None,
+                root_location: None,
+                overlaps: vec![],
+                label: None,
+            }],
+        }
     }
 
     fn held() -> serde_json::Value {

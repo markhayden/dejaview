@@ -21,7 +21,7 @@ tag.
 - [x] 1.4a Obligation model, merge, validation
 - [x] 1.4b Instances, rendering, shipped rule sets
 - [x] 1.5a Manifest and envelope types, fake tool
-- [ ] 1.5b Checklist and evidence binding
+- [x] 1.5b Checklist and evidence binding
 - [ ] 1.6a Submission schema and semantic validation
 - [ ] 1.6b Aggregation and decision tables
 - [ ] 1.7a State machine: tool turns

@@ -42,6 +42,9 @@ pub enum Error {
     /// A tool crashed, timed out, returned a malformed envelope or breached its bounds.
     #[error("tool: {0}")]
     Tool(String),
+    /// A budget (evidence items, spend, turns) would be exceeded.
+    #[error("budget: {0}")]
+    Budget(String),
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
     #[error("json: {0}")]
@@ -57,6 +60,7 @@ impl Error {
             Error::Config(_) | Error::Job(_) | Error::Image(_) | Error::Toml(_) => "resolve",
             Error::Provider(_) => "provider",
             Error::Tool(_) => "tool",
+            Error::Budget(_) => "budget",
             Error::Submission(_) => "submission_invalid",
             Error::NoSubmission(_) => "no_submission",
             Error::Io(_) | Error::Json(_) => "io",

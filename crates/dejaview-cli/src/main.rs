@@ -172,7 +172,7 @@ fn check(args: &CheckArgs) -> i32 {
                     );
                 }
                 println!("Checklist:");
-                for c in &p.checklist {
+                for c in &p.checklist.items {
                     println!("  {} <- {:?}", c.id, c.instance_ids);
                 }
                 for w in &p.summary.warnings {

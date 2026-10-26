@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::Result;
 use crate::aggregate::{Confidence, Disposition, Row, Verdict};
-use crate::checklist::ChecklistItem;
+use crate::checklist::Checklist;
 use crate::image::CanonicalImage;
 use crate::job::JobSummary;
 use crate::obligations::Instance;
@@ -29,7 +29,7 @@ pub struct Report {
     pub rules: Option<crate::run::RulesSummary>,
     pub images: Vec<CanonicalImage>,
     pub instances: Vec<InstanceEntry>,
-    pub checklist: Vec<ChecklistItem>,
+    pub checklist: Checklist,
     pub items: Vec<ItemRow>,
     pub provider: String,
     /// `pass | fail | unsure`, absent when the run ended in an error.

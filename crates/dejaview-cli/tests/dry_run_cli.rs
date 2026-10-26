@@ -39,6 +39,10 @@ fn dry_run_prints_obligations_instances_and_checklist() {
         "{out}"
     );
     assert!(out.contains("chk:ob:RQ1@candidate"), "{out}");
+    assert!(
+        out.contains("chk:ref:ref:pip") && out.contains("chk:ref:ref:bridge"),
+        "{out}"
+    );
     assert!(out.contains("evidence=[\"ref:pip\"]"), "{out}");
 }
 

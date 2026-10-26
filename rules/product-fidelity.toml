@@ -1,0 +1,39 @@
+# Base rule set: product fidelity. A product shot keeps the exact product.
+[rules]
+use_case = "product-fidelity"
+version = 1
+requires_roles = ["candidate", "reference"]
+default_evidence_kinds = ["subject_match", "text_region", "change_region"]
+
+[[rule]]
+id = "PF1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["reference"]
+text = "The product's shape and proportions match the reference exactly."
+
+[[rule]]
+id = "PF2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["reference"]
+evidence_kinds = ["text_region", "subject_match"]
+text = "Label text, logo and typography match the reference exactly."
+
+[[rule]]
+id = "PF3"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["reference"]
+text = "The product's colour and material finish match the reference, allowing for the scene's lighting."
+
+[[rule]]
+id = "PF4"
+kind = "allowed"
+waives = []
+text = "The scene, background, props, camera angle and lighting around the product may be anything."
+
+[[rule]]
+id = "PF5"
+kind = "observe"
+text = "Any other difference from the reference product is noted with its location."

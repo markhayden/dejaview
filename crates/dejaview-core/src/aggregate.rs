@@ -97,6 +97,9 @@ mod tests {
             matters,
             hidden_ok,
             text: String::new(),
+            evidence: vec![],
+            evidence_kinds: vec![],
+            provenance: "test".into(),
         }
     }
 

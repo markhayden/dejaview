@@ -1,0 +1,39 @@
+# Base rule set: reference consistency. A subject from one or more reference images appears
+# faithfully in a new scene. Version is part of the cache key.
+[rules]
+use_case = "reference-consistency"
+version = 1
+requires_roles = ["candidate", "reference"]
+default_evidence_kinds = ["subject_match", "class_difference"]
+
+[[rule]]
+id = "RC1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["reference"]
+text = "Each reference subject appears in the candidate as the same individual: species or type, build, proportions and distinctive markings match the reference."
+
+[[rule]]
+id = "RC2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["reference"]
+text = "Distinctive markings, patterns, colours and features visible in a reference are present and unchanged wherever the subject is visible."
+
+[[rule]]
+id = "RC3"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["reference"]
+text = "No reference subject is duplicated, merged with another subject, or replaced by a lookalike."
+
+[[rule]]
+id = "RC4"
+kind = "allowed"
+waives = []
+text = "Pose, expression, viewpoint, lighting and the surrounding scene may differ from the reference."
+
+[[rule]]
+id = "RC5"
+kind = "observe"
+text = "Any other difference from a reference is noted with its location."

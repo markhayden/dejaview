@@ -11,6 +11,7 @@ pub mod job;
 pub mod journal;
 pub mod obligations;
 pub mod provider;
+pub mod render;
 pub mod report;
 pub mod run;
 pub mod submission;

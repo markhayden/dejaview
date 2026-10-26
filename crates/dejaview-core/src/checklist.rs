@@ -53,6 +53,9 @@ mod tests {
             matters: true,
             hidden_ok: false,
             text: format!("text of {id}"),
+            evidence: vec![],
+            evidence_kinds: vec![],
+            provenance: "test".into(),
         }
     }
 

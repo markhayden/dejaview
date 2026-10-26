@@ -113,6 +113,15 @@ impl RulesFile {
     }
 }
 
+/// Every shipped base set name, one per use case.
+pub const SHIPPED_BASES: &[&str] = &[
+    "source-fidelity",
+    "reference-consistency",
+    "reality-checks",
+    "brief-compliance",
+    "product-fidelity",
+];
+
 /// The shipped rule sets, embedded at build time. Keys are base names and `<base>/<profile>`.
 pub fn shipped(name: &str) -> Option<&'static str> {
     match name {
@@ -120,6 +129,10 @@ pub fn shipped(name: &str) -> Option<&'static str> {
         "source-fidelity/architecture" => Some(include_str!(
             "../../../rules/profiles/source-fidelity-architecture.toml"
         )),
+        "reference-consistency" => Some(include_str!("../../../rules/reference-consistency.toml")),
+        "reality-checks" => Some(include_str!("../../../rules/reality-checks.toml")),
+        "brief-compliance" => Some(include_str!("../../../rules/brief-compliance.toml")),
+        "product-fidelity" => Some(include_str!("../../../rules/product-fidelity.toml")),
         _ => None,
     }
 }
@@ -436,8 +449,7 @@ fn role_name(role: Role) -> &'static str {
     }
 }
 
-/// One obligation resolved to one target image: `SF2@candidate`. Resolution of scope and
-/// evidence arrives in task 1.4b; the walking slice hard-codes one instance below.
+/// One obligation resolved to one target image: `SF2@candidate`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Instance {
     pub obligation_id: String,
@@ -446,6 +458,11 @@ pub struct Instance {
     pub matters: bool,
     pub hidden_ok: bool,
     pub text: String,
+    /// Image ids consulted to judge this instance.
+    pub evidence: Vec<String>,
+    /// Tool evidence kinds whose regions bear on this instance.
+    pub evidence_kinds: Vec<String>,
+    pub provenance: String,
 }
 
 impl Instance {
@@ -459,23 +476,150 @@ impl Instance {
     }
 }
 
-/// The walking slice's instances: SF2 on the candidate. Replaced by resolution in task 1.4b.
-pub fn walking_slice_instances(job: &Job) -> Vec<Instance> {
-    let target = job
-        .candidate()
-        .map(|c| c.id.clone())
-        .unwrap_or_else(|| "candidate".into());
-    vec![Instance {
-        obligation_id: "SF2".into(),
-        target,
-        kind: Kind::MustHold,
-        matters: true,
-        hidden_ok: false,
-        text:
-            "The candidate is derived from the source: same scene, same camera, same projection; \
-               nothing rotated, stretched or cropped away."
+/// An exemption resolved to the targets it may waive on.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Exemption {
+    pub id: String,
+    pub text: String,
+    pub waives: Vec<String>,
+    pub condition: Option<String>,
+    pub targets: Vec<String>,
+    pub provenance: String,
+}
+
+impl Exemption {
+    /// True when this exemption may waive `obligation_id` on `target`.
+    pub fn applies_to(&self, obligation_id: &str, target: &str) -> bool {
+        self.waives.iter().any(|w| w == obligation_id) && self.targets.iter().any(|t| t == target)
+    }
+}
+
+/// An observational obligation resolved to its targets.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Observation {
+    pub id: String,
+    pub text: String,
+    pub targets: Vec<String>,
+    pub provenance: String,
+}
+
+/// Everything resolution produces for one job.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Resolved {
+    pub instances: Vec<Instance>,
+    pub exemptions: Vec<Exemption>,
+    pub observations: Vec<Observation>,
+}
+
+impl Resolved {
+    pub fn instance(&self, id: &str) -> Option<&Instance> {
+        self.instances.iter().find(|i| i.id() == id)
+    }
+}
+
+/// Expands a scope or evidence list to image ids: roles expand to every image with that role, ids
+/// pass through, duplicates are removed, job order is kept.
+fn expand(entries: &[String], job: &Job) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for image in &job.images {
+        let hit = entries.iter().any(|e| {
+            e == &image.id
+                || matches!(
+                    (e.as_str(), image.role),
+                    ("candidate", Role::Candidate)
+                        | ("source", Role::Source)
+                        | ("reference", Role::Reference)
+                )
+        });
+        if hit && !out.contains(&image.id) {
+            out.push(image.id.clone());
+        }
+    }
+    out
+}
+
+/// Resolves merged obligations against a job into instances, exemptions and observations
+/// (SPEC "Instances"). Errors: a mandatory obligation with no target, a job with no mandatory
+/// instance, a reference image no mandatory obligation consults.
+pub fn resolve(merged: &Merged, job: &Job) -> Result<Resolved> {
+    let default_scope = vec!["candidate".to_string()];
+    let default_evidence = vec!["source".to_string(), "reference".to_string()];
+    let mut resolved = Resolved {
+        instances: Vec::new(),
+        exemptions: Vec::new(),
+        observations: Vec::new(),
+    };
+
+    for m in &merged.obligations {
+        let o = &m.obligation;
+        let targets = expand(o.scope.as_ref().unwrap_or(&default_scope), job);
+        match o.kind {
+            Kind::MustHold | Kind::MustNot => {
+                if targets.is_empty() {
+                    return Err(Error::Config(format!(
+                        "rules: {} resolves to no target image in this job (scope {:?}); disable it \
+                         rather than leaving it empty",
+                        o.id,
+                        o.scope.as_ref().unwrap_or(&default_scope)
+                    )));
+                }
+                let evidence = expand(o.evidence.as_ref().unwrap_or(&default_evidence), job);
+                let evidence_kinds = o
+                    .evidence_kinds
+                    .clone()
+                    .unwrap_or_else(|| merged.default_evidence_kinds.clone());
+                for target in targets {
+                    resolved.instances.push(Instance {
+                        obligation_id: o.id.clone(),
+                        target,
+                        kind: o.kind,
+                        matters: o.matters(),
+                        hidden_ok: o.hidden_ok,
+                        text: o.text.clone(),
+                        evidence: evidence.clone(),
+                        evidence_kinds: evidence_kinds.clone(),
+                        provenance: m.provenance.clone(),
+                    });
+                }
+            }
+            Kind::Allowed => resolved.exemptions.push(Exemption {
+                id: o.id.clone(),
+                text: o.text.clone(),
+                waives: o.waives.clone(),
+                condition: o.condition.clone(),
+                targets,
+                provenance: m.provenance.clone(),
+            }),
+            Kind::Observe => resolved.observations.push(Observation {
+                id: o.id.clone(),
+                text: o.text.clone(),
+                targets,
+                provenance: m.provenance.clone(),
+            }),
+        }
+    }
+
+    if resolved.instances.is_empty() {
+        return Err(Error::Config(
+            "rules: this check has no mandatory instance; at least one must_hold or must_not obligation \
+             must apply to an image in the job"
                 .into(),
-    }]
+        ));
+    }
+    for image in job.images.iter().filter(|i| i.role == Role::Reference) {
+        let consulted = resolved
+            .instances
+            .iter()
+            .any(|i| i.evidence.contains(&image.id));
+        if !consulted {
+            return Err(Error::Config(format!(
+                "rules: reference image {:?} is consulted by no mandatory obligation; remove it from the \
+                 job or add a requirement that uses it",
+                image.id
+            )));
+        }
+    }
+    Ok(resolved)
 }
 
 #[cfg(test)]

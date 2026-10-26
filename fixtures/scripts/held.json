@@ -8,6 +8,15 @@
           "schema_version": 1,
           "items": [
             {
+              "id": "chk:ob:SF1@candidate",
+              "disposition": "held",
+              "confidence": "confident",
+              "reason": "No protected feature named by the job changed.",
+              "allowed_by": null,
+              "location": null,
+              "evidence": []
+            },
+            {
               "id": "chk:ob:SF2@candidate",
               "disposition": "held",
               "confidence": "confident",

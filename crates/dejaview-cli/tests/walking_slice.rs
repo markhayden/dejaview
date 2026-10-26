@@ -73,10 +73,25 @@ fn held_disposition_passes_with_exit_0() {
     let r = report(&out);
     assert_eq!(r["report_version"], 1);
     assert_eq!(r["verdict"], "pass");
-    assert_eq!(r["instances"][0]["id"], "SF2@candidate");
-    assert_eq!(r["items"][0]["id"], "chk:ob:SF2@candidate");
-    assert_eq!(r["items"][0]["disposition"], "held");
-    assert_eq!(r["items"][0]["row"], "recorded");
+    let ids: Vec<&str> = r["instances"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        ids,
+        ["SF1@candidate", "SF2@candidate"],
+        "the shipped source-fidelity base resolves two instances"
+    );
+    let sf2 = r["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["id"] == "chk:ob:SF2@candidate")
+        .unwrap();
+    assert_eq!(sf2["disposition"], "held");
+    assert_eq!(sf2["row"], "recorded");
     assert_eq!(
         journal_events(&out),
         [
@@ -101,8 +116,14 @@ fn confident_violation_fails_with_exit_1() {
     );
     let r = report(&out);
     assert_eq!(r["verdict"], "fail");
-    assert_eq!(r["items"][0]["row"], "fail");
-    assert_eq!(r["items"][0]["location"]["kind"], "whole_image");
+    let sf2 = r["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["id"] == "chk:ob:SF2@candidate")
+        .unwrap();
+    assert_eq!(sf2["row"], "fail");
+    assert_eq!(sf2["location"]["kind"], "whole_image");
 }
 
 #[test]

@@ -87,6 +87,10 @@ struct CheckArgs {
     /// Output directory for run directories; overrides `[output] dir`.
     #[arg(long)]
     out: Option<PathBuf>,
+    /// Resolve the rules and print the Obligations section, the instances and the checklist
+    /// without calling any provider.
+    #[arg(long)]
+    dry_run: bool,
     /// Scripted fake provider responses, for tests and debugging only.
     #[cfg(feature = "testkit")]
     #[arg(long)]
@@ -123,6 +127,38 @@ fn check(args: &CheckArgs) -> i32 {
             return EXIT_USAGE;
         }
     };
+    if args.dry_run {
+        return match dejaview_core::run::resolve_rules(&config, &job, Path::new(".")) {
+            Ok(p) => {
+                println!("{}", p.system_prompt);
+                println!("Instances:");
+                for i in &p.resolved.instances {
+                    println!(
+                        "  {} kind={:?} matters={} hidden_ok={} evidence={:?} kinds={:?} [{}]",
+                        i.id(),
+                        i.kind,
+                        i.matters,
+                        i.hidden_ok,
+                        i.evidence,
+                        i.evidence_kinds,
+                        i.provenance
+                    );
+                }
+                println!("Checklist:");
+                for c in &p.checklist {
+                    println!("  {} <- {:?}", c.id, c.instance_ids);
+                }
+                for w in &p.summary.warnings {
+                    eprintln!("warning: {w}");
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("dejaview: {e}");
+                EXIT_USAGE
+            }
+        };
+    }
     let provider: Box<dyn Provider> = match select_provider(args) {
         Ok(p) => p,
         Err(message) => {

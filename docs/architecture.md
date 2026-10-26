@@ -61,7 +61,7 @@ behind the `testkit` feature, and a dev-dependency anywhere.
 | Area | State | Filled by |
 |---|---|---|
 | Workspace, checks, CI | done | 0.1, 0.2 |
-| Core domain, state machine, journal, report | pending | M1 |
+| Core domain: job, images, frames, config, obligations, checklist, submission, aggregation, journal, report | in progress (1.1 to 1.4b done) | M1 |
 | Provider adapters, catalog, profiles | pending | M2 |
 | Evaluation sets, runner, metrics, gates, viewer | pending | M3 |
 | Built-in tools, MCP client | pending | M4 |

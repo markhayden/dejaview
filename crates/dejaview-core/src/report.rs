@@ -25,6 +25,8 @@ pub struct Report {
     pub job: JobSummary,
     /// The config as resolved, with every expanded secret redacted.
     pub config: serde_json::Value,
+    /// The rules as merged (base, profile, versions, obligations with provenance, warnings).
+    pub rules: Option<crate::run::RulesSummary>,
     pub images: Vec<CanonicalImage>,
     pub instances: Vec<InstanceEntry>,
     pub checklist: Vec<ChecklistItem>,

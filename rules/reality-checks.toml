@@ -1,0 +1,37 @@
+# Base rule set: reality checks. Mistakes no real photograph would make.
+[rules]
+use_case = "reality-checks"
+version = 1
+requires_roles = ["candidate"]
+default_evidence_kinds = ["anatomy", "text_region"]
+
+[[rule]]
+id = "RE1"
+kind = "must_not"
+scope = ["candidate"]
+evidence_kinds = ["anatomy"]
+text = "Impossible anatomy: extra, missing or fused limbs, fingers or teeth; faces or bodies melting into each other or into objects."
+
+[[rule]]
+id = "RE2"
+kind = "must_not"
+scope = ["candidate"]
+text = "Shadows, reflections or perspective that contradict the light and geometry of the scene."
+
+[[rule]]
+id = "RE3"
+kind = "must_not"
+scope = ["candidate"]
+evidence_kinds = ["text_region"]
+text = "Garbled text: letters that are not letters, words that are not words, or writing that changes mid-word."
+
+[[rule]]
+id = "RE4"
+kind = "must_not"
+scope = ["candidate"]
+text = "Objects that pass through, merge into or float against each other in ways a photograph of a real scene would not show."
+
+[[rule]]
+id = "RE5"
+kind = "observe"
+text = "Any other oddity is noted with its location."

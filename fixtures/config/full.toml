@@ -13,7 +13,7 @@ max_long_edge = 1568
 [rules]
 base = "source-fidelity"
 profile = "architecture"
-extra = ["./rules/mine.toml"]
+extra = ["fixtures/rules/mine.toml"]
 
 [tools]
 enabled = ["view", "align", "regions", "classes"]

@@ -19,7 +19,7 @@ tag.
 - [x] 1.2 Canonical images and frames registry
 - [x] 1.3 Config loading, validation, shorthand job
 - [x] 1.4a Obligation model, merge, validation
-- [ ] 1.4b Instances, rendering, shipped rule sets
+- [x] 1.4b Instances, rendering, shipped rule sets
 - [ ] 1.5a Manifest and envelope types, fake tool
 - [ ] 1.5b Checklist and evidence binding
 - [ ] 1.6a Submission schema and semantic validation

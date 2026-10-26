@@ -1,0 +1,10 @@
+# A consumer rules file layered over the shipped base: one replacement. (Appending a mandatory
+# rule would change the checklist the scripted fixtures answer; see fixtures/rules/append.toml.)
+[rules]
+use_case = "source-fidelity"
+version = 2
+
+[[rule]]
+id = "SF4"
+kind = "observe"
+text = "Any other change is noted with its location and a one-line description."

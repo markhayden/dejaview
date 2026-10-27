@@ -1081,7 +1081,9 @@ async fn send_turn(
         request: request_ref,
     }))?;
     state.turns = turn;
-    // A failed attempt's usage is unknown: its hold is charged at the bound.
+    // A failed attempt's usage is unknown: its hold is charged at the bound. The retry that
+    // follows draws on the envelope's retry reserve; once the balance cannot cover another
+    // attempt the retry is refused instead of overrunning the envelope.
     let mut charged_usd = 0.0;
     let mut on_retry = |a: &retry::Attempt| -> Result<()> {
         let hold = account.hold(bound_usd);
@@ -1094,7 +1096,15 @@ async fn send_turn(
             delay_ms: a.delay.as_millis() as u64,
             error: a.message.clone(),
             charged_usd: bound_usd,
-        }))
+        }))?;
+        if !account.covers(bound_usd) {
+            return Err(Error::Budget(format!(
+                "turn {turn}: the envelope cannot cover another attempt (${:.4} unallocated, bound ${bound_usd:.4}) after {} failed attempt(s); the retry reserve is spent",
+                account.unallocated(),
+                a.attempt
+            )));
+        }
+        Ok(())
     };
     let backoff = retry::Backoff::default();
     let mut jitter = rand::random::<f64>;

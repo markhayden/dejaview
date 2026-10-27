@@ -89,7 +89,6 @@ pub struct PlanInput {
 pub struct PlannedRequest {
     pub kind: String,
     pub shape: RequestShape,
-    pub attempts: u32,
     /// The bound of one attempt.
     pub bound_usd: f64,
 }
@@ -100,9 +99,12 @@ pub struct PlannedRequest {
 pub struct Envelope {
     pub usd: f64,
     pub decision_runs: u32,
-    /// One run's requests, in order; every run is planned the same.
+    /// One run's requests, in order, each planned once; every run is planned the same.
     pub requests: Vec<PlannedRequest>,
-    /// Billable attempts across the decision.
+    /// Per run, what transport retries may draw: `retries` times the largest request bound.
+    pub retry_reserve_usd: f64,
+    /// Billable attempts the envelope can pay for across the decision: every planned request
+    /// once, plus `retries` per run.
     pub attempts: u32,
 }
 
@@ -114,10 +116,12 @@ const FRAMING_BYTES: u64 = 4096;
 const HEADROOM: f64 = 1.1;
 
 /// Plans the decision envelope: per run, every tool turn, the final turn and every repair the
-/// budget allows, each bounded by the history it could carry, counted once per possible attempt.
+/// budget allows, each bounded by the history it could carry and planned once, plus a retry
+/// reserve of `retries` times the largest bound. A retryable failure is charged at its bound, so
+/// the reserve pays for `retries` failures anywhere in the run; a retry it cannot cover is refused
+/// (`error: budget`) rather than made.
 pub fn plan(config: &Config, input: &PlanInput, pricing: &dyn Pricing) -> Result<Envelope> {
     let b = &config.budget;
-    let attempts_per_request = 1 + b.retries;
     let base_bytes =
         input.system_bytes + input.tools_bytes + input.first_look_bytes + FRAMING_BYTES;
     let checklist_bytes = input.checklist_bytes + u64::from(b.evidence_items) * EVIDENCE_LINE_BYTES;
@@ -169,18 +173,17 @@ pub fn plan(config: &Config, input: &PlanInput, pricing: &dyn Pricing) -> Result
         requests.push(PlannedRequest {
             kind: kind.into(),
             shape,
-            attempts: attempts_per_request,
             bound_usd,
         });
     }
-    let per_run: f64 = requests
-        .iter()
-        .map(|r| r.bound_usd * f64::from(r.attempts))
-        .sum();
+    let largest = requests.iter().map(|r| r.bound_usd).fold(0.0, f64::max);
+    let retry_reserve_usd = f64::from(b.retries) * largest;
+    let per_run: f64 = requests.iter().map(|r| r.bound_usd).sum::<f64>() + retry_reserve_usd;
     Ok(Envelope {
         usd: per_run * f64::from(b.decision_runs),
         decision_runs: b.decision_runs,
-        attempts: total * attempts_per_request * b.decision_runs,
+        attempts: (total + b.retries) * b.decision_runs,
+        retry_reserve_usd,
         requests,
     })
 }
@@ -300,6 +303,18 @@ impl Account {
         self.envelope_usd
     }
 
+    /// Money not yet held or spent: what another attempt may draw.
+    pub fn unallocated(&self) -> f64 {
+        self.unallocated
+    }
+
+    /// Whether the balance covers one more attempt at this bound. A retry that it does not cover
+    /// is refused rather than made, so a run of failures ends in `error: budget` instead of an
+    /// overrun; the planned requests themselves are always made (a bound is an estimate).
+    pub fn covers(&self, bound: f64) -> bool {
+        self.unallocated + EPSILON >= bound
+    }
+
     /// Money still held for the decision: the unallocated balance plus open holds.
     pub fn reserved(&self) -> f64 {
         self.unallocated + self.holds.iter().flatten().sum::<f64>()
@@ -367,6 +382,25 @@ mod tests {
 
     fn close_to(a: f64, b: f64) -> bool {
         (a - b).abs() < 1e-9
+    }
+
+    #[test]
+    fn ledger_account_covers_a_retry_only_while_the_balance_holds_its_bound() {
+        // Envelope 1.0: three charged failures at 0.3 leave 0.1, which covers no fourth attempt.
+        let mut a = Account::new(1.0);
+        for _ in 0..3 {
+            assert!(a.covers(0.3));
+            let h = a.hold(0.3);
+            a.charge(h);
+        }
+        assert!(close_to(a.unallocated(), 0.1));
+        assert!(!a.covers(0.3));
+        assert!(a.covers(0.1), "an exact fit is covered");
+        // Settling a hold below its bound gives the balance back and covers again.
+        let h = a.hold(0.1);
+        a.settle(h, 0.0);
+        assert!(close_to(a.unallocated(), 0.1));
+        assert!(close_to(a.close().overrun_usd, 0.0));
     }
 
     #[test]
@@ -494,7 +528,10 @@ mod tests {
             tool_images: 0,
         };
         let e = plan(&config, &input, &prices).expect("plan");
-        assert_eq!(e.requests.len() as u32, config.budget.tool_turns + 2);
+        assert_eq!(
+            e.requests.len() as u32,
+            config.budget.tool_turns + 1 + config.budget.repairs
+        );
         for w in e.requests.windows(2) {
             assert!(
                 w[1].shape.input_tokens > w[0].shape.input_tokens,
@@ -509,18 +546,20 @@ mod tests {
         );
         assert_eq!(
             e.attempts,
-            (config.budget.tool_turns + 2)
-                * (1 + config.budget.retries)
+            (config.budget.tool_turns + 1 + config.budget.repairs + config.budget.retries)
                 * config.budget.decision_runs
         );
-        let per_attempt: f64 = e
-            .requests
-            .iter()
-            .map(|r| r.bound_usd * f64::from(r.attempts))
-            .sum();
+        // Every request once, plus `retries` times the largest bound (the repair's).
+        let largest = e.requests.iter().map(|r| r.bound_usd).fold(0.0, f64::max);
+        assert!(close_to(largest, repair.bound_usd));
+        assert!(close_to(
+            e.retry_reserve_usd,
+            f64::from(config.budget.retries) * largest
+        ));
+        let once: f64 = e.requests.iter().map(|r| r.bound_usd).sum();
         assert!(close_to(
             e.usd,
-            per_attempt * f64::from(config.budget.decision_runs)
+            (once + e.retry_reserve_usd) * f64::from(config.budget.decision_runs)
         ));
     }
 }

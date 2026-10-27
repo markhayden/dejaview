@@ -326,7 +326,7 @@
       "description": "The decision envelope.",
       "properties": {
         "attempts": {
-          "description": "Billable attempts across the decision.",
+          "description": "Billable attempts the envelope can pay for across the decision: every planned request\nonce, plus `retries` per run.",
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
@@ -337,11 +337,16 @@
           "type": "integer"
         },
         "requests": {
-          "description": "One run's requests, in order; every run is planned the same.",
+          "description": "One run's requests, in order, each planned once; every run is planned the same.",
           "items": {
             "$ref": "#/$defs/PlannedRequest"
           },
           "type": "array"
+        },
+        "retry_reserve_usd": {
+          "description": "Per run, what transport retries may draw: `retries` times the largest request bound.",
+          "format": "double",
+          "type": "number"
         },
         "usd": {
           "format": "double",
@@ -352,6 +357,7 @@
         "usd",
         "decision_runs",
         "requests",
+        "retry_reserve_usd",
         "attempts"
       ],
       "type": "object"
@@ -735,11 +741,6 @@
       "additionalProperties": false,
       "description": "One planned request of the envelope.",
       "properties": {
-        "attempts": {
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        },
         "bound_usd": {
           "description": "The bound of one attempt.",
           "format": "double",
@@ -755,7 +756,6 @@
       "required": [
         "kind",
         "shape",
-        "attempts",
         "bound_usd"
       ],
       "type": "object"

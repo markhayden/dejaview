@@ -942,8 +942,11 @@ shared across concurrent decisions with atomic operations. The unit of reservati
 turns, the final turn, every repair the budget allows (`repairs`) at `repair_output_tokens`;
 times decision runs), each bounded by the history it could carry (prior prompts, prior model output at the
 output allowance, tool outputs at their manifest byte and image bounds, request framing, image
-token estimates) at catalog prices, plus any per-image price, with every request counted once per
-possible attempt (1 plus `retries`). The envelope is reserved once at step 3.
+token estimates) at catalog prices, plus any per-image price, with every request counted once,
+plus a per-run **retry reserve** of `retries` times the largest request bound. A retryable failure
+is charged at its bound, so the reserve pays for `retries` failures anywhere in the run; a retry
+the balance cannot cover is refused and the run ends with `error: budget` rather than overrunning
+the envelope. The envelope is reserved once at step 3.
 
 Each billable attempt transfers its bound from the envelope's unallocated balance to an attempt
 hold; total reserved spending never increases. When the provider reports usage, the hold is

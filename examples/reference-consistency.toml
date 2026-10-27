@@ -19,12 +19,10 @@ model = "claude-haiku-5-5"
 base = "reference-consistency"
 
 [budget]
-# The cap is checked before the first call against the worst-case envelope: every tool turn, the
-# final turn and the repair, each retried `retries` times at the full output allowance. A check on
-# the cheapest models usually costs a few cents; the envelope is a bound, not a forecast.
-retries = 1
-repair_output_tokens = 16000
-spend_cap_usd = 5.00
+# The cap is checked before the first call against the worst-case envelope (every tool turn, the
+# final turn and the repair at the full output allowance, plus a reserve for `retries` failed
+# attempts). A check on the cheapest models usually costs a few cents; the envelope is a bound.
+spend_cap_usd = 2.00
 
 [privacy]
 cloud_calls = true

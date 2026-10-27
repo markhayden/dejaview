@@ -53,7 +53,8 @@ git -C "$work" config user.email test@example.invalid
 git -C "$work" config user.name test
 mkdir -p "$work/scripts/hooks"
 cp scripts/scan-secrets.sh scripts/synthetic-tokens.txt "$work/scripts/"
-cp scripts/hooks/pre-commit "$work/scripts/hooks/"
+cp scripts/hooks/pre-commit scripts/hooks/commit-msg "$work/scripts/hooks/"
+cp scripts/check-attribution.sh "$work/scripts/"
 git -C "$work" config core.hooksPath scripts/hooks
 export DEJAVIEW_HOOK_SKIP_CARGO=1
 
@@ -70,6 +71,11 @@ printf '# test\nAKIA%s\n' "$(rep Q 16)" > "$work/scripts/test-hooks.sh"; git -C 
 cp fixtures/synthetic-secrets/example.env "$work/synthetic.env"; git -C "$work" add synthetic.env; commit_ok "the synthetic tokens"
 { head -c 64 /dev/urandom; printf 'AKIA%s' "$(rep Q 16)"; head -c 64 /dev/urandom; } > "$work/blob.bin"; git -C "$work" add blob.bin; commit_bad "key inside a binary blob"
 printf 'KEY=\x93sk-ant-%s\x94\n' "$(rep r 30)" > "$work/quoted.txt"; git -C "$work" add quoted.txt; commit_bad "key in smart quotes"
+# --- commit-msg hook: no agent attribution in a message -------------------------------------
+echo "plain" > "$work/plain.txt"; git -C "$work" add plain.txt
+commit_bad $'a change\n\nCo-Authored-By: Claude Example <noreply@anthropic.com>'
+git -C "$work" add plain.txt; commit_bad $'a change\n\nGenerated with [Some Tool](https://example.invalid)'
+git -C "$work" add plain.txt; commit_ok $'a change\n\nCo-Authored-By: A Person <person@example.invalid>'
 unset DEJAVIEW_HOOK_SKIP_CARGO
 
 echo "hook tests: $pass passed, $fail failed"

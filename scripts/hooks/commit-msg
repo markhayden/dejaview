@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Commit-msg hook: the repository carries no agent attribution. A message with a Co-Authored-By
+# trailer naming an assistant, a "Generated with" line or an assistant's no-reply address is
+# refused. Install with `just hooks`; scripts/check-attribution.sh applies the same rule to the
+# whole history and the tracked files in `just check`.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+if ! scripts/check-attribution.sh "${1:?commit message file}"; then
+  echo "commit-msg: the message carries agent attribution; remove it and commit again" >&2
+  exit 1
+fi

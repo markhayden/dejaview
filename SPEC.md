@@ -124,8 +124,8 @@ Sub-decisions:
 - The first ML tool is the change-region finder. The built-in `view` and `align` tools come first
   and support flat and equirectangular images from their first milestone.
 - The OpenAI adapter is built in M2 alongside Anthropic and Gemini, with API-key auth.
-- Claude subscription OAuth is not supported. Anthropic's legal page restricts it to Claude Code
-  and native apps and forbids third-party routing through Free, Pro or Max credentials. OpenAI's
+- Claude subscription OAuth is not supported. Anthropic's legal page restricts it to Anthropic's
+  own apps and forbids third-party routing through Free, Pro or Max credentials. OpenAI's
   ChatGPT-plan flow is a later milestone (see "Auth schemes").
 - fal is out of scope for the initial judge adapters. Admission of any provider requires verified
   multi-image input, tool calling with paired results, conversation continuity, a stable model
@@ -1569,7 +1569,9 @@ explicit commands.
   outside the documented OAuth store; fall back to another model, profile, upstream or auth path
   silently; resize an image silently; let an operational error become a verdict; read the cache
   during an evaluation; remove a failing test to make a commit pass; shape a crate or the base
-  rules around one use case.
+  rules around one use case; show an agent association anywhere in the repository (no
+  `Co-Authored-By` trailer naming an assistant, no "Generated with" line, in any commit message
+  or file; the `commit-msg` hook and `scripts/check-attribution.sh` enforce it).
 
 ## Success criteria
 

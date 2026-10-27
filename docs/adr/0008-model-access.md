@@ -6,7 +6,7 @@ Date: 2026-10-25. Status: accepted.
 
 Model access must work with direct keys, gateways (Vercel AI Gateway, Cloudflare AI Gateway),
 cloud providers (Bedrock, Vertex) and whatever comes next, and adding one must be cheap. Research
-on 2026-10-25: Anthropic's legal page restricts subscription OAuth to Claude Code and native apps
+on 2026-10-25: Anthropic's legal page restricts subscription OAuth to Anthropic's own apps
 and forbids third parties routing through Free, Pro or Max credentials. OpenAI's Sign in with
 ChatGPT lets Plus and Pro subscribers run requests on their plan in approved apps (client id by
 application). Vercel exposes an Anthropic Messages endpoint with `anthropic/` model ids; Cloudflare

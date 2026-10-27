@@ -1,7 +1,8 @@
 # Review checklist
 
-Applied to every milestone branch before the owner's checkpoint review, by the Claude Code skills
-`/agent-skills:review` and `/agent-skills:test` where available, otherwise by hand using this list.
+Applied to every milestone branch before the owner's checkpoint review, by the review and test
+skills (`/agent-skills:review`, `/agent-skills:test`) where available, otherwise by hand using this
+list.
 
 ## Code review, five axes
 

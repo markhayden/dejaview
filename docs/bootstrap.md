@@ -13,12 +13,16 @@ configurations (default, and `--features dejaview/testkit`), `cargo test --works
 configurations, `cargo deny check licenses bans sources` (advisories need the network and run in
 CI as `just deny-advisories`), `scripts/check-crate-graph.sh`, `scripts/check-packaging.sh`
 (every asset a crate embeds sits inside that crate and in the file list `cargo package` ships),
-`scripts/test-hooks.sh` (the credential scanner and the pre-commit hook, end to end in a scratch
+`scripts/check-attribution.sh` (no agent attribution in any commit message or tracked file),
+`scripts/test-hooks.sh` (the credential scanner and both hooks, end to end in a scratch
 repository) and `scripts/test-checks.sh` (the checks fail when they should).
 
-`just hooks` installs the pre-commit hook from `scripts/hooks/`. It scans every staged blob for
-credential-shaped values first, then runs fmt and Clippy. Only the exact synthetic values in
-`scripts/synthetic-tokens.txt` are allowed, and each must contain `SYNTHETIC`.
+`just hooks` installs the hooks from `scripts/hooks/`. The pre-commit hook scans every staged blob
+for credential-shaped values first, then runs fmt and Clippy; only the exact synthetic values in
+`scripts/synthetic-tokens.txt` are allowed, and each must contain `SYNTHETIC`. The commit-msg hook
+refuses a message that carries agent attribution (a `Co-Authored-By` trailer naming an assistant,
+a "Generated with" line or an assistant's no-reply address): the repository shows no agent
+association, in its history or its files.
 
 The `testkit` feature of the `dejaview` package enables the scripted fake provider and the
 `--provider-script` flag for tests and debugging. Release builds never enable it.

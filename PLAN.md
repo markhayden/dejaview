@@ -141,7 +141,7 @@ never reused; spent money is recorded in results documents. `eval-out/` and run 
 never committed; results live under `docs/results/`.
 
 **Reviews.** This plan is reviewed by Codex before M0 begins. Each milestone's diff is reviewed
-with the Claude Code skills `/agent-skills:review` and `/agent-skills:test` available in the
+with the review and test skills (`/agent-skills:review`, `/agent-skills:test`) available in the
 owner's environment; where they are not available, `docs/review-checklist.md` (written in 0.3)
 is applied by hand. The owner reviews every checkpoint.
 

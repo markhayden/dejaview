@@ -12,7 +12,7 @@ bootstrap:
     @command -v uv >/dev/null || echo "uv not found: install from https://docs.astral.sh/uv/ (the Python tool pack needs it)"
 
 # Everything a commit must pass: fmt, clippy and tests in both feature configurations, deny, graph.
-check: fmt-check clippy test deny graph packaging hooks-test checks-test
+check: fmt-check clippy test deny graph packaging attribution hooks-test checks-test
 
 fmt-check:
     cargo fmt --all -- --check
@@ -87,7 +87,12 @@ bundle:
 provisioning-test: bundle
     cargo test -p dejaview-tools --test provisioning -- --ignored
 
-# Install the git hooks (task 0.2).
+# No agent attribution in any commit message or tracked file.
+attribution:
+    scripts/check-attribution.sh
+
+# Install the git hooks (task 0.2): pre-commit (credential scan, fmt, clippy) and commit-msg
+# (no agent attribution).
 hooks:
     git config core.hooksPath scripts/hooks
 

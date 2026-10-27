@@ -205,6 +205,12 @@ fn check(args: &CheckArgs) -> i32 {
             return EXIT_USAGE;
         }
     };
+    // Every enabled tool and `submit_verdict` must have a wire form for the selected model, and
+    // the set must fit the provider's limits, before any billable request.
+    if let Err(e) = check_wire_schemas(&config, &tools) {
+        eprintln!("dejaview: {e}");
+        return EXIT_USAGE;
+    }
     if args.dry_run {
         return match dejaview_core::run::resolve_rules(&config, &job, Path::new("."), &tools) {
             Ok(p) => {
@@ -454,6 +460,33 @@ fn rules_show(args: &RulesShowArgs) -> i32 {
             EXIT_USAGE
         }
     }
+}
+
+/// The wire transformation of every tool definition for the configured model (SPEC "Wire
+/// schemas"). The scripted pair has no adapter and nothing to check.
+fn check_wire_schemas(
+    config: &Config,
+    tools: &dejaview_core::tool::ToolRegistry,
+) -> dejaview_core::Result<()> {
+    use dejaview_providers::catalog::{Catalog, FAKE_MODEL};
+    use dejaview_providers::wire::{Adapter, check_tool_set};
+    if config.provider.model == FAKE_MODEL {
+        return Ok(());
+    }
+    let catalog = Catalog::shipped()?;
+    let Some(model) = catalog.model(&config.provider.model) else {
+        return Ok(());
+    };
+    let Some(adapter) = Adapter::parse(&model.adapter) else {
+        return Err(dejaview_core::Error::Config(format!(
+            "catalog: model {:?} names an adapter this build lacks: {}",
+            config.provider.model, model.adapter
+        )));
+    };
+    let mut definitions: Vec<dejaview_core::provider::ToolDefinition> =
+        tools.manifests().map(|m| m.tool_definition()).collect();
+    definitions.push(dejaview_core::submission::submit_verdict_tool());
+    check_tool_set(adapter, &model.capabilities, &definitions).map(|_| ())
 }
 
 /// The tools this build knows. Built-ins arrive in M4; the fake tool exists behind `testkit`.

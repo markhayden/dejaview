@@ -126,3 +126,28 @@ fn check_without_testkit_refuses_the_scripted_pair_unless_dry_run() {
         String::from_utf8_lossy(&o.stderr)
     );
 }
+
+/// A live model's dry run passes the catalog and wire checks for `submit_verdict` and the enabled
+/// tools before printing the prompt.
+#[test]
+fn dry_run_with_a_live_model_passes_the_wire_check() {
+    let o = dejaview(&[
+        "check",
+        "--config",
+        "fixtures/config/minimal.toml",
+        "--set",
+        "provider.profile=\"anthropic\"",
+        "--set",
+        "provider.model=\"claude-opus-5-5\"",
+        "--job",
+        "fixtures/jobs/pair.toml",
+        "--dry-run",
+    ]);
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    assert!(String::from_utf8_lossy(&o.stdout).contains("Checklist:"));
+}

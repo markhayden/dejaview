@@ -26,6 +26,16 @@ confirm or correct them:
 | `gpt-6.1-sol`, `gpt-6.1-terra` | `capabilities.system_messages_in_history` | `true` | `developer`/`system` items are accepted as input items; acceptance mid-history is confirmed by recording. |
 | `gpt-6.1-sol`, `gpt-6.1-terra` | `images.native_long_edge_px`, `images.tokens` | the gpt-5.6 family values (2048 px, 2,500 patches at `high`) | The vision guide's sizing table does not name the gpt-6.1 family. |
 
+Wire schema assumptions (task 2.2) carried the same way, re-verified by the recordings:
+
+| Adapter | Assumption | Why |
+|---|---|---|
+| Gemini | `$ref`/`$defs` are inlined before sending | The `parametersJsonSchema` reference shows raw JSON Schema but does not state that definitions are accepted; the structured-output guide shows `$ref` only in an example. |
+| Gemini | string `format` kept only for `date-time`, `date`, `time` | The structured-output guide names those three; the Schema reference says any value is allowed but ignored. |
+| Gemini | `const` is sent as a one-value `enum` | `const` is not named in either guide. |
+| OpenAI | `const` is sent as a one-value `enum`; `default` is removed | Neither keyword appears in the supported-schemas list. |
+| Anthropic | `minItems` above 1 is removed; `maxItems` removed | "Array constraints beyond `minItems` of 0 or 1" are unsupported in strict mode. |
+
 Two prices in the catalog are introductory and dated: `gemini-4-argon` to 2026-11-30 and
 `gemini-3.8-flash` to 2026-12-31. The entries carry the later prices in a comment; re-pin them when
 the dates pass.

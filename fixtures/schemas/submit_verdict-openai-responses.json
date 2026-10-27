@@ -1,0 +1,268 @@
+{
+  "adapter": "openai-responses",
+  "wire_version": 1,
+  "strict": true,
+  "schema": {
+    "$defs": {
+      "Confidence": {
+        "enum": [
+          "confident",
+          "tentative"
+        ],
+        "type": "string"
+      },
+      "Disposition": {
+        "enum": [
+          "violation",
+          "held",
+          "allowed_change",
+          "hidden",
+          "cant_tell",
+          "observed"
+        ],
+        "type": "string"
+      },
+      "Finding": {
+        "additionalProperties": false,
+        "description": "Something the model noticed beyond the checklist.",
+        "properties": {
+          "allowed_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confidence": {
+            "$ref": "#/$defs/Confidence"
+          },
+          "disposition": {
+            "$ref": "#/$defs/FindingDisposition"
+          },
+          "evidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "location": {
+            "$ref": "#/$defs/Location"
+          },
+          "obligation_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "allowed_by",
+          "confidence",
+          "disposition",
+          "evidence",
+          "location",
+          "obligation_ids",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "FindingDisposition": {
+        "description": "Dispositions a finding may carry. `held` and `hidden` belong to checklist items only.",
+        "enum": [
+          "violation",
+          "allowed_change",
+          "cant_tell",
+          "observed"
+        ],
+        "type": "string"
+      },
+      "ItemDisposition": {
+        "additionalProperties": false,
+        "description": "What the model said about one checklist item. Items carry no obligation ids: the checklist\nowns them.",
+        "properties": {
+          "allowed_by": {
+            "description": "Exemption id; required when `disposition = allowed_change`, null otherwise.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confidence": {
+            "$ref": "#/$defs/Confidence"
+          },
+          "disposition": {
+            "$ref": "#/$defs/Disposition"
+          },
+          "evidence": {
+            "description": "Tool call ids from this run used as evidence.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Location"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "allowed_by",
+          "confidence",
+          "disposition",
+          "evidence",
+          "id",
+          "location",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "Location": {
+        "additionalProperties": false,
+        "description": "A location as a tagged record with nullable fields (see SPEC \"Frames and locations\").",
+        "properties": {
+          "bbox": {
+            "items": {
+              "type": "number"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "fov": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "frame": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/$defs/LocationKind"
+          },
+          "pitch": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "polygon": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "yaw": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "bbox",
+          "fov",
+          "frame",
+          "kind",
+          "pitch",
+          "polygon",
+          "yaw"
+        ],
+        "type": "object"
+      },
+      "LocationKind": {
+        "enum": [
+          "bbox",
+          "polygon",
+          "view",
+          "whole_image",
+          "absent"
+        ],
+        "type": "string"
+      },
+      "Opinion": {
+        "additionalProperties": false,
+        "description": "Recorded, never read by aggregation.",
+        "properties": {
+          "reason": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "verdict"
+        ],
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "The canonical submission, schema version 1. Every property is required; optional values are\nnullable, so the shape survives every provider's strict mode.",
+    "properties": {
+      "findings": {
+        "items": {
+          "$ref": "#/$defs/Finding"
+        },
+        "type": "array"
+      },
+      "items": {
+        "items": {
+          "$ref": "#/$defs/ItemDisposition"
+        },
+        "type": "array"
+      },
+      "opinion": {
+        "$ref": "#/$defs/Opinion"
+      },
+      "schema_version": {
+        "minimum": 0,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "findings",
+      "items",
+      "opinion",
+      "schema_version"
+    ],
+    "type": "object"
+  },
+  "changes": [
+    "/properties/schema_version/format: removed (uint32)",
+    "/$defs/Disposition/oneOf: rewritten as anyOf",
+    "/$defs/Disposition/anyOf/1/const: rewritten as enum",
+    "/$defs/Disposition/anyOf: enums merged into one enum",
+    "/$defs/Location/properties/bbox/items/format: removed (double)",
+    "/$defs/Location/properties/fov/format: removed (double)",
+    "/$defs/Location/properties/pitch/format: removed (double)",
+    "/$defs/Location/properties/polygon/items/items/format: removed (double)",
+    "/$defs/Location/properties/yaw/format: removed (double)"
+  ]
+}

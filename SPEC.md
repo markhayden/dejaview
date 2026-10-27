@@ -793,10 +793,23 @@ stay in canonical validation.
   required, optional values nullable; unions only in the documented `anyOf` form; remove
   unsupported keywords per the catalog.
 
-The harness normalises a wire payload back to canonical form before validation. `submit_verdict`
-and every enabled tool schema must pass the wire transformation for the selected model at resolve
-time; a tool whose schema cannot be represented is refused with the reason, before any billable
-request.
+Common to every adapter (`dejaview-providers::wire`, `WIRE_VERSION`): `oneOf` becomes `anyOf`; a
+union of plain enums becomes one enum; metadata (`$schema`, `title`) and `format` values the
+provider does not list are dropped; the constraint keywords the catalog names for the model are
+removed; `allOf`, `not`, conditionals, `patternProperties`, external references and any keyword
+outside the wire subset are refused. Gemini receives references inlined (its documentation does not
+state that `$defs` is accepted), with `const` as a one-value enum. Every removal and rewrite is
+recorded with the schema as a JSON pointer, and the transformed `submit_verdict` schema per adapter
+is committed under `fixtures/schemas/`.
+
+The harness normalises a wire payload back to canonical form before validation: `null` is dropped
+from properties the canonical schema leaves optional (OpenAI's nullable emulation) and enum strings
+are restored to the canonical spelling (Anthropic does not guarantee their capitalisation).
+`submit_verdict` and every enabled tool schema must pass the wire transformation for the selected
+model at resolve time, and the set must fit the provider's limits (Anthropic strict mode: 20 strict
+tools, 24 optional and 16 union-typed parameters per request; OpenAI: 5,000 properties, 10 levels,
+1,000 enum values, 120,000 characters per schema); a tool whose schema cannot be represented is
+refused with the reason, before any billable request.
 
 ### Protocol requirements
 

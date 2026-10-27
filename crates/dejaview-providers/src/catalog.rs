@@ -215,7 +215,8 @@ pub struct Capabilities {
     pub forced_tool_choice: bool,
     /// Whether the provider enforces tool schemas (strict mode).
     pub strict_tools: bool,
-    /// JSON Schema keywords the wire transformation removes for this model.
+    /// Constraint keywords the wire transformation removes for this model (canonical validation
+    /// keeps enforcing them). Constructs with no wire form at all are refused by `wire`.
     pub strict_unsupported_keywords: Vec<String>,
     /// Whether every tool call carries an id the result must echo.
     pub function_call_ids: bool,

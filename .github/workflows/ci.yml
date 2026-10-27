@@ -101,8 +101,10 @@ jobs:
       - if: steps.pack.outputs.present == 'true' && !env.ACT
         name: Install and launch the pack without a network
         run: |
-          sudo unshare -n -- sudo -u "$USER" --preserve-env=PATH,HOME,UV_CACHE_DIR,UV_PYTHON \
-            env UV_OFFLINE=1 UV_PYTHON_DOWNLOADS=never CARGO_TERM_COLOR=always \
+          # sudo resets PATH, so the runner's values are passed as explicit arguments.
+          sudo unshare -n -- sudo -u "$USER" env PATH="$PATH" HOME="$HOME" \
+            UV_CACHE_DIR="$UV_CACHE_DIR" UV_PYTHON="$UV_PYTHON" \
+            UV_OFFLINE=1 UV_PYTHON_DOWNLOADS=never CARGO_TERM_COLOR=always \
             cargo test --offline -p dejaview-tools --test provisioning -- --ignored
       - if: steps.pack.outputs.present == 'true' && env.ACT
         name: Install and launch the pack (no namespace under act)

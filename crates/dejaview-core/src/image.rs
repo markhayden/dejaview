@@ -63,6 +63,92 @@ pub struct CanonicalImage {
     pub alpha: Option<Arc<image::GrayImage>>,
 }
 
+impl CanonicalImage {
+    /// The pixels as one image: RGBA when the file had an alpha channel, RGB otherwise.
+    pub fn dynamic(&self) -> Result<DynamicImage> {
+        let pixels = self
+            .pixels
+            .as_ref()
+            .ok_or_else(|| Error::Image(format!("{}: no pixels", self.id)))?;
+        match &self.alpha {
+            Some(alpha) if alpha.dimensions() == pixels.dimensions() => {
+                let mut rgba = image::RgbaImage::new(pixels.width(), pixels.height());
+                for (x, y, p) in rgba.enumerate_pixels_mut() {
+                    let rgb = pixels.get_pixel(x, y).0;
+                    *p = image::Rgba([rgb[0], rgb[1], rgb[2], alpha.get_pixel(x, y).0[0]]);
+                }
+                Ok(DynamicImage::ImageRgba8(rgba))
+            }
+            _ => Ok(DynamicImage::ImageRgb8(pixels.as_ref().clone())),
+        }
+    }
+}
+
+/// One image as a provider receives it (SPEC "Image preparation"): the bytes, their hash and the
+/// preparation that produced them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Prepared {
+    /// The id the request's content blocks use (a job image id or a frame id).
+    pub id: String,
+    pub media_type: String,
+    pub width: u32,
+    pub height: u32,
+    pub source_width: u32,
+    pub source_height: u32,
+    /// SHA-256 of the prepared bytes, lowercase hex.
+    pub sha256: String,
+    pub prep_version: String,
+    /// The bytes sent; stored as an artifact by the harness, never serialised here.
+    #[serde(skip)]
+    pub bytes: Vec<u8>,
+}
+
+impl Prepared {
+    pub fn resized(&self) -> bool {
+        (self.width, self.height) != (self.source_width, self.source_height)
+    }
+}
+
+/// The canonical pixels as lossless PNG, unresized: what a provider without its own preparation
+/// sends (`prep_version` `canonical`).
+pub fn canonical_png(id: &str, pixels: &DynamicImage) -> Result<Prepared> {
+    use image::ImageEncoder;
+    let (w, h) = (pixels.width(), pixels.height());
+    let mut bytes = Vec::new();
+    let encoder = image::codecs::png::PngEncoder::new_with_quality(
+        Cursor::new(&mut bytes),
+        image::codecs::png::CompressionType::Default,
+        image::codecs::png::FilterType::Adaptive,
+    );
+    let result = if pixels.color().has_alpha() {
+        encoder.write_image(
+            pixels.to_rgba8().as_raw(),
+            w,
+            h,
+            image::ExtendedColorType::Rgba8,
+        )
+    } else {
+        encoder.write_image(
+            pixels.to_rgb8().as_raw(),
+            w,
+            h,
+            image::ExtendedColorType::Rgb8,
+        )
+    };
+    result.map_err(|e| Error::Image(format!("{id}: cannot encode PNG: {e}")))?;
+    Ok(Prepared {
+        id: id.to_string(),
+        media_type: "image/png".into(),
+        width: w,
+        height: h,
+        source_width: w,
+        source_height: h,
+        sha256: hex(&Sha256::digest(&bytes)),
+        prep_version: "canonical".into(),
+        bytes,
+    })
+}
+
 /// Loads one image spec, resolving a relative path against `base`.
 pub fn load(spec: &ImageSpec, base: &Path, bounds: &DecodeBounds) -> Result<CanonicalImage> {
     let bytes = read_bytes(spec, base)?;

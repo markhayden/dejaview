@@ -446,6 +446,32 @@ impl Catalog {
             )));
         }
         for (name, value) in &p.controls {
+            // Request controls derived from capabilities rather than declared per model.
+            if name == "final_turn" {
+                match value.as_str() {
+                    Some(m) if model.capabilities.final_turn.iter().any(|f| f == m) => continue,
+                    _ => {
+                        return Err(resolve(format!(
+                            "control final_turn = {value} is not supported by {:?}; allowed: {:?}",
+                            p.model, model.capabilities.final_turn
+                        )));
+                    }
+                }
+            }
+            if name == "prefix_mismatch_behavior" {
+                match value.as_str() {
+                    Some("error" | "drop_block")
+                        if model.betas.contains_key("thinking_binding") =>
+                    {
+                        continue;
+                    }
+                    _ => {
+                        return Err(resolve(format!(
+                            "control prefix_mismatch_behavior = {value} needs a model with the thinking-binding beta and one of [\"error\", \"drop_block\"]"
+                        )));
+                    }
+                }
+            }
             let Some(control) = model.controls.get(name) else {
                 return Err(resolve(format!(
                     "model {:?} has no control {name:?}; it accepts {}",

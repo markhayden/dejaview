@@ -2,10 +2,10 @@
 //! harness exchanges with an adapter. Adapters live in `dejaview-providers`; the scripted fake in
 //! `dejaview-testkit`. The trait is dyn-compatible and used as `Box<dyn Provider>`.
 //!
-//! Task 1.1 defines `id`, `send` and the message types. `capabilities`, `wire_schema`,
-//! `prepare_images`, `preflight` and `classify` arrive with the adapters (M2) and the state
-//! machine (1.7a).
+//! The harness owns the history and the typed view of it; an adapter owns the wire shapes, the
+//! opaque blocks it must echo (thinking), the prepared image bytes it attaches, and the prices.
 
+use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -13,14 +13,17 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::Result;
+use crate::image::Prepared;
 
-/// One turn to send: the system prompt, the provider history so far, the tools on offer.
+/// One turn to send: the system prompt, the provider history so far, the tools on offer, and the
+/// prepared bytes of every image the history names (by the id its content block carries).
 #[derive(Debug, Clone)]
 pub struct TurnRequest<'a> {
     pub system: &'a str,
     pub history: &'a [Message],
     pub tools: &'a [ToolDefinition],
     pub max_output_tokens: u32,
+    pub images: &'a BTreeMap<String, Prepared>,
 }
 
 /// A message in the provider history.
@@ -35,6 +38,10 @@ pub struct Message {
 pub enum MessageRole {
     User,
     Assistant,
+    /// A harness instruction mid-conversation: the final-turn instruction (SPEC "Final turn
+    /// mechanics"). Adapters send it as a system message where the model supports one, otherwise
+    /// as a trailing text block of the preceding user message; its presence marks the final turn.
+    System,
 }
 
 /// The harness's typed view of message content. Adapters map these to their wire shapes.
@@ -61,6 +68,12 @@ pub enum ContentBlock {
         #[serde(default)]
         images: Vec<String>,
     },
+    /// An adapter-owned block echoed exactly as received (thinking, signatures, reasoning items).
+    /// Only the adapter named may interpret it; history is append-only, so it is never edited.
+    Opaque {
+        adapter: String,
+        block: serde_json::Value,
+    },
 }
 
 /// A tool as the provider sees it: name, description and the model schema.
@@ -71,13 +84,17 @@ pub struct ToolDefinition {
     pub input_schema: serde_json::Value,
 }
 
-/// What came back from one turn.
+/// What came back from one turn. `text` and `tool_calls` are the harness's view; `content` is the
+/// assistant message as it must be echoed, in the provider's order, including opaque blocks. An
+/// adapter without opaque blocks may leave `content` empty and the harness builds it from the view.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TurnResponse {
     #[serde(default)]
     pub text: Vec<String>,
     #[serde(default)]
     pub tool_calls: Vec<ToolCall>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub content: Vec<ContentBlock>,
     #[serde(default)]
     pub stop_reason: StopReason,
     #[serde(default)]
@@ -106,8 +123,19 @@ pub enum StopReason {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default, JsonSchema)]
 pub struct Usage {
+    /// Uncached input tokens.
     pub input_tokens: u64,
     pub output_tokens: u64,
+    /// Input tokens served from the provider's prompt cache (priced at the cached rate).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub cache_read_tokens: u64,
+    /// Input tokens written to the provider's prompt cache (priced at the cache-write rate).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub cache_write_tokens: u64,
+}
+
+fn is_zero(n: &u64) -> bool {
+    *n == 0
 }
 
 /// The future `send` returns: boxed and `Send`, tied to the request's lifetime.
@@ -134,6 +162,11 @@ pub trait Provider: Send + Sync {
     /// the machine (the scripted provider).
     fn recipient(&self) -> Option<crate::report::Recipient> {
         None
+    }
+    /// Prepares one image for this provider (SPEC "Image preparation"): the bytes the adapter
+    /// attaches for the content-block id. The default sends the canonical pixels as lossless PNG.
+    fn prepare_image(&self, id: &str, pixels: &image::DynamicImage) -> Result<Prepared> {
+        crate::image::canonical_png(id, pixels)
     }
 }
 

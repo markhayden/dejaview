@@ -169,6 +169,7 @@ fn journal_artifacts_hold_no_secret_even_when_the_model_echoes_it() {
     let echo = TurnResponse {
         text: vec![format!("The account is {secret}.")],
         tool_calls: vec![],
+        content: vec![],
         stop_reason: StopReason::EndTurn,
         usage: Default::default(),
         provider_request_id: None,

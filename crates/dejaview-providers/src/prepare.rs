@@ -5,11 +5,11 @@
 //! counting every image in the history including tool results, and refuses a request that would
 //! exceed any catalog limit with `error: image_limit`; nothing is ever downscaled silently.
 
-use std::collections::BTreeMap;
 use std::io::Cursor;
 
-use dejaview_core::image::{CanonicalImage, hex};
+use dejaview_core::image::{CanonicalImage, Prepared, hex};
 use dejaview_core::provider::{ContentBlock, TurnRequest};
+
 use dejaview_core::{Error, Result};
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::{CompressionType, FilterType, PngEncoder};
@@ -23,30 +23,6 @@ use crate::catalog::Images;
 /// alpha, metadata stripped. Bump when any of that changes; it is part of the cache key.
 pub const PREP_VERSION: &str = "1";
 pub const JPEG_QUALITY: u8 = 90;
-
-/// One image as the model receives it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PreparedImage {
-    /// The id the request's content blocks use (a job image id or a frame id).
-    pub id: String,
-    pub media_type: String,
-    pub width: u32,
-    pub height: u32,
-    pub source_width: u32,
-    pub source_height: u32,
-    /// SHA-256 of the prepared bytes, lowercase hex.
-    pub sha256: String,
-    pub prep_version: String,
-    /// The bytes sent; stored as an artifact by the caller, never serialised here.
-    #[serde(skip)]
-    pub bytes: Vec<u8>,
-}
-
-impl PreparedImage {
-    pub fn resized(&self) -> bool {
-        (self.width, self.height) != (self.source_width, self.source_height)
-    }
-}
 
 /// Prepares images for one model.
 pub struct Preparer<'a> {
@@ -71,27 +47,12 @@ impl<'a> Preparer<'a> {
     }
 
     /// A job image, keyed by its id.
-    pub fn prepare_canonical(&self, img: &CanonicalImage) -> Result<PreparedImage> {
-        let pixels = img
-            .pixels
-            .as_ref()
-            .ok_or_else(|| Error::Image(format!("{}: no pixels to prepare", img.id)))?;
-        let dynamic = match &img.alpha {
-            Some(alpha) if alpha.dimensions() == pixels.dimensions() => {
-                let mut rgba = image::RgbaImage::new(pixels.width(), pixels.height());
-                for (x, y, p) in rgba.enumerate_pixels_mut() {
-                    let rgb = pixels.get_pixel(x, y).0;
-                    *p = image::Rgba([rgb[0], rgb[1], rgb[2], alpha.get_pixel(x, y).0[0]]);
-                }
-                DynamicImage::ImageRgba8(rgba)
-            }
-            _ => DynamicImage::ImageRgb8(pixels.as_ref().clone()),
-        };
-        self.prepare(&img.id, &dynamic)
+    pub fn prepare_canonical(&self, img: &CanonicalImage) -> Result<Prepared> {
+        self.prepare(&img.id, &img.dynamic()?)
     }
 
     /// Any pixels (a tool's returned frame, decoded by the caller), keyed by the given id.
-    pub fn prepare(&self, id: &str, pixels: &DynamicImage) -> Result<PreparedImage> {
+    pub fn prepare(&self, id: &str, pixels: &DynamicImage) -> Result<Prepared> {
         let (sw, sh) = (pixels.width(), pixels.height());
         if sw == 0 || sh == 0 {
             return Err(Error::Image(format!("{id}: empty image")));
@@ -141,7 +102,7 @@ impl<'a> Preparer<'a> {
                 self.images.formats
             )));
         }
-        Ok(PreparedImage {
+        Ok(Prepared {
             id: id.to_string(),
             media_type: media_type.to_string(),
             width: w,
@@ -170,30 +131,6 @@ pub fn fit(w: u32, h: u32, long_edge: u32) -> (u32, u32) {
     }
 }
 
-/// The prepared images a conversation can send, by content-block id.
-#[derive(Debug, Default, Clone)]
-pub struct PreparedSet {
-    images: BTreeMap<String, PreparedImage>,
-}
-
-impl PreparedSet {
-    pub fn insert(&mut self, image: PreparedImage) {
-        self.images.insert(image.id.clone(), image);
-    }
-
-    pub fn get(&self, id: &str) -> Option<&PreparedImage> {
-        self.images.get(id)
-    }
-
-    pub fn len(&self) -> usize {
-        self.images.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.images.is_empty()
-    }
-}
-
 /// What a request carries, as preflight measured it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Preflight {
@@ -203,12 +140,9 @@ pub struct Preflight {
     pub request_bytes: u64,
 }
 
-/// Every image in the outgoing history, including tool results, against the model's limits.
-pub fn preflight(
-    limits: &Images,
-    request: &TurnRequest<'_>,
-    set: &PreparedSet,
-) -> Result<Preflight> {
+/// Every image in the outgoing history, including tool results, against the model's limits; the
+/// bytes come from the request's prepared images.
+pub fn preflight(limits: &Images, request: &TurnRequest<'_>) -> Result<Preflight> {
     let mut ids: Vec<&str> = Vec::new();
     let mut text_bytes = request.system.len() as u64;
     for message in request.history {
@@ -225,6 +159,7 @@ pub fn preflight(
                     text_bytes += content.len() as u64;
                     ids.extend(images.iter().map(String::as_str));
                 }
+                ContentBlock::Opaque { block, .. } => text_bytes += block.to_string().len() as u64,
             }
         }
     }
@@ -244,7 +179,7 @@ pub fn preflight(
         .filter(|(threshold, _)| count > u64::from(*threshold));
     let mut image_bytes = 0u64;
     for id in ids {
-        let img = set.get(id).ok_or_else(|| {
+        let img = request.images.get(id).ok_or_else(|| {
             Error::Image(format!(
                 "{id}: referenced by the request but never prepared"
             ))

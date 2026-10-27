@@ -983,6 +983,12 @@
               "type": "null"
             }
           ]
+        },
+        "wall_ms": {
+          "description": "Wall time from the first journal line to the last, in milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
         }
       },
       "required": [
@@ -996,7 +1002,8 @@
         "tool_calls",
         "repairs",
         "items",
-        "finding_rows"
+        "finding_rows",
+        "wall_ms"
       ],
       "type": "object"
     },
@@ -1213,7 +1220,20 @@
     },
     "Usage": {
       "properties": {
+        "cache_read_tokens": {
+          "description": "Input tokens served from the provider's prompt cache (priced at the cached rate).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cache_write_tokens": {
+          "description": "Input tokens written to the provider's prompt cache (priced at the cache-write rate).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "input_tokens": {
+          "description": "Uncached input tokens.",
           "format": "uint64",
           "minimum": 0,
           "type": "integer"

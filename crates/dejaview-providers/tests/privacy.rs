@@ -10,7 +10,7 @@ use std::time::Duration;
 use dejaview_core::artifacts::ArtifactStore;
 use dejaview_core::config::Config;
 use dejaview_providers::catalog::Catalog;
-use dejaview_providers::http::Client;
+use dejaview_providers::http::{Client, Transport};
 use dejaview_providers::privacy::{FORBIDDEN_MARKERS, consent, credential, scan, scan_fixtures};
 
 fn root() -> std::path::PathBuf {
@@ -168,6 +168,13 @@ fn serve(responses: usize) -> u16 {
     port
 }
 
+fn hdr(pairs: &[(&str, &str)]) -> Vec<(String, String)> {
+    pairs
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect()
+}
+
 #[tokio::test]
 async fn privacy_http_client_follows_same_origin_redirects_only() {
     let port = serve(4);
@@ -176,14 +183,14 @@ async fn privacy_http_client_follows_same_origin_redirects_only() {
     let ok = client
         .post_json(
             &format!("http://127.0.0.1:{port}/moved"),
-            &[("x-api-key", "k")],
+            &hdr(&[("x-api-key", "k")]),
             &body,
         )
         .await
         .unwrap();
     assert_eq!(ok.status, 200);
     assert_eq!(ok.body, "{\"ok\":true}");
-    assert_eq!(ok.request_id.as_deref(), Some("req_1"));
+    assert_eq!(ok.header("request-id"), Some("req_1"));
     let err = client
         .post_json(&format!("http://127.0.0.1:{port}/away"), &[], &body)
         .await
@@ -193,11 +200,12 @@ async fn privacy_http_client_follows_same_origin_redirects_only() {
         err.to_string().contains("another host") && err.to_string().contains("example.invalid"),
         "{err}"
     );
-    let err = client
+    let busy = client
         .post_json(&format!("http://127.0.0.1:{port}/busy"), &[], &body)
         .await
-        .unwrap_err();
-    match err {
+        .unwrap();
+    assert_eq!(busy.status, 429);
+    match busy.ok().unwrap_err() {
         dejaview_core::Error::Transport(t) => {
             assert_eq!(t.status, Some(429));
             assert_eq!(t.retry_after, Some(Duration::from_secs(7)));

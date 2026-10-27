@@ -4,14 +4,14 @@
 
 use std::io::Cursor;
 
+use dejaview_core::image::Prepared;
 use dejaview_core::image::{DecodeBounds, base64_encode, load};
 use dejaview_core::job::{ImageSource, ImageSpec, Role};
 use dejaview_core::provider::{ContentBlock, Message, MessageRole, TurnRequest};
 use dejaview_providers::catalog::{Catalog, Images};
-use dejaview_providers::prepare::{
-    PREP_VERSION, PreparedImage, PreparedSet, Preparer, fit, preflight,
-};
+use dejaview_providers::prepare::{PREP_VERSION, Preparer, fit, preflight};
 use image::{DynamicImage, ImageEncoder, Rgb, Rgba};
+use std::collections::BTreeMap;
 
 fn root() -> std::path::PathBuf {
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -152,8 +152,8 @@ fn prepare_keeps_png_with_alpha_and_drops_metadata() {
     assert!(!prepared.bytes.windows(5).any(|w| w == b"GPano"));
 }
 
-fn fake_prepared(id: &str, side: u32, bytes: usize) -> PreparedImage {
-    PreparedImage {
+fn fake_prepared(id: &str, side: u32, bytes: usize) -> Prepared {
+    Prepared {
         id: id.into(),
         media_type: "image/jpeg".into(),
         width: side,
@@ -201,6 +201,16 @@ fn conversation(ids: &[String]) -> Vec<Message> {
     history
 }
 
+fn request<'a>(history: &'a [Message], images: &'a BTreeMap<String, Prepared>) -> TurnRequest<'a> {
+    TurnRequest {
+        system: "s",
+        history,
+        tools: &[],
+        max_output_tokens: 1000,
+        images,
+    }
+}
+
 #[test]
 fn preflight_counts_tool_images_and_fails_at_the_many_image_threshold_before_sending() {
     let lim = limits("claude-opus-5-5");
@@ -214,34 +224,26 @@ fn preflight_counts_tool_images_and_fails_at_the_many_image_threshold_before_sen
         })
         .collect();
     let history = conversation(&ids);
-    fn request<'a>(history: &'a [Message]) -> TurnRequest<'a> {
-        TurnRequest {
-            system: "s",
-            history,
-            tools: &[],
-            max_output_tokens: 1000,
-        }
-    }
-    let mut big = PreparedSet::default();
-    let mut small = PreparedSet::default();
+    let mut big = BTreeMap::new();
+    let mut small = BTreeMap::new();
     for id in &ids {
-        big.insert(fake_prepared(id, 2100, 10_000));
-        small.insert(fake_prepared(id, 1900, 10_000));
+        big.insert(id.clone(), fake_prepared(id, 2100, 10_000));
+        small.insert(id.clone(), fake_prepared(id, 1900, 10_000));
     }
     // 21 images over the threshold of 20: the one over 2000 pixels is refused with the rule.
-    let err = preflight(&lim, &request(&history), &big).unwrap_err();
+    let err = preflight(&lim, &request(&history, &big)).unwrap_err();
     assert_eq!(err.class(), "image_limit");
     assert!(
         err.to_string().contains("more than 20 images (21 here)"),
         "{err}"
     );
     // The same count under 2000 pixels passes, and tool-result images were counted.
-    let ok = preflight(&lim, &request(&history), &small).unwrap();
+    let ok = preflight(&lim, &request(&history, &small)).unwrap();
     assert_eq!(ok.images, 21);
     assert_eq!(ok.image_bytes, 210_000);
     // Twenty images at 2100 pixels pass: the stricter rule applies only above the threshold.
     let twenty = conversation(&ids[..20]);
-    assert_eq!(preflight(&lim, &request(&twenty), &big).unwrap().images, 20);
+    assert_eq!(preflight(&lim, &request(&twenty, &big)).unwrap().images, 20);
 }
 
 #[test]
@@ -249,56 +251,52 @@ fn preflight_enforces_count_bytes_dimensions_and_formats() {
     let lim = limits("gemini-4-argon");
     let ids: Vec<String> = (0..3).map(|i| format!("img{i}")).collect();
     let history = conversation(&ids);
-    let request = TurnRequest {
-        system: "s",
-        history: &history,
-        tools: &[],
-        max_output_tokens: 1,
-    };
-    let mut set = PreparedSet::default();
+    let mut set = BTreeMap::new();
     for id in &ids {
-        set.insert(fake_prepared(id, 1536, 8_000_000));
+        set.insert(id.clone(), fake_prepared(id, 1536, 8_000_000));
     }
-    let err = preflight(&lim, &request, &set).unwrap_err();
+    let err = preflight(&lim, &request(&history, &set)).unwrap_err();
     assert!(
         err.to_string()
             .contains("over the model's limit of 20000000 bytes"),
         "{err}"
     );
-    let mut set = PreparedSet::default();
+    let mut set = BTreeMap::new();
     for id in &ids {
-        set.insert(fake_prepared(id, 1536, 1_000));
+        set.insert(id.clone(), fake_prepared(id, 1536, 1_000));
     }
-    let mut heic = fake_prepared("img1", 1536, 1_000);
-    heic.media_type = "image/bmp".into();
-    set.insert(heic);
-    let err = preflight(&lim, &request, &set).unwrap_err();
+    let mut bmp = fake_prepared("img1", 1536, 1_000);
+    bmp.media_type = "image/bmp".into();
+    set.insert("img1".into(), bmp);
+    let err = preflight(&lim, &request(&history, &set)).unwrap_err();
     assert!(err.to_string().contains("image/bmp is not among"), "{err}");
     // An image the request names but nobody prepared is an internal error, not a limit.
-    let missing = PreparedSet::default();
+    let missing = BTreeMap::new();
     assert_eq!(
-        preflight(&lim, &request, &missing).unwrap_err().class(),
+        preflight(&lim, &request(&history, &missing))
+            .unwrap_err()
+            .class(),
         "resolve"
     );
     // Per-side limit (OpenAI) and per-image bytes (Anthropic).
     let openai = limits("gpt-6.1-sol");
-    let mut set = PreparedSet::default();
+    let mut set = BTreeMap::new();
     for id in &ids {
-        set.insert(fake_prepared(id, 70_000, 1_000));
+        set.insert(id.clone(), fake_prepared(id, 70_000, 1_000));
     }
     assert!(
-        preflight(&openai, &request, &set)
+        preflight(&openai, &request(&history, &set))
             .unwrap_err()
             .to_string()
             .contains("pixels per side")
     );
     let anthropic = limits("claude-haiku-5-5");
-    let mut set = PreparedSet::default();
+    let mut set = BTreeMap::new();
     for id in &ids {
-        set.insert(fake_prepared(id, 100, 10_000_001));
+        set.insert(id.clone(), fake_prepared(id, 100, 10_000_001));
     }
     assert!(
-        preflight(&anthropic, &request, &set)
+        preflight(&anthropic, &request(&history, &set))
             .unwrap_err()
             .to_string()
             .contains("bytes per image")

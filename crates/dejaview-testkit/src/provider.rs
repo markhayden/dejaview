@@ -177,11 +177,13 @@ mod tests {
                 ..TurnResponse::default_for_test()
             },
         ]);
+        let images = std::collections::BTreeMap::new();
         let req = TurnRequest {
             system: "",
             history: &[],
             tools: &[],
             max_output_tokens: 1,
+            images: &images,
         };
         assert_eq!(
             block_on(p.send(req.clone())).expect("turn 1").stop_reason,
@@ -205,6 +207,7 @@ mod tests {
             TurnResponse {
                 text: vec![],
                 tool_calls: vec![],
+                content: vec![],
                 stop_reason: StopReason::EndTurn,
                 usage: Default::default(),
                 provider_request_id: None,

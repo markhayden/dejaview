@@ -24,12 +24,12 @@ recorded here with the task that owns it.
 | Suggestion | Two decisions in one millisecond collided on the directory name. | Fixed: a suffix on `AlreadyExists`. |
 | Suggestion | The cache key included how a pack is launched (`command`, `args`, timeouts). | Fixed: the key carries the enabled tools, their order and the frozen manifests. |
 | Suggestion | The report lacked the tool version and the findings' rows. | Fixed. |
-| Suggestion | The final-turn instruction is a separate user message, not a trailing text block. | Recorded for 2.5a: adapters decide how consecutive user messages are merged; the typed history stays as it is. |
+| Suggestion | The final-turn instruction is a separate user message, not a trailing text block. | Done in 2.5a: the instruction is a `System` message in the typed history; an adapter sends it as a mid-conversation system message where the model supports one, otherwise as the trailing text block of the preceding user message. |
 | Suggestion | Calls are validated one at a time rather than the whole batch first. | Recorded for 4.4a; the results are the same either way today (invalid calls get error results, valid ones execute). |
 | Suggestion | Server stderr is captured but never reaches the journal; the buffer is unbounded. | Recorded for 4.4b. |
 | Suggestion | `--dry-run` connects packs. | Kept: the Tools section of the prompt needs the frozen manifests. |
-| Suggestion | `first_look_bytes` is an estimate; images are encoded per run and `images_sent` holds the canonical PNG, not what the adapter sends. | Recorded for 2.3 (image preparation per model) and 1.9 follow-up in M2. |
-| Suggestion | No wall time in the report. | Recorded for 2.5a with the first live adapter. |
+| Suggestion | `first_look_bytes` is an estimate; images are encoded per run and `images_sent` holds the canonical PNG, not what the adapter sends. | Done in 2.3 and 2.5a: the provider prepares every image (`prepare_image`) and `images_sent` holds the prepared bytes the adapter sends; `first_look_bytes` remains an estimate by design (the bound is conservative). |
+| Suggestion | No wall time in the report. | Done in 2.5a: `wall_ms` per run, from the first journal line to the last. |
 | Suggestion | Very short secrets redact unrelated text. | Recorded; config review in 2.4. |
 
 ## Coverage

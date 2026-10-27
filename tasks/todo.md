@@ -42,7 +42,7 @@ tag.
 - [x] 2.2 Wire schema transformations
 - [x] 2.3 Image preparation and preflight
 - [x] 2.4 Privacy enforcement before any live call
-- [ ] 2.5a Anthropic adapter and replay harness
+- [x] 2.5a Anthropic adapter and replay harness
 - [ ] 2.5b Anthropic recordings → tag `m2.1`
 - [ ] 2.6a Gemini adapter
 - [ ] 2.6b Gemini recordings

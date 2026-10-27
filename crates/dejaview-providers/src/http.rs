@@ -1,9 +1,14 @@
-//! The HTTPS client every adapter sends through: rustls with the ring provider and the platform's
-//! trust roots, a request timeout, and a redirect policy that follows same-origin redirects only;
-//! a redirect to another host, scheme or port is refused as `error: provider`. Failures become
-//! `Error::Transport` with the status and `retry-after`, so the run loop decides about retries;
-//! messages never carry the URL or headers.
+//! The transport every adapter sends through. `Transport` is the one seam: `Client` is the HTTPS
+//! client in the binary (rustls with the ring provider and the platform's trust roots, a request
+//! timeout, same-origin redirects only: another host, scheme or port is `error: provider`); the
+//! replay player and recorder in `replay` implement it for fixtures. A response of any status
+//! comes back as `Response`; `Response::ok` turns a non-2xx into `Error::Transport` with the
+//! status and `retry-after`, so the run loop decides about retries. Messages never carry the URL
+//! or headers.
 
+use std::collections::BTreeMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::time::Duration;
 
 use dejaview_core::retry::TransportError;
@@ -14,17 +19,62 @@ pub const MAX_REDIRECTS: usize = 5;
 /// Body bytes kept in a transport error message.
 const ERROR_BODY_BYTES: usize = 2048;
 
+/// Header name and value pairs as an adapter builds them.
+pub type Headers = Vec<(String, String)>;
+
+pub type TransportFuture<'a> = Pin<Box<dyn Future<Output = Result<Response>> + Send + 'a>>;
+
+/// One HTTPS round trip. Implementations never retry; the run loop owns that.
+pub trait Transport: Send + Sync {
+    fn post_json<'a>(
+        &'a self,
+        url: &'a str,
+        headers: &'a [(String, String)],
+        body: &'a serde_json::Value,
+    ) -> TransportFuture<'a>;
+}
+
+/// A response of any status.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Response {
+    pub status: u16,
+    /// Response headers with lowercased names; a repeated header keeps its last value.
+    pub headers: BTreeMap<String, String>,
+    pub body: String,
+}
+
+impl Response {
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .get(&name.to_ascii_lowercase())
+            .map(String::as_str)
+    }
+
+    /// The server's `retry-after` in seconds, when it gave one.
+    pub fn retry_after(&self) -> Option<Duration> {
+        self.header("retry-after")
+            .and_then(|s| s.trim().parse::<u64>().ok())
+            .map(Duration::from_secs)
+    }
+
+    /// 2xx is `Ok`; anything else is a transport error carrying the status, `retry-after` and the
+    /// start of the body, for the run loop's retry decision.
+    pub fn ok(self) -> Result<Response> {
+        if (200..300).contains(&self.status) {
+            return Ok(self);
+        }
+        let excerpt: String = self.body.chars().take(ERROR_BODY_BYTES).collect();
+        Err(Error::Transport(TransportError {
+            status: Some(self.status),
+            retry_after: self.retry_after(),
+            message: format!("HTTP {}: {excerpt}", self.status),
+        }))
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Client {
     inner: reqwest::Client,
-}
-
-/// A successful (2xx) response.
-#[derive(Debug, Clone)]
-pub struct Response {
-    pub status: u16,
-    pub body: String,
-    pub request_id: Option<String>,
 }
 
 impl Client {
@@ -41,51 +91,47 @@ impl Client {
         Ok(Client { inner })
     }
 
-    /// POST a JSON body with the given headers. 2xx is `Ok`; anything else is a transport error
-    /// carrying the status, the server's `retry-after` and the start of the body.
-    pub async fn post_json(
+    async fn send(
         &self,
         url: &str,
-        headers: &[(&str, &str)],
+        headers: &[(String, String)],
         body: &serde_json::Value,
     ) -> Result<Response> {
         let mut req = self.inner.post(url).json(body);
         for (name, value) in headers {
-            req = req.header(*name, *value);
+            req = req.header(name.as_str(), value.as_str());
         }
         let response = req.send().await.map_err(map_send_error)?;
         let status = response.status().as_u16();
-        let retry_after = response
-            .headers()
-            .get("retry-after")
-            .and_then(|v| v.to_str().ok())
-            .and_then(|s| s.trim().parse::<u64>().ok())
-            .map(Duration::from_secs);
-        let request_id = ["request-id", "x-request-id"]
-            .iter()
-            .find_map(|h| response.headers().get(*h))
-            .and_then(|v| v.to_str().ok())
-            .map(str::to_string);
+        let mut out = BTreeMap::new();
+        for (name, value) in response.headers() {
+            if let Ok(v) = value.to_str() {
+                out.insert(name.as_str().to_ascii_lowercase(), v.to_string());
+            }
+        }
         let body = response.text().await.map_err(|e| {
             Error::Transport(TransportError {
                 status: Some(status),
-                retry_after,
+                retry_after: None,
                 message: format!("reading the response body: {}", strip_url(e)),
             })
         })?;
-        if (200..300).contains(&status) {
-            return Ok(Response {
-                status,
-                body,
-                request_id,
-            });
-        }
-        let excerpt: String = body.chars().take(ERROR_BODY_BYTES).collect();
-        Err(Error::Transport(TransportError {
-            status: Some(status),
-            retry_after,
-            message: format!("HTTP {status}: {excerpt}"),
-        }))
+        Ok(Response {
+            status,
+            headers: out,
+            body,
+        })
+    }
+}
+
+impl Transport for Client {
+    fn post_json<'a>(
+        &'a self,
+        url: &'a str,
+        headers: &'a [(String, String)],
+        body: &'a serde_json::Value,
+    ) -> TransportFuture<'a> {
+        Box::pin(self.send(url, headers, body))
     }
 }
 

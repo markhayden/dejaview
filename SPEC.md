@@ -746,8 +746,13 @@ per model:
   block per tool other than `submit_verdict`, leaving the definitions in `tools`, and still
   answers a stray call with an error result.
 
-Each mechanism has adapter fixtures, including the transition into the final turn and a stray
-call during it. A configuration whose model supports none is rejected at resolve time.
+The harness marks the final turn by appending the instruction as a `System` message; the adapter
+renders it by the mechanism in force. The mechanism is the first the catalog lists for the model
+unless `[provider] controls = { final_turn = "…" }` names another supported one; the thinking
+prefix check is `controls.prefix_mismatch_behavior = "error" | "drop_block"` on models with the
+thinking-binding beta (owner decision 2 sets `error` while recording). Each mechanism has adapter
+fixtures, including the transition into the final turn and a stray call during it. A
+configuration whose model supports none is rejected at resolve time.
 
 ## Providers
 
@@ -755,26 +760,32 @@ call during it. A configuration whose model supports none is rejected at resolve
 
 ```rust
 pub trait Provider: Send + Sync {
-    fn id(&self) -> &'static str;                            // "anthropic-messages"
-    fn capabilities(&self, model: &ModelSpec) -> Capabilities; // from the catalog
-    fn wire_schema(&self, canonical: &Schema, model: &ModelSpec) -> Result<Schema>;
-    fn prepare_images(&self, imgs: &[CanonicalImage], model: &ModelSpec) -> Result<Vec<PreparedImage>>;
-    fn preflight(&self, req: &TurnRequest<'_>, model: &ModelSpec) -> Result<RequestBound>;
-    fn classify(&self, resp: &RawResponse) -> ResponseClass;    // complete, non-replayable, error
-    fn send<'a>(&'a self, req: TurnRequest<'a>)
-        -> Pin<Box<dyn Future<Output = Result<TurnResponse>> + Send + 'a>>;
+    fn id(&self) -> &str;                                              // "anthropic-messages"
+    fn send<'a>(&'a self, req: TurnRequest<'a>) -> SendFuture<'a>;     // one round trip, no retries
+    fn pricing(&self) -> Option<&dyn Pricing>;                         // the catalog entry
+    fn prep_version(&self) -> &str;                                    // part of the cache key
+    fn prepare_image(&self, id: &str, pixels: &DynamicImage) -> Result<Prepared>;
+    fn recipient(&self) -> Option<Recipient>;                          // profile, host, upstream, model
 }
 ```
 
 `Provider` is dyn-compatible and used as `Box<dyn Provider>`; `send` returns a boxed `Send`
-future. `TurnRequest` carries the system prompt, the provider history as adapter-owned opaque
-blocks plus the harness's typed view of them, tool definitions, the model id, the control settings
-allowed by the catalog, and the output token limit. `TurnResponse` carries text blocks, tool
-calls (adapter call id, name, parsed arguments), the stop reason, usage, the provider request id,
-upstream provenance where a gateway returns it, and the opaque blocks to echo. `preflight`
-returns the request's upper-bound cost and rejects it when any catalog limit would be exceeded.
+future. The adapter is built from the catalog entry (capabilities, limits, prices, betas), the
+profile, the credential and an injected transport, so the capability, wire-schema and preflight
+steps of the request are the adapter's own: it transforms the tool schemas once (`wire`), runs
+preflight over every outgoing request (`prepare::preflight`) and maps controls as the catalog
+allows. `TurnRequest` carries the system prompt, the history (the harness's typed view, in which
+adapter-owned opaque blocks appear as `Opaque { adapter, block }` and the final-turn instruction as
+a `System` message), the frozen tool definitions, the output token limit and the prepared bytes of
+every image the history names. `TurnResponse` carries text blocks, tool calls (adapter call id,
+name, parsed arguments), the assistant content in the provider's order including the opaque blocks
+to echo, the stop reason, usage (uncached, cache-read and cache-write tokens), and the provider
+request id. The harness appends that content to the history unchanged.
 
-The HTTP client is injected (`reqwest` with `rustls` in the binary; a fixture player in tests).
+The transport is injected (`http::Client`, reqwest with rustls in the binary; `replay::Player` for
+recorded conversations, `replay::Recorder` around the client when recording). `dejaview check
+--replay <dir>` runs a decision against a recording without a credential; `--record <dir>` writes
+one, secrets stripped.
 
 ### Wire schemas
 
@@ -1397,6 +1408,8 @@ dejaview eval run --matrix matrix.toml --out eval-out/<name>
 dejaview eval report eval-out/<name>
 dejaview eval gate --matrix matrix.toml --tool regions --set <sealed set>
 dejaview eval canary --config dejaview.toml
+dejaview check --config dejaview.toml --job job.toml --replay fixtures/adapters/anthropic-messages/first-look
+dejaview check --config dejaview.toml --job job.toml --record recordings/first-look
 dejaview catalog show claude-opus-5-5 [--json]
 dejaview catalog list [--json]
 ```
@@ -1417,8 +1430,8 @@ crates/
 tools/python/                   dejaview-tools uv project (MCP server, segmenter, MODEL.md, uv.lock, bundle build, tests)
 rules/                          base rule sets and profiles/, embedded at build time
 providers/
-  profiles/*.toml               endpoint profiles, embedded
-  catalog.toml                  model catalog, embedded
+  catalog.toml                  model catalog and the shipped endpoint profiles, embedded
+  profiles/*.toml               gateway profiles with upstream contracts, embedded (2.8)
 prompts/                        versioned system prompt templates
 schemas/                        generated JSON Schemas: submission, envelope, manifest, config, report, tools/
 fixtures/

@@ -112,6 +112,16 @@ fn show(catalog: &Catalog, args: &ShowArgs) -> i32 {
                 .unwrap_or_default()
         );
     }
+    println!(
+        "  control final_turn: {}",
+        m.capabilities.final_turn.join(" | ")
+    );
+    if m.betas.contains_key("thinking_binding") {
+        println!(
+            "  control prefix_mismatch_behavior: error | drop_block (beta {})",
+            m.betas["thinking_binding"]
+        );
+    }
     if !m.unverified.is_empty() {
         println!("  unverified: {}", m.unverified.join(", "));
     }

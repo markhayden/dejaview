@@ -22,7 +22,7 @@ observed: profile, host, upstream provenance where a gateway reports one, and th
 
 | Profile | Enforced by the harness | Attested by the operator | Not verifiable |
 |---|---|---|---|
-| `anthropic` | (2.5b) | | |
+| `anthropic` | Credential only in `x-api-key`; `anthropic-version` pinned; HTTPS to `api.anthropic.com` with same-origin redirects only; no `temperature`, `top_p`, `top_k`, `metadata`, `stream` or server-side fallback parameters; `thinking: adaptive` with the prefix check when configured; tools with `strict: true` and the wire schema; images as base64 at the catalog's native size without metadata; the final turn as a mid-conversation system message, `tool_removal` blocks or a forced `tool_choice` only where the catalog allows | (2.5b) | (2.5b) |
 | `google-ai-studio` | (2.6b) | | |
 | `openai` | (2.7b) | | |
 

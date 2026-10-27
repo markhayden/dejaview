@@ -88,6 +88,7 @@ fn catalog_prices_bound_requests_and_cost_usage() {
     let cost = opus.cost(&Usage {
         input_tokens: 10_000,
         output_tokens: 1_000,
+        ..Default::default()
     });
     assert!((cost - (0.04 + 0.02)).abs() < 1e-12);
     // Haiku's long-prompt tier applies above 100k prompt tokens.
@@ -95,10 +96,12 @@ fn catalog_prices_bound_requests_and_cost_usage() {
     let short = haiku.cost(&Usage {
         input_tokens: 100_000,
         output_tokens: 0,
+        ..Default::default()
     });
     let long = haiku.cost(&Usage {
         input_tokens: 100_001,
         output_tokens: 0,
+        ..Default::default()
     });
     assert!((short - 0.01).abs() < 1e-12);
     assert!(long > 0.05 - 1e-9, "{long}");

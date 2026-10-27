@@ -166,6 +166,8 @@ pub struct RunReport {
     pub finding_rows: Vec<Row>,
     pub verdict: Option<Verdict>,
     pub error: Option<ErrorEntry>,
+    /// Wall time from the first journal line to the last, in milliseconds.
+    pub wall_ms: u64,
 }
 
 /// One model turn: a request, and its response if one came back.
@@ -273,6 +275,10 @@ impl RunReport {
             finding_rows: Vec::new(),
             verdict: None,
             error: None,
+            wall_ms: match (lines.first(), lines.last()) {
+                (Some(a), Some(b)) => b.unix_ms.saturating_sub(a.unix_ms),
+                _ => 0,
+            },
         };
         for line in lines {
             match &line.event {

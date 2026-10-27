@@ -413,6 +413,8 @@ fn shape_of(request: &TurnRequest<'_>) -> RequestShape {
                     bytes += content.len() as u64;
                     images += imgs.len() as u64;
                 }
+                // Echoed thinking is billed as input like any other block.
+                ContentBlock::Opaque { block, .. } => bytes += block.to_string().len() as u64,
             }
         }
     }
@@ -430,6 +432,8 @@ struct RunState {
     artifacts: ArtifactStore,
     images_sent: BTreeMap<String, ArtifactRef>,
     images: Vec<CanonicalImage>,
+    /// The bytes the provider sends per content-block id (job image ids and frame ids).
+    prepared_images: BTreeMap<String, image::Prepared>,
     instances: Vec<Instance>,
     checklist: Checklist,
     registry: Registry,
@@ -450,6 +454,7 @@ impl RunState {
             artifacts: ArtifactStore::create(run_dir, secrets)?,
             images_sent: BTreeMap::new(),
             images: Vec::new(),
+            prepared_images: BTreeMap::new(),
             instances: Vec::new(),
             checklist: Checklist::default(),
             registry: Registry::new(),
@@ -461,12 +466,19 @@ impl RunState {
         })
     }
 
-    /// Stores a frame's pixels as sent to the model and records it under `images_sent`.
-    fn record_image_sent(&mut self, frame_id: &str) -> Result<ArtifactRef> {
-        let path = self.frame_file(frame_id)?;
-        let bytes = std::fs::read(&path)?;
-        let r = self.artifacts.put(&bytes)?;
+    /// Prepares an image for the provider, stores the bytes as sent under `images_sent` (by frame
+    /// id) and keeps them for the requests (by the content-block id).
+    fn prepare_for_provider(
+        &mut self,
+        provider: &dyn Provider,
+        block_id: &str,
+        frame_id: &str,
+        pixels: &::image::DynamicImage,
+    ) -> Result<ArtifactRef> {
+        let prepared = provider.prepare_image(block_id, pixels)?;
+        let r = self.artifacts.put(&prepared.bytes)?;
         self.images_sent.insert(frame_id.to_string(), r.clone());
+        self.prepared_images.insert(block_id.to_string(), prepared);
         Ok(r)
     }
 
@@ -554,10 +566,18 @@ async fn drive(
             .registry
             .add_raw(&img.id, img.width, img.height, img.projection);
     }
-    // Every image the model will see is stored as sent before the event that names it.
-    let ids: Vec<String> = state.images.iter().map(|i| i.id.clone()).collect();
-    for id in &ids {
-        state.record_image_sent(&format!("raw:{id}"))?;
+    // Every image the model will see is prepared for the provider and stored as sent before the
+    // event that names it.
+    let job_images: Vec<(String, ::image::DynamicImage)> = state
+        .images
+        .iter()
+        .map(|i| i.dynamic().map(|d| (i.id.clone(), d)))
+        .collect::<Result<_>>()?;
+    for (id, pixels) in &job_images {
+        let frame = format!("raw:{id}");
+        state.prepare_for_provider(provider, id, &frame, pixels)?;
+        // The lossless pixels tools read, written once up front.
+        state.frame_file(&frame)?;
     }
     journal.append(&Event::Resolved(events::Resolved {
         images: state.images.clone(),
@@ -566,7 +586,6 @@ async fn drive(
         checklist: state.checklist.clone(),
         tools: tools.manifests().map(|m| m.name.clone()).collect(),
     }))?;
-    // Prepare is a stub until task 2.3; the event exists so the journal's shape is final.
     journal.append(&Event::Prepared(events::Prepared {
         prep_version: provider.prep_version().to_string(),
         images: state.images.len(),
@@ -669,7 +688,7 @@ async fn drive(
 
         match classify(&response.stop_reason, &response.tool_calls) {
             Class::Submission(call) => {
-                history.push(assistant_message(&response.text, &response.tool_calls));
+                history.push(assistant_message(&response));
                 match finish(prepared, state, journal, call) {
                     Ok(verdict) => return Ok(verdict),
                     Err(Error::Submission(message)) => {
@@ -686,7 +705,7 @@ async fn drive(
                 }
             }
             Class::MixedCalls(calls) => {
-                history.push(assistant_message(&response.text, &response.tool_calls));
+                history.push(assistant_message(&response));
                 if !take_repair(config, state, journal, "rejected", "mixed_batch")? {
                     return Err(Error::ModelOutput(
                         "submit_verdict must be the only call in its batch (mixed batch), again after the repair".into(),
@@ -713,7 +732,7 @@ async fn drive(
                 }
             }
             Class::Batch(calls) => {
-                history.push(assistant_message(&response.text, &response.tool_calls));
+                history.push(assistant_message(&response));
                 turns_used += 1;
                 let remaining = config.budget.tool_calls.saturating_sub(calls_used);
                 if calls.len() as u32 > remaining {
@@ -742,8 +761,17 @@ async fn drive(
                 let mut results: Vec<ContentBlock> = Vec::new();
                 for c in calls {
                     results.push(
-                        execute_call(config, tools, prepared, journal, state, c, services.cancel)
-                            .await?,
+                        execute_call(
+                            config,
+                            provider,
+                            tools,
+                            prepared,
+                            journal,
+                            state,
+                            c,
+                            services.cancel,
+                        )
+                        .await?,
                     );
                 }
                 calls_used += calls.len() as u32;
@@ -767,7 +795,7 @@ async fn drive(
     // Then `error: no_submission`.
     let instruction = final_turn_instruction(state);
     history.push(Message {
-        role: MessageRole::User,
+        role: MessageRole::System,
         content: vec![ContentBlock::Text {
             text: instruction.clone(),
         }],
@@ -790,7 +818,7 @@ async fn drive(
         allowance = config.provider.max_output_tokens;
         match classify(&response.stop_reason, &response.tool_calls) {
             Class::Submission(call) => {
-                history.push(assistant_message(&response.text, &response.tool_calls));
+                history.push(assistant_message(&response));
                 match finish(prepared, state, journal, call) {
                     Ok(verdict) => return Ok(verdict),
                     Err(Error::Submission(message)) => {
@@ -807,7 +835,7 @@ async fn drive(
                 }
             }
             Class::Batch(calls) | Class::MixedCalls(calls) => {
-                history.push(assistant_message(&response.text, &response.tool_calls));
+                history.push(assistant_message(&response));
                 for c in calls {
                     journal.append(&not_executed(c, "final_turn"))?;
                 }
@@ -979,18 +1007,26 @@ fn classify<'a>(stop: &StopReason, calls: &'a [ToolCall]) -> Class<'a> {
     }
 }
 
-fn assistant_message(text: &[String], calls: &[ToolCall]) -> Message {
-    let mut content: Vec<ContentBlock> = text
-        .iter()
-        .map(|t| ContentBlock::Text { text: t.clone() })
-        .collect();
-    for c in calls {
-        content.push(ContentBlock::ToolUse {
-            id: c.id.clone(),
-            name: c.name.clone(),
-            arguments: c.arguments.clone(),
-        });
-    }
+/// The assistant message as the provider must see it again: the adapter's ordered content when it
+/// gave one (opaque blocks included), otherwise the typed view.
+fn assistant_message(response: &TurnResponse) -> Message {
+    let content: Vec<ContentBlock> = if response.content.is_empty() {
+        let mut content: Vec<ContentBlock> = response
+            .text
+            .iter()
+            .map(|t| ContentBlock::Text { text: t.clone() })
+            .collect();
+        for c in &response.tool_calls {
+            content.push(ContentBlock::ToolUse {
+                id: c.id.clone(),
+                name: c.name.clone(),
+                arguments: c.arguments.clone(),
+            });
+        }
+        content
+    } else {
+        response.content.clone()
+    };
     Message {
         role: MessageRole::Assistant,
         content,
@@ -1023,6 +1059,7 @@ async fn send_turn(
         history,
         tools: definitions,
         max_output_tokens,
+        images: &state.prepared_images,
     };
     let bound_usd = pricing.bound(&shape_of(&request))?;
     // The model-visible request body, with images by frame id (their bytes are artifacts of their
@@ -1126,6 +1163,7 @@ async fn send_turn(
 #[allow(clippy::too_many_arguments)]
 async fn execute_call(
     config: &Config,
+    provider: &dyn Provider,
     tools: &ToolRegistry,
     prepared: &Prepared,
     journal: &mut Journal,
@@ -1360,7 +1398,13 @@ async fn execute_call(
         let path = dir.join(format!("{}.{ext}", sanitise(&img.frame)));
         crate::artifacts::write_private(&path, &bytes)?;
         state.frame_files.insert(img.frame.clone(), path);
-        state.record_image_sent(&img.frame)?;
+        let decoded = ::image::load_from_memory(&bytes).map_err(|e| {
+            Error::Tool(format!(
+                "{}: returned image {} cannot be decoded: {e}",
+                manifest.name, img.frame
+            ))
+        })?;
+        state.prepare_for_provider(provider, &img.frame, &img.frame, &decoded)?;
     }
     let ingest = state.checklist.ingest(
         &call_id,

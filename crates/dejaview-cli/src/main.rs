@@ -141,6 +141,13 @@ struct CheckArgs {
     /// without calling any provider.
     #[arg(long)]
     dry_run: bool,
+    /// Replay a recorded conversation (a directory of exchanges) instead of calling the provider;
+    /// no credential is needed and nothing leaves the machine.
+    #[arg(long, value_name = "DIR", conflicts_with = "record")]
+    replay: Option<PathBuf>,
+    /// Record every exchange with the provider into this directory, secrets stripped.
+    #[arg(long, value_name = "DIR")]
+    record: Option<PathBuf>,
     /// Scripted fake provider responses, for tests and debugging only.
     #[cfg(feature = "testkit")]
     #[arg(long)]
@@ -176,7 +183,7 @@ fn main() {
 }
 
 fn check(args: &CheckArgs) -> i32 {
-    let config = match Config::load_with_overrides(&args.config, &args.overrides) {
+    let mut config = match Config::load_with_overrides(&args.config, &args.overrides) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("dejaview: {e}");
@@ -251,7 +258,7 @@ fn check(args: &CheckArgs) -> i32 {
             }
         };
     }
-    let provider: Box<dyn Provider> = match select_provider(args) {
+    let provider: Box<dyn Provider> = match select_provider(args, &mut config) {
         Ok(p) => p,
         Err(message) => {
             eprintln!("dejaview: {message}");
@@ -275,7 +282,13 @@ fn check(args: &CheckArgs) -> i32 {
         }
     };
     let cancel = std::sync::Arc::new(Cancel::new());
-    runtime.spawn(cancel_on_signal(std::sync::Arc::clone(&cancel)));
+    // The handlers are registered here, before the run starts, so a signal that lands during the
+    // run's first synchronous work is caught rather than taking the process down.
+    let signals = {
+        let _guard = runtime.enter();
+        install_signal_handlers()
+    };
+    runtime.spawn(cancel_on_signal(signals, std::sync::Arc::clone(&cancel)));
     let services = Services::new(provider.as_ref(), &tools).with_cancel(&cancel);
     let outcome = runtime.block_on(dejaview_core::run::check(
         &config, &job, job_base, &services, &out_dir, VERSION,
@@ -312,23 +325,47 @@ fn check(args: &CheckArgs) -> i32 {
     }
 }
 
+/// The registered signal streams (unix) or nothing (elsewhere, where `ctrl_c` registers on await).
+#[cfg(unix)]
+type Signals = Option<(tokio::signal::unix::Signal, tokio::signal::unix::Signal)>;
+#[cfg(not(unix))]
+type Signals = ();
+
+/// Registers SIGINT and SIGTERM with the runtime; must run inside a runtime context.
+#[cfg(unix)]
+fn install_signal_handlers() -> Signals {
+    use tokio::signal::unix::{SignalKind, signal};
+    match (
+        signal(SignalKind::interrupt()),
+        signal(SignalKind::terminate()),
+    ) {
+        (Ok(int), Ok(term)) => Some((int, term)),
+        _ => None,
+    }
+}
+
+#[cfg(not(unix))]
+fn install_signal_handlers() -> Signals {}
+
 /// SIGINT or SIGTERM cancels the run; it appends `cancelled` and exits 3.
-async fn cancel_on_signal(cancel: std::sync::Arc<Cancel>) {
+async fn cancel_on_signal(signals: Signals, cancel: std::sync::Arc<Cancel>) {
     #[cfg(unix)]
     {
-        use tokio::signal::unix::{SignalKind, signal};
-        let Ok(mut term) = signal(SignalKind::terminate()) else {
-            let _ = tokio::signal::ctrl_c().await;
-            cancel.cancel();
-            return;
-        };
-        tokio::select! {
-            _ = tokio::signal::ctrl_c() => {}
-            _ = term.recv() => {}
+        match signals {
+            Some((mut int, mut term)) => {
+                tokio::select! {
+                    _ = int.recv() => {}
+                    _ = term.recv() => {}
+                }
+            }
+            None => {
+                let _ = tokio::signal::ctrl_c().await;
+            }
         }
     }
     #[cfg(not(unix))]
     {
+        let _ = signals;
         let _ = tokio::signal::ctrl_c().await;
     }
     cancel.cancel();
@@ -371,23 +408,84 @@ fn load_job(args: &CheckArgs) -> Result<Job, String> {
     }
 }
 
-#[cfg(feature = "testkit")]
-fn select_provider(args: &CheckArgs) -> Result<Box<dyn Provider>, String> {
-    match &args.provider_script {
-        Some(path) => dejaview_testkit::ScriptedProvider::from_path(path)
+/// The provider for this run: the scripted fake (testkit builds, `--provider-script`), a replay of
+/// a recorded conversation, or the live adapter for the configured profile and model over HTTPS,
+/// optionally recording every exchange. The credential joins the redaction list before any run.
+fn select_provider(args: &CheckArgs, config: &mut Config) -> Result<Box<dyn Provider>, String> {
+    use std::sync::Arc;
+
+    use dejaview_providers::anthropic::AnthropicProvider;
+    use dejaview_providers::catalog::{Catalog, FAKE_PROFILE};
+    use dejaview_providers::http::{Client, Transport};
+    use dejaview_providers::privacy::credential;
+    use dejaview_providers::replay::{Player, Recorder};
+    #[cfg(feature = "testkit")]
+    if let Some(path) = &args.provider_script {
+        return dejaview_testkit::ScriptedProvider::from_path(path)
             .map(|p| Box::new(p) as Box<dyn Provider>)
-            .map_err(|e| e.to_string()),
-        None => Err(
-            "no provider adapter is available yet (adapters arrive in M2); pass --provider-script"
-                .into(),
-        ),
+            .map_err(|e| e.to_string());
+    }
+    if config.provider.profile == FAKE_PROFILE {
+        return Err("the fake profile runs only with --provider-script in a testkit build".into());
+    }
+    let catalog = Catalog::shipped().map_err(|e| e.to_string())?;
+    let profile = catalog.profile(&config.provider.profile).ok_or_else(|| {
+        format!(
+            "profile {:?} is not in the catalog",
+            config.provider.profile
+        )
+    })?;
+    let model = catalog
+        .model(&config.provider.model)
+        .ok_or_else(|| format!("model {:?} is not in the catalog", config.provider.model))?;
+    let (cred, transport): (_, Arc<dyn Transport>) = match &args.replay {
+        Some(dir) => {
+            let cred =
+                credential(profile, &|_| Some("replay".into())).map_err(|e| e.to_string())?;
+            let player =
+                Player::load(dir, AnthropicProvider::volatile()).map_err(|e| e.to_string())?;
+            (cred, Arc::new(player))
+        }
+        None => {
+            let cred =
+                credential(profile, &|name| std::env::var(name).ok()).map_err(|e| e.to_string())?;
+            config.secrets.push(cred.expose().to_string());
+            let client = Client::new(REQUEST_TIMEOUT).map_err(|e| e.to_string())?;
+            let base: Arc<dyn Transport> = Arc::new(client);
+            match &args.record {
+                Some(dir) => {
+                    let recorder = Recorder::new(
+                        base,
+                        dir,
+                        vec![cred.expose().to_string()],
+                        AnthropicProvider::volatile(),
+                    )
+                    .map_err(|e| e.to_string())?;
+                    (cred, Arc::new(recorder))
+                }
+                None => (cred, base),
+            }
+        }
+    };
+    match model.adapter.as_str() {
+        "anthropic-messages" => AnthropicProvider::new(
+            config,
+            &config.provider.profile,
+            profile,
+            model,
+            cred,
+            transport,
+        )
+        .map(|p| Box::new(p) as Box<dyn Provider>)
+        .map_err(|e| e.to_string()),
+        other => Err(format!(
+            "adapter {other} is not implemented yet (Gemini arrives with task 2.6a, OpenAI with 2.7a)"
+        )),
     }
 }
 
-#[cfg(not(feature = "testkit"))]
-fn select_provider(_args: &CheckArgs) -> Result<Box<dyn Provider>, String> {
-    Err("no provider adapter is available yet (adapters arrive in M2)".into())
-}
+/// The per-request HTTP timeout: long enough for a high-effort turn, bounded.
+const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
 
 fn rules_show(args: &RulesShowArgs) -> i32 {
     use dejaview_core::obligations::{MergeInput, RulesFile, merge};

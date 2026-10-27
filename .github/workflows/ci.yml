@@ -53,10 +53,18 @@ jobs:
         name: Detect the Python tool pack
         run: |
           if [ -f tools/python/pyproject.toml ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; fi
-      - if: steps.pack.outputs.present == 'true'
+      # The uv action's cache post-step needs node, which act's image lacks; under act, install uv
+      # with its script instead.
+      - if: steps.pack.outputs.present == 'true' && !env.ACT
         uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
+      - if: steps.pack.outputs.present == 'true' && env.ACT
+        name: Install uv (act)
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/uv" python install 3.12
       - if: steps.pack.outputs.present == 'true'
         run: uv sync --frozen
         working-directory: tools/python

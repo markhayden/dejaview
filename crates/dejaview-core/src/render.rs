@@ -8,7 +8,7 @@ use crate::obligations::{Kind, Resolved};
 pub const PROMPT_VERSION: &str = "v1";
 
 /// The versioned prompt template, embedded at build time.
-pub const TEMPLATE: &str = include_str!("../../../prompts/v1.md");
+pub const TEMPLATE: &str = include_str!("../prompts/v1.md");
 
 /// The numbered Obligations section: rules first, then job requirements, each with its targets
 /// (and evidence) named, kinds in words; then the brief in a delimited data block; then the

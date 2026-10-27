@@ -100,6 +100,16 @@ impl Error {
 /// Result alias for this crate.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// A repository fixture read at test time. Unit tests never `include_str!` across the crate
+/// boundary: the published crate must build from its own files alone (scripts/check-packaging.sh).
+#[cfg(test)]
+pub(crate) fn fixture(relative: &str) -> String {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures")
+        .join(relative);
+    std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("fixture {}: {e}", path.display()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

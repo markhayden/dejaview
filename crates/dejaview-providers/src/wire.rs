@@ -6,7 +6,7 @@
 //! `normalize` takes a wire payload back to the canonical shape before validation.
 //!
 //! The provider rules were read from the providers' documentation on 2026-10-26 (sources in
-//! `providers/catalog.toml`); the catalog's `strict_unsupported_keywords` names the constraint
+//! `crates/dejaview-providers/catalog.toml`); the catalog's `strict_unsupported_keywords` names the constraint
 //! keywords each model's strict mode rejects, and the structural rules live in `Rules` below.
 
 use std::collections::{BTreeMap, BTreeSet};

@@ -12,7 +12,7 @@ bootstrap:
     @command -v uv >/dev/null || echo "uv not found: install from https://docs.astral.sh/uv/ (the Python tool pack needs it)"
 
 # Everything a commit must pass: fmt, clippy and tests in both feature configurations, deny, graph.
-check: fmt-check clippy test deny graph hooks-test checks-test
+check: fmt-check clippy test deny graph packaging hooks-test checks-test
 
 fmt-check:
     cargo fmt --all -- --check
@@ -34,6 +34,22 @@ deny-advisories:
 
 graph:
     scripts/check-crate-graph.sh
+
+# Every embedded asset sits inside its crate and in the file list `cargo package` ships.
+packaging:
+    scripts/check-packaging.sh
+
+# Package and verify every crate as `cargo publish` would, without uploading (network for the index).
+publish-dry-run:
+    scripts/publish.sh --dry-run
+
+# Install `dejaview` from the packaged .crate files outside the repository and run the offline smoke.
+registry-install-test:
+    scripts/registry-install-test.sh
+
+# The offline smoke against any built binary, for example `just smoke target/release/dejaview`.
+smoke binary="target/debug/dejaview":
+    scripts/offline-smoke.sh {{binary}}
 
 # Run one filtered suite and fail if the filter selects no tests.
 # Usage: just check-filter dejaview-core -- image frames

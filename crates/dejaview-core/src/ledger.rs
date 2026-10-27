@@ -477,11 +477,7 @@ mod tests {
 
     #[test]
     fn ledger_plan_grows_with_history_and_counts_every_attempt() {
-        let text = std::fs::read_to_string(
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../fixtures/config/minimal.toml"),
-        )
-        .expect("fixture");
+        let text = crate::fixture("config/minimal.toml");
         let config = Config::parse(&text, &[], &|_| None).expect("config");
         let prices = Prices {
             input_per_million: 1.0,

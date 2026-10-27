@@ -232,13 +232,13 @@ impl Manifest {
 mod tests {
     use super::*;
 
-    fn text() -> &'static str {
-        include_str!("../../../../fixtures/tools/regions.toml")
+    fn text() -> String {
+        crate::fixture("tools/regions.toml")
     }
 
     #[test]
     fn the_spec_example_parses_and_validates() {
-        let m = Manifest::from_toml(text()).expect("parses");
+        let m = Manifest::from_toml(&text()).expect("parses");
         assert_eq!(m.name, "regions");
         assert_eq!(m.evidence_kind.as_deref(), Some("change_region"));
         assert_eq!(m.requires, ["align"]);

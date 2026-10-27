@@ -2,7 +2,7 @@
 
 Rules and job requirements share one model, the **obligation** (`SPEC.md`, "Obligations"). This
 page is the practical version. Code: `crates/dejaview-core/src/obligations.rs`; shipped sets:
-`rules/`.
+`crates/dejaview-core/rules/`, embedded in the binary at build time.
 
 ## An obligation
 

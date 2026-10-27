@@ -112,7 +112,7 @@ mod tests {
     }
 
     fn tool(name: &str, tier: &str, requires: &[&str]) -> Box<dyn Tool> {
-        let text = include_str!("../../../../fixtures/tools/regions.toml")
+        let text = crate::fixture("tools/regions.toml")
             .replace("name = \"regions\"", &format!("name = \"{name}\""))
             .replace("tier = \"expensive\"", &format!("tier = \"{tier}\""))
             .replace(

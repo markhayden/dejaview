@@ -513,8 +513,8 @@ mod tests {
 
     #[test]
     fn parses_the_minimal_fixture_with_defaults() {
-        let text = include_str!("../../../fixtures/config/minimal.toml");
-        let config = Config::parse(text, &[], &no_env).expect("parses");
+        let text = crate::fixture("config/minimal.toml");
+        let config = Config::parse(&text, &[], &no_env).expect("parses");
         assert_eq!(config.provider.profile, "fake");
         assert_eq!(config.budget.tool_turns, 4);
         assert_eq!(config.policy.on_unsure, PolicyOutcome::Review);
@@ -523,7 +523,7 @@ mod tests {
 
     #[test]
     fn unknown_keys_are_rejected() {
-        let text = include_str!("../../../fixtures/config/minimal.toml")
+        let text = crate::fixture("config/minimal.toml")
             .replace("[provider]\n", "[provider]\nbogus = 1\n");
         assert!(
             matches!(Config::parse(&text, &[], &no_env), Err(Error::Config(m)) if m.contains("bogus"))
@@ -532,7 +532,7 @@ mod tests {
 
     #[test]
     fn cloud_calls_false_is_refused() {
-        let text = include_str!("../../../fixtures/config/minimal.toml")
+        let text = crate::fixture("config/minimal.toml")
             .replace("cloud_calls = true", "cloud_calls = false");
         assert!(
             matches!(Config::parse(&text, &[], &no_env), Err(Error::Config(m)) if m.contains("cloud_calls"))
@@ -543,7 +543,7 @@ mod tests {
     fn credential_names_in_pack_env_are_refused() {
         let text = format!(
             "{}\n[tools.packs.python]\npackage = \"dejaview-tools\"\nversion = \"0.1.0\"\nenv = [\"ANTHROPIC_API_KEY\"]\n",
-            include_str!("../../../fixtures/config/minimal.toml")
+            crate::fixture("config/minimal.toml")
         );
         assert!(
             matches!(Config::parse(&text, &[], &no_env), Err(Error::Config(m)) if m.contains("credential"))
@@ -559,9 +559,9 @@ mod tests {
 
     #[test]
     fn overrides_apply_to_single_values() {
-        let text = include_str!("../../../fixtures/config/minimal.toml");
+        let text = crate::fixture("config/minimal.toml");
         let config = Config::parse(
-            text,
+            &text,
             &[
                 "budget.tool_turns=2".into(),
                 "policy.on_unsure=\"pass\"".into(),
@@ -571,12 +571,12 @@ mod tests {
         .expect("parses");
         assert_eq!(config.budget.tool_turns, 2);
         assert_eq!(config.policy.on_unsure, PolicyOutcome::Pass);
-        assert!(Config::parse(text, &["budget.tool_turns=notanumber".into()], &no_env).is_err());
+        assert!(Config::parse(&text, &["budget.tool_turns=notanumber".into()], &no_env).is_err());
     }
 
     #[test]
     fn env_expansion_records_secrets_and_redacts_them() {
-        let text = include_str!("../../../fixtures/config/minimal.toml").replace(
+        let text = crate::fixture("config/minimal.toml").replace(
             "account = \"fake:test\"",
             "account = \"fake:${DJV_TEST_ACCOUNT}\"",
         );

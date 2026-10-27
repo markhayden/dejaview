@@ -29,7 +29,7 @@ observed: profile, host, upstream provenance where a gateway reports one, and th
 
 ## Model catalog provenance
 
-`providers/catalog.toml` (task 2.1) carries, per model, the `verified` date on which every value
+`crates/dejaview-providers/catalog.toml` (task 2.1) carries, per model, the `verified` date on which every value
 was read and the documentation pages it was read from (`sources`). `dejaview catalog show <model>`
 prints both. Fields the documentation did not state on 2026-10-26 are listed in each entry's
 `unverified` array and carried as the best estimate until the recordings (2.5b, 2.6b, 2.7b)

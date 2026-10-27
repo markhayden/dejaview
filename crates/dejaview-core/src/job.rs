@@ -279,8 +279,8 @@ mod tests {
 
     #[test]
     fn parses_the_pair_fixture() {
-        let text = include_str!("../../../fixtures/jobs/pair.toml");
-        let file: JobFile = toml::from_str(text).expect("parses");
+        let text = crate::fixture("jobs/pair.toml");
+        let file: JobFile = toml::from_str(&text).expect("parses");
         assert_eq!(file.job.images.len(), 2);
         assert_eq!(
             file.job.candidate().map(|c| c.id.as_str()),

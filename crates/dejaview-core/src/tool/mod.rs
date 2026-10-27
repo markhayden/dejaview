@@ -137,8 +137,7 @@ mod tests {
     use super::*;
 
     fn manifest() -> Manifest {
-        Manifest::from_toml(include_str!("../../../../fixtures/tools/regions.toml"))
-            .expect("manifest")
+        Manifest::from_toml(&crate::fixture("tools/regions.toml")).expect("manifest")
     }
 
     #[test]

@@ -1,4 +1,4 @@
-//! The model catalog (SPEC "Model catalog", ADR 0008): `providers/catalog.toml`, embedded and
+//! The model catalog (SPEC "Model catalog", ADR 0008): `catalog.toml` beside this crate's `src/`, embedded and
 //! versioned, part of the cache key. Per model: adapter, limits, image fields, prices with a
 //! `verified` date and sources, capabilities, the controls a config may set and their values.
 //! Configuration a model does not support is rejected at resolve time; a request's cost bound
@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 pub const CATALOG_VERSION: u32 = 1;
 
 /// The shipped catalog file.
-pub const SHIPPED: &str = include_str!("../../../providers/catalog.toml");
+pub const SHIPPED: &str = include_str!("../catalog.toml");
 
 /// Adapters this release implements.
 pub const ADAPTERS: &[&str] = &[

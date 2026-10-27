@@ -11,9 +11,10 @@ just check                                      # what every commit must pass
 `just check` runs `cargo fmt --all -- --check`, Clippy with `-D warnings` in both feature
 configurations (default, and `--features dejaview/testkit`), `cargo test --workspace` in both
 configurations, `cargo deny check licenses bans sources` (advisories need the network and run in
-CI as `just deny-advisories`), `scripts/check-crate-graph.sh`, `scripts/test-hooks.sh` (the
-credential scanner and the pre-commit hook, end to end in a scratch repository) and
-`scripts/test-checks.sh` (the checks fail when they should).
+CI as `just deny-advisories`), `scripts/check-crate-graph.sh`, `scripts/check-packaging.sh`
+(every asset a crate embeds sits inside that crate and in the file list `cargo package` ships),
+`scripts/test-hooks.sh` (the credential scanner and the pre-commit hook, end to end in a scratch
+repository) and `scripts/test-checks.sh` (the checks fail when they should).
 
 `just hooks` installs the pre-commit hook from `scripts/hooks/`. It scans every staged blob for
 credential-shaped values first, then runs fmt and Clippy. Only the exact synthetic values in
@@ -29,7 +30,31 @@ check` runs Clippy with `-D warnings`) with `clippy` and `rustfmt`; rustup insta
 
 The six package names (`dejaview`, `dejaview-core`, `dejaview-providers`, `dejaview-tools`,
 `dejaview-eval`, `dejaview-testkit`) were all unregistered on crates.io on 2026-10-26, so no
-fallback name is needed. Publication order and the registry install check are task 2.10a.
+fallback name is needed.
+
+## Publishing
+
+The shipped rule sets, prompt template and model catalog live inside the crates that embed them
+(`crates/dejaview-core/rules/`, `crates/dejaview-core/prompts/`,
+`crates/dejaview-providers/catalog.toml`), so a published crate builds from its own files. The core
+crate's dev-dependency on the testkit is path-only (no version): `cargo publish` drops it, which
+breaks the cycle between the two crates.
+
+- `just publish-dry-run` (`scripts/publish.sh --dry-run`) packages and verifies every crate as
+  `cargo publish --workspace` would, uploading nothing. The real publication is the owner's:
+  `scripts/publish.sh` from a clean checkout whose `HEAD` carries the tag `v<version>`, after
+  `cargo login`. Cargo orders the crates itself: core, testkit, providers, tools, eval, dejaview.
+- `just registry-install-test` (`scripts/registry-install-test.sh`) installs `dejaview` from the
+  packaged `.crate` files in a scratch directory outside the repository, with the sibling crates
+  supplied from the extracted packages the way crates.io would supply them, then runs the offline
+  smoke.
+- `just smoke <binary>` (`scripts/offline-smoke.sh`) is that smoke on any built binary:
+  `--version`, `tools list`, `rules show`, and a `check` without a credential that must stop with
+  `auth:` and exit 64 before anything leaves the machine.
+
+The `package` workflow runs all three on every push. `dejaview --version` prints the short commit;
+a packaged crate has no repository, so the build script reads the commit `cargo package` records
+in `.cargo_vcs_info.json` instead.
 
 `cargo-dist` installs an executable named `dist` (run `dist --version`), used from task 2.10b.
 

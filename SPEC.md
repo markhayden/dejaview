@@ -312,7 +312,7 @@ binding is therefore trusted data from rules and config, covers consumer require
 depends on fixed ids inside a tool.
 
 ```toml
-# rules/source-fidelity.toml (generic base; ships in the binary)
+# crates/dejaview-core/rules/source-fidelity.toml (generic base; ships in the binary)
 [rules]
 use_case = "source-fidelity"
 version = 1
@@ -347,7 +347,7 @@ text = "Any other change is noted with its location."
 ```
 
 ```toml
-# rules/profiles/source-fidelity-architecture.toml (the prototype's venue case, a named profile)
+# crates/dejaview-core/rules/profiles/source-fidelity-architecture.toml (the prototype's venue case, a named profile)
 [rules]
 use_case = "source-fidelity"
 profile = "architecture"
@@ -918,7 +918,7 @@ missing credential is `error: auth`.
 
 ### Model catalog
 
-`providers/catalog.toml`, versioned, part of the cache key. Per model id: adapter; context and
+`crates/dejaview-providers/catalog.toml`, versioned, part of the cache key. Per model id: adapter; context and
 output limits; the image fields above; prices per million input, output and cached tokens, and
 any per-image price; `verified` date and source URL; capabilities: `forced_tool_choice`,
 `strict_tools`, `strict_unsupported_keywords`, `function_call_ids`, `parallel_tools`,
@@ -1426,16 +1426,16 @@ Exit codes for `check`: 0 pass, 1 fail, 2 unsure, 3 error or cancelled, 64 usage
 Cargo.toml                      workspace
 crates/
   dejaview-core/                config, obligations, instances, checklist, prompt, state machine, repair, schema, aggregation, decision, journal, report, cache, ledger, frames
+    rules/                      base rule sets and profiles/, embedded at build time
+    prompts/                    versioned system prompt templates, embedded
   dejaview-providers/           Provider trait, adapters, wire schemas, endpoint profiles, catalog, auth schemes, fixtures player
+    catalog.toml                model catalog and the shipped endpoint profiles, embedded
+    profiles/*.toml             gateway profiles with upstream contracts, embedded (2.8)
   dejaview-tools/               Tool trait, built-ins, MCP client, manifest registry, envelope, projections, provisioning
   dejaview-eval/                set manifests, hashing, sealing, matrix runner, metrics, bootstrap, gates
   dejaview-cli/                 the binary
 tools/python/                   dejaview-tools uv project (MCP server, segmenter, MODEL.md, uv.lock, bundle build, tests)
-rules/                          base rule sets and profiles/, embedded at build time
-providers/
-  catalog.toml                  model catalog and the shipped endpoint profiles, embedded
-  profiles/*.toml               gateway profiles with upstream contracts, embedded (2.8)
-prompts/                        versioned system prompt templates
+scripts/                        repository checks, the credential scanner, publish and install-from-registry scripts
 schemas/                        generated JSON Schemas: submission, envelope, manifest, config, report, tools/
 fixtures/
   adapters/<adapter>/           recorded conversations per capability combination

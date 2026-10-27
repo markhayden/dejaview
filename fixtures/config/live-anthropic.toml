@@ -1,0 +1,19 @@
+# A live config for Claude Haiku 5.5 on the direct Anthropic profile: the account comes from the
+# environment (see .env.example) and the thinking prefix check is on, as during recording.
+[provider]
+profile = "anthropic"
+model = "claude-haiku-5-5"
+controls = { effort = "low", prefix_mismatch_behavior = "error" }
+max_output_tokens = 8000
+
+[budget]
+retries = 1
+repair_output_tokens = 16000
+spend_cap_usd = 5.0
+
+[privacy]
+cloud_calls = true
+account = "anthropic:${DEJAVIEW_ANTHROPIC_ACCOUNT}"
+
+[output]
+dir = "./dejaview-out"

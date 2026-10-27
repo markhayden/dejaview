@@ -507,6 +507,7 @@ impl Provider for AnthropicProvider {
             host,
             upstream: None,
             model: self.model_id.clone(),
+            api_version: API_VERSION.into(),
         })
     }
 

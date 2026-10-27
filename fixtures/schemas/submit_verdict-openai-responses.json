@@ -24,9 +24,10 @@
       },
       "Finding": {
         "additionalProperties": false,
-        "description": "Something the model noticed beyond the checklist.",
+        "description": "Something the model noticed beyond the checklist: a violation or allowed change not covered by\nan item, or an observation under an `observe` rule.",
         "properties": {
           "allowed_by": {
+            "description": "Exemption id when `disposition = allowed_change`, null otherwise.",
             "type": [
               "string",
               "null"
@@ -39,21 +40,25 @@
             "$ref": "#/$defs/FindingDisposition"
           },
           "evidence": {
+            "description": "Tool call ids from this run used as evidence.",
             "items": {
               "type": "string"
             },
             "type": "array"
           },
           "location": {
-            "$ref": "#/$defs/Location"
+            "$ref": "#/$defs/Location",
+            "description": "Where it is; findings always have a location."
           },
           "obligation_ids": {
+            "description": "One to eight rule ids as numbered under Obligations, for example `SF4`; never checklist item ids.",
             "items": {
               "type": "string"
             },
             "type": "array"
           },
           "reason": {
+            "description": "One to a few sentences; at most 600 characters.",
             "type": "string"
           }
         },
@@ -103,6 +108,7 @@
             "type": "array"
           },
           "id": {
+            "description": "The checklist item id exactly as listed, for example `chk:ob:SF1@candidate`.",
             "type": "string"
           },
           "location": {
@@ -116,6 +122,7 @@
             ]
           },
           "reason": {
+            "description": "One to a few sentences; at most 600 characters.",
             "type": "string"
           }
         },
@@ -132,9 +139,10 @@
       },
       "Location": {
         "additionalProperties": false,
-        "description": "A location as a tagged record with nullable fields (see SPEC \"Frames and locations\").",
+        "description": "A location as a tagged record with nullable fields (see SPEC \"Frames and locations\"). The\nfields `kind` needs are set; every other field is null.",
         "properties": {
           "bbox": {
+            "description": "`[left, top, right, bottom]` as fractions of the frame's width and height, each between 0 and 1 (never pixels).",
             "items": {
               "type": "number"
             },
@@ -146,24 +154,29 @@
             ]
           },
           "fov": {
+            "description": "Degrees, 10 to 120, for `view`.",
             "type": [
               "number",
               "null"
             ]
           },
           "frame": {
+            "description": "A frame id as given in the conversation, for example `raw:candidate` or a crop a tool returned.",
             "type": "string"
           },
           "kind": {
-            "$ref": "#/$defs/LocationKind"
+            "$ref": "#/$defs/LocationKind",
+            "description": "`bbox` and `polygon` take coordinates; `view` takes yaw, pitch and fov; `whole_image` and `absent` take nothing."
           },
           "pitch": {
+            "description": "Degrees, -90 to 90, for `view`.",
             "type": [
               "number",
               "null"
             ]
           },
           "polygon": {
+            "description": "Three to sixty-four `[x, y]` points as fractions of the frame's width and height, between 0 and 1.",
             "items": {
               "items": {
                 "type": "number"
@@ -178,6 +191,7 @@
             ]
           },
           "yaw": {
+            "description": "Degrees, -180 to 180, for `view` on an equirectangular frame.",
             "type": [
               "number",
               "null"
@@ -210,9 +224,11 @@
         "description": "Recorded, never read by aggregation.",
         "properties": {
           "reason": {
+            "description": "At most 600 characters.",
             "type": "string"
           },
           "verdict": {
+            "description": "Your own overall call: `pass`, `fail` or `unsure`.",
             "type": "string"
           }
         },

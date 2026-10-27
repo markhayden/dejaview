@@ -78,6 +78,8 @@ pub struct Recipient {
     pub host: String,
     pub upstream: Option<String>,
     pub model: String,
+    /// The API version or path the adapter speaks (`2023-06-01`, `v1beta`, `v1`).
+    pub api_version: String,
 }
 
 impl DecisionHeader {

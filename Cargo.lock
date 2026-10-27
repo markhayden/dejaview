@@ -349,6 +349,7 @@ name = "dejaview-providers"
 version = "0.1.0"
 dependencies = [
  "dejaview-core",
+ "dejaview-testkit",
  "image",
  "jsonschema",
  "reqwest",

@@ -559,9 +559,10 @@
     },
     "Location": {
       "additionalProperties": false,
-      "description": "A location as a tagged record with nullable fields (see SPEC \"Frames and locations\").",
+      "description": "A location as a tagged record with nullable fields (see SPEC \"Frames and locations\"). The\nfields `kind` needs are set; every other field is null.",
       "properties": {
         "bbox": {
+          "description": "`[left, top, right, bottom]` as fractions of the frame's width and height, each between 0 and 1 (never pixels).",
           "items": {
             "format": "double",
             "type": "number"
@@ -574,6 +575,7 @@
           ]
         },
         "fov": {
+          "description": "Degrees, 10 to 120, for `view`.",
           "format": "double",
           "type": [
             "number",
@@ -581,12 +583,15 @@
           ]
         },
         "frame": {
+          "description": "A frame id as given in the conversation, for example `raw:candidate` or a crop a tool returned.",
           "type": "string"
         },
         "kind": {
-          "$ref": "#/$defs/LocationKind"
+          "$ref": "#/$defs/LocationKind",
+          "description": "`bbox` and `polygon` take coordinates; `view` takes yaw, pitch and fov; `whole_image` and `absent` take nothing."
         },
         "pitch": {
+          "description": "Degrees, -90 to 90, for `view`.",
           "format": "double",
           "type": [
             "number",
@@ -594,6 +599,7 @@
           ]
         },
         "polygon": {
+          "description": "Three to sixty-four `[x, y]` points as fractions of the frame's width and height, between 0 and 1.",
           "items": {
             "items": {
               "format": "double",
@@ -609,6 +615,7 @@
           ]
         },
         "yaw": {
+          "description": "Degrees, -180 to 180, for `view` on an equirectangular frame.",
           "format": "double",
           "type": [
             "number",

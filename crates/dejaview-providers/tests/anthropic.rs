@@ -454,9 +454,16 @@ fn anthropic_reports_recipient_pricing_and_preparation() {
             r.profile.as_str(),
             r.host.as_str(),
             r.model.as_str(),
-            r.upstream
+            r.upstream,
+            r.api_version.as_str()
         ),
-        ("anthropic", "api.anthropic.com", "claude-sonnet-5-5", None)
+        (
+            "anthropic",
+            "api.anthropic.com",
+            "claude-sonnet-5-5",
+            None,
+            "2023-06-01"
+        )
     );
     assert_eq!(p.prep_version(), "1");
     let pricing = p.pricing().unwrap();

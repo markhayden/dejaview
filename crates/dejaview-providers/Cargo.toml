@@ -21,6 +21,7 @@ tokio = { workspace = true }
 
 [dev-dependencies]
 jsonschema = { workspace = true }
+dejaview-testkit = { workspace = true }
 
 [lints]
 workspace = true

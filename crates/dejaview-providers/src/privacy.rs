@@ -129,13 +129,70 @@ pub const FORBIDDEN_MARKERS: &[&str] = &[
     "GPano",
 ];
 
-/// Every forbidden marker found in a request body, with its offset.
+/// Every forbidden marker found in a request body. JSON is walked value by value so that image
+/// bytes, which are base64 and can spell any short marker by chance, are left out of the search;
+/// anything else is scanned as text.
 pub fn scan(text: &str) -> Vec<String> {
+    match serde_json::from_str::<serde_json::Value>(text) {
+        Ok(v) => {
+            let mut out = Vec::new();
+            scan_value(&v, "", &mut out);
+            out
+        }
+        Err(_) => scan_text(text, "")
+            .into_iter()
+            .map(|(marker, pos)| format!("{marker:?} at byte {pos}"))
+            .collect(),
+    }
+}
+
+fn scan_value(v: &serde_json::Value, path: &str, out: &mut Vec<String>) {
+    match v {
+        serde_json::Value::Object(o) => {
+            for (k, val) in o {
+                let p = format!("{path}/{k}");
+                for (marker, _) in scan_text(k, &p) {
+                    out.push(format!("{marker:?} in key {p}"));
+                }
+                scan_value(val, &p, out);
+            }
+        }
+        serde_json::Value::Array(a) => {
+            for (i, val) in a.iter().enumerate() {
+                scan_value(val, &format!("{path}/{i}"), out);
+            }
+        }
+        serde_json::Value::String(s) if !is_image_data(s) => {
+            for (marker, _) in scan_text(s, path) {
+                out.push(format!(
+                    "{marker:?} in {}",
+                    if path.is_empty() { "/" } else { path }
+                ));
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Base64 image bytes (raw or as a data URL): long and drawn from the base64 alphabet only.
+fn is_image_data(s: &str) -> bool {
+    let body = s
+        .strip_prefix("data:")
+        .and_then(|r| r.split_once(";base64,"))
+        .map(|(_, b)| b)
+        .unwrap_or(s);
+    body.len() >= 256
+        && body
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'+' || b == b'/' || b == b'=')
+}
+
+fn scan_text(text: &str, _path: &str) -> Vec<(&'static str, usize)> {
     let mut out = Vec::new();
     for marker in FORBIDDEN_MARKERS {
         let mut from = 0;
         while let Some(pos) = text[from..].find(marker) {
-            out.push(format!("{marker:?} at byte {}", from + pos));
+            out.push((*marker, from + pos));
             from += pos + marker.len();
         }
     }

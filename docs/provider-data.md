@@ -22,7 +22,7 @@ observed: profile, host, upstream provenance where a gateway reports one, and th
 
 | Profile | Enforced by the harness | Attested by the operator | Not verifiable |
 |---|---|---|---|
-| `anthropic` | Credential only in `x-api-key`; `anthropic-version` pinned; HTTPS to `api.anthropic.com` with same-origin redirects only; no `temperature`, `top_p`, `top_k`, `metadata`, `stream` or server-side fallback parameters; `thinking: adaptive` with the prefix check when configured; tools with `strict: true` and the wire schema; images as base64 at the catalog's native size without metadata; the final turn as a mid-conversation system message, `tool_removal` blocks or a forced `tool_choice` only where the catalog allows | (2.5b) | (2.5b) |
+| `anthropic` | Credential only in `x-api-key`; `anthropic-version` pinned; HTTPS to `api.anthropic.com` with same-origin redirects only; no `temperature`, `top_p`, `top_k`, `metadata`, `stream` or server-side fallback parameters; `thinking: adaptive` with the prefix check when configured; tools with `strict: true` and the wire schema; images as base64 at the catalog's native size without metadata; the final turn as a mid-conversation system message, `tool_removal` blocks or a forced `tool_choice` only where the catalog allows. Recorded 2026-10-27 under `fixtures/adapters/anthropic-messages/`. | Retention and training settings of the organisation in the Claude Console; which workspace the key belongs to | Internal retention of abuse-review samples; the resize applied to images past the token tier; the region that served a request (`usage.inference_geo` reports `global`) |
 | `google-ai-studio` | Credential only in `x-goog-api-key`, never in the URL; HTTPS to `generativelanguage.googleapis.com` with same-origin redirects only; no `temperature`, `topP`, `topK` or cached-content parameters; tools as `functionDeclarations` with `parametersJsonSchema` (references inlined); images as `inlineData` at the catalog's native size without metadata; `functionResponse` paired by id with the call, or without an id only when the response carried none; function-calling mode `ANY` restricted to `submit_verdict` only where the mechanism is `forced` | (2.6b) | (2.6b) |
 | `openai` | Credential only in `Authorization: Bearer`; HTTPS to `api.openai.com` with same-origin redirects only; `store = false` and `include = ["reasoning.encrypted_content"]` on every request; `truncation = "disabled"`; no `temperature`, `top_p`, `metadata` or `previous_response_id`; function tools with `strict: true` and the wire schema; images as data URLs at the catalog's native size without metadata; `function_call_output` paired by `call_id`; reasoning items echoed as received | (2.7b) | (2.7b) |
 
@@ -60,7 +60,7 @@ recordings:
 | Provider | Assumption | Why |
 |---|---|---|
 | all | The provider does no processing beyond its documented downscale; the harness fits the long edge to the catalog's native size and sends JPEG at quality 90, or PNG when alpha is present | Only the resize behaviour at the native size is documented. |
-| Anthropic | A prepared image at the native long edge may still exceed the 4,784-token tier and be downscaled by the provider | The token formula (⌈w/28⌉ × ⌈h/28⌉) and the long-edge figure are both documented; which wins for a square image is not. The ledger bounds every image at the maximum. |
+| Anthropic | A prepared image at the native long edge may still exceed the 4,784-token tier and be downscaled by the provider | The token formula (⌈w/28⌉ × ⌈h/28⌉) and the long-edge figure are both documented; which wins for a square image is not. The ledger bounds every image at the maximum. The `many-images` recording (21 images at 2000×1500) was accepted and billed about 4,100 tokens per image. |
 | OpenAI | The request payload limit (512 MB) stands in for the per-image byte limit | No per-image limit is stated. |
 | Gemini | No maximum pixel dimension is enforced before the 20 MB inline request limit | None is documented. |
 
@@ -86,3 +86,16 @@ model, a profile whose adapter differs from the model's, a control the model doe
 value outside its allowed list, `images.max_long_edge` above the model's native size, and output
 allowances above the model's maximum. The test-only `fake` profile with `fake-model` is admitted
 only by a binary built with the `testkit` feature.
+
+## Confirmed by the Anthropic recordings (2026-10-27)
+
+Fifteen conversations under `fixtures/adapters/anthropic-messages/` (about $1 in total) confirmed,
+for Claude Opus 5.5, Sonnet 5.5 and Haiku 5.5: the `thinking-binding-controls-2026-08-01` beta
+with `prefix_mismatch_behavior = "error"` accepts an append-only history with thinking blocks
+echoed verbatim; `role: "system"` mid-conversation is accepted after a user turn; `tool_removal`
+blocks under `inline-tools-2026-09-15` are accepted with the tools array unchanged; Haiku 5.5
+accepts `tool_choice: {type: "tool"}` and answers without a thinking block; a request over the
+many-image threshold with every image at 2000 pixels is accepted; the `reasoning_extraction`
+refusal arrives as `stop_reason: "refusal"` with `stop_details` and no content. Opus 5.5 follows
+the final-turn instruction, so no stray call during the final turn was recorded live; that path is
+covered by the offline scripted conversations.

@@ -80,7 +80,13 @@ pub fn load(dir: &Path) -> Result<Vec<Exchange>> {
     let mut files: Vec<PathBuf> = std::fs::read_dir(dir)
         .map_err(|e| Error::Provider(format!("replay: cannot read {}: {e}", dir.display())))?
         .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.extension().is_some_and(|x| x == "json"))
+        // Exchanges are numbered files; anything else beside them (`expected.json`) is not one.
+        .filter(|p| {
+            p.extension().is_some_and(|x| x == "json")
+                && p.file_stem()
+                    .and_then(|s| s.to_str())
+                    .is_some_and(|s| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit()))
+        })
         .collect();
     files.sort();
     if files.is_empty() {

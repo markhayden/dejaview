@@ -295,7 +295,7 @@ fn finding_rules() {
         None,
         whole("raw:candidate")
     )]);
-    expect_err(&f, &v, "cites only observe obligations");
+    expect_err(&f, &v, "cite observe rules only");
     // Observed, valid.
     let mut v = f.valid();
     v["findings"] = serde_json::json!([finding(

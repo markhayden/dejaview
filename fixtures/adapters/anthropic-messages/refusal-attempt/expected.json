@@ -1,0 +1,15 @@
+{
+  "model": "claude-opus-5-5",
+  "terminal": "error",
+  "verdict": null,
+  "error": "model_output: the model refused (stop reason Refusal), again after the repair",
+  "repairs": [
+    [
+      "reissue",
+      "refusal"
+    ]
+  ],
+  "turns": 2,
+  "tool_calls": 0,
+  "cost_usd": 0.025092
+}

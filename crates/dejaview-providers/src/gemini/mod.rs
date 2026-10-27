@@ -527,6 +527,7 @@ impl Provider for GeminiProvider {
             host: host_of(&self.profile.base_url),
             upstream: None,
             model: self.model_id.clone(),
+            api_version: "v1beta".into(),
         })
     }
 

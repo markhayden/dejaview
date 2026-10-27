@@ -7,7 +7,7 @@ A blank entry blocks the task named in its row. Dates are when the owner decided
 |---|---|---|---|
 | 1 | Initial judge-model subset for live fixtures and matrices | 2.1 | 2026-10-26: two per vendor: `claude-opus-5-5`, `claude-sonnet-5-5`, `gemini-4-argon`, `gemini-3.8-flash`, and two OpenAI vision models (frontier and mid-tier) named at 2.1. Confirmed 2026-10-26 from the live model list: `gpt-6.1-sol` (mid-tier, $2/$10) and `gpt-6.1-terra` (low-tier, $1/$5); the frontier `gpt-6-astra` was declined as cost prohibitive at $10/$50 |
 | 2 | Anthropic account for recordings: enforced-thinking (created on or after 2026-08-31) or not | 2.5b | 2026-10-26: the existing account, with the prefix check switched on per request (`thinking-binding-controls` beta, `prefix_mismatch_behavior = "error"`) during recording |
-| 3 | Spend cap: fixture recordings (all three vendors) | 2.5b | decide before 2.5b |
+| 3 | Spend cap: fixture recordings (all three vendors) | 2.5b | 2026-10-26: $25 for the Anthropic recordings (expected $5 to $10 across Opus 5.5, Sonnet 5.5 and Haiku 5.5); Gemini and OpenAI caps decided before 2.6b and 2.7b |
 | 4 | Spend cap: release and gateway smoke tests | 2.8, 2.10b | decide before 2.8 |
 | 5 | Spend cap: image generation for public sets | 3.2a | decide before 3.2a |
 | 6 | Spend cap: arm A baseline | 3.8 | decide before 3.8, against `eval estimate` |

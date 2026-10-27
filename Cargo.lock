@@ -301,7 +301,10 @@ name = "dejaview-providers"
 version = "0.1.0"
 dependencies = [
  "dejaview-core",
+ "serde",
+ "serde_json",
  "thiserror",
+ "toml",
 ]
 
 [[package]]

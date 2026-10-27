@@ -1,6 +1,7 @@
 //! The `dejaview` binary: argument parsing and wiring only. All behaviour lives in the library
 //! crates.
 
+mod catalog;
 mod eval;
 mod report;
 
@@ -44,6 +45,8 @@ enum Command {
     Report(report::ReportArgs),
     /// Evaluation: the admission gate on a result table (the runner arrives with M3).
     Eval(eval::EvalArgs),
+    /// The model catalog: limits, prices, capabilities and sources per model.
+    Catalog(catalog::CatalogArgs),
 }
 
 #[derive(clap::Args)]
@@ -167,6 +170,7 @@ fn main() {
         })) => tools_setup(&args),
         Some(Command::Report(args)) => report::run(&args),
         Some(Command::Eval(args)) => eval::run(&args),
+        Some(Command::Catalog(args)) => catalog::run(&args),
     };
     std::process::exit(code);
 }
@@ -179,6 +183,14 @@ fn check(args: &CheckArgs) -> i32 {
             return EXIT_USAGE;
         }
     };
+    // Resolve-time check against the catalog: profile, model, controls, image size, allowances.
+    // The scripted pair passes in testkit builds, and in a dry run, where nothing is sent.
+    if let Err(e) = dejaview_providers::catalog::Catalog::shipped()
+        .and_then(|c| c.check_config(&config, cfg!(feature = "testkit") || args.dry_run))
+    {
+        eprintln!("dejaview: {e}");
+        return EXIT_USAGE;
+    }
     let job = match load_job(args) {
         Ok(j) => j,
         Err(e) => {

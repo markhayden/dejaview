@@ -1,5 +1,7 @@
 //! Provider adapters (Anthropic Messages, Gemini generateContent, OpenAI Responses), wire schemas, endpoint profiles, model catalog and the fixtures player.
 
+pub mod catalog;
+
 /// Errors this crate produces. Every public fallible function returns this type.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

@@ -38,7 +38,7 @@ tag.
 - [x] Checkpoint M1 → tag `m1` (2026-10-26; `just check` under a minute, docs filled, review and coverage passes applied: docs/reviews/m1-checkpoint.md)
 
 ## M2 Provider adapters
-- [ ] 2.1 Model catalog and capability validation
+- [x] 2.1 Model catalog and capability validation
 - [ ] 2.2 Wire schema transformations
 - [ ] 2.3 Image preparation and preflight
 - [ ] 2.4 Privacy enforcement before any live call

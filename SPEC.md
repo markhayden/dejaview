@@ -894,9 +894,13 @@ output limits; the image fields above; prices per million input, output and cach
 any per-image price; `verified` date and source URL; capabilities: `forced_tool_choice`,
 `strict_tools`, `strict_unsupported_keywords`, `function_call_ids`, `parallel_tools`,
 `system_messages_in_history`, `final_turn` (the mechanisms supported, see "Final turn
-mechanics"), `sampling`, `thinking` (control name and allowed values), required headers or
-betas. Config
-settings not supported by the model's capabilities are rejected at resolve time. Candidate first
+mechanics"), `sampling`, `prefill`, the controls a config may set (name, allowed values,
+default: the vendor's thinking control and, where one exists, the image detail control), required
+headers or betas. Fields the documentation does not state are listed per entry under `unverified`
+and recorded in `docs/provider-data.md` until recordings confirm them. The file also carries the
+shipped endpoint profiles (adapter, endpoint, API-key scheme, static headers). Config settings not
+supported by the model's capabilities are rejected at resolve time; the test-only `fake` profile
+and `fake-model` pass only in binaries built with the `testkit` feature. Candidate first
 entries, re-verified at M2: `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`,
 `gemini-4-argon`, `gemini-3.8-flash`, and the current OpenAI vision models. Preview models are
 excluded.
@@ -1377,7 +1381,8 @@ dejaview eval run --matrix matrix.toml --out eval-out/<name>
 dejaview eval report eval-out/<name>
 dejaview eval gate --matrix matrix.toml --tool regions --set <sealed set>
 dejaview eval canary --config dejaview.toml
-dejaview catalog show claude-opus-5-5
+dejaview catalog show claude-opus-5-5 [--json]
+dejaview catalog list [--json]
 ```
 
 Exit codes for `check`: 0 pass, 1 fail, 2 unsure, 3 error or cancelled, 64 usage error, after

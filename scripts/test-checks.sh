@@ -41,5 +41,18 @@ if CRATE_DIRS="$probe/crate" scripts/check-packaging.sh >/dev/null 2>&1; then pa
 else echo "FAIL: check-packaging rejected a packaged asset" >&2; fail=$((fail+1)); fi
 rm -rf "$probe"
 
+# archive-smoke: an archive with no dejaview binary must fail and say so; a bad checksum file must
+# fail before anything is unpacked.
+probe="$(mktemp -d)"; mkdir -p "$probe/dejaview-x"; printf 'readme\n' > "$probe/dejaview-x/README.md"
+tar cJf "$probe/dejaview-x.tar.xz" -C "$probe" dejaview-x
+out="$(scripts/archive-smoke.sh "$probe/dejaview-x.tar.xz" 2>&1 || true)"
+if grep -q 'no dejaview binary inside' <<< "$out"; then pass=$((pass+1));
+else echo "FAIL: archive-smoke accepted an archive without the binary: $out" >&2; fail=$((fail+1)); fi
+printf '%s  dejaview-x.tar.xz\n' "$(printf '0%.0s' $(seq 64))" > "$probe/dejaview-x.tar.xz.sha256"
+out="$(scripts/archive-smoke.sh "$probe/dejaview-x.tar.xz" 2>&1 || true)"
+if grep -q 'checksum mismatch' <<< "$out"; then pass=$((pass+1));
+else echo "FAIL: archive-smoke accepted a wrong checksum: $out" >&2; fail=$((fail+1)); fi
+rm -rf "$probe"
+
 echo "check tests: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

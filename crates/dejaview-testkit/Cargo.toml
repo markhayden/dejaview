@@ -20,3 +20,7 @@ path = "src/bin/mcp.rs"
 
 [lints]
 workspace = true
+
+# A test helper, never distributed: `dist` skips it when building the release archives.
+[package.metadata.dist]
+dist = false

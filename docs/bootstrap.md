@@ -56,7 +56,35 @@ The `package` workflow runs all three on every push. `dejaview --version` prints
 a packaged crate has no repository, so the build script reads the commit `cargo package` records
 in `.cargo_vcs_info.json` instead.
 
-`cargo-dist` installs an executable named `dist` (run `dist --version`), used from task 2.10b.
+## Releasing
+
+`cargo-dist` installs an executable named `dist` (run `dist --version`; the version is pinned in
+the justfile and in `dist-workspace.toml`). `dist-workspace.toml` is the one source for binary
+distribution: three archive targets (macOS arm64, Linux x86_64 and arm64), no installers, GitHub
+releases. `dist generate` rewrites `.github/workflows/release.yml` from it; that file is never
+edited by hand, and `just dist-check` (`dist generate --check` plus `dist plan`) fails when it is
+stale. The `package` workflow runs the same check.
+
+- A pushed tag that parses as a version (`v0.1.0`) runs the release workflow: `dist` builds the
+  three archives on their own runners, the `archive-smoke` workflow unpacks each one on its own
+  architecture and runs the offline smoke on the binary inside, and only then is the GitHub
+  release created (`github-release = "announce"` with the smoke as the one publish job). A
+  failing smoke on any architecture leaves no release behind.
+- The release dry run is the `archive` job of the `package` workflow on every push: each
+  architecture builds its archive exactly as the release workflow does and smokes it, nothing is
+  tagged or released. A pull request additionally runs the release workflow in upload mode, which
+  builds the archives as workflow artifacts without releasing.
+- Locally, `just archive-build` builds this machine's archive into `target/distrib/` (`dist build`
+  for the host target; the other targets cross-compile only on their runners) and
+  `just archive-smoke target/distrib/dejaview-<target>.tar.xz` smokes it, checksum file included.
+- `just live-smoke <binary>` (`scripts/live-smoke.sh`) is the paid smoke behind owner decision 4:
+  one `check` per direct profile whose key and account are in the environment, with each vendor's
+  cheapest model on the fixture image pair, from any binary (the unpacked archive for a release
+  record). It prints verdict, exit code and cost per vendor and never prints an account id or key.
+  The M2 record is `docs/reviews/m2-live-smoke.md`.
+
+`examples/` holds one ready-to-run config per use case; each shows the `--set` overrides that
+point it at another direct profile, and a CLI test dry-runs every example and those overrides.
 
 ## Running CI locally
 

@@ -29,3 +29,9 @@ the tasks that own them.
 | Checkpoint | Record |
 |---|---|
 | M1 | [m1-checkpoint.md](m1-checkpoint.md): code review and coverage findings, each fixed or recorded with its owning task |
+
+## Release records
+
+| Record | What it holds |
+|---|---|
+| [m2-live-smoke.md](m2-live-smoke.md) | The task 2.10b live smoke: one `check` per direct profile from the unpacked release archive, with verdicts, exit codes and costs (owner decision 4) |

@@ -2,7 +2,9 @@ name: package
 
 # Proves the crates publish and install as crates.io would serve them: a workspace publish dry run
 # (package, verify, no upload) and an install of `dejaview` from the packaged .crate files in a
-# scratch directory outside the checkout, followed by the offline smoke.
+# scratch directory outside the checkout, followed by the offline smoke. The `archive` job is the
+# release dry run: on each release architecture, build the archive exactly as the release workflow
+# does and run the offline smoke on the binary inside it; nothing is tagged or released.
 on:
   push:
     branches: ["main", "m*"]
@@ -28,7 +30,43 @@ jobs:
           rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
         if: ${{ !env.ACT }}
+      - name: Install dist (pinned in dist-workspace.toml)
+        shell: bash
+        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.33.1/cargo-dist-installer.sh | sh
+      - name: The generated release workflow is current
+        run: dist generate --check && dist plan
       - run: scripts/check-packaging.sh
       - run: scripts/publish.sh --dry-run
       - name: Install from the packaged crates outside the checkout and smoke
         run: REGISTRY_STAGE_DIR="$RUNNER_TEMP/registry-stage" scripts/registry-install-test.sh
+
+  archive:
+    name: release archive and smoke (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            target: aarch64-apple-darwin
+          - runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain from rust-toolchain.toml
+        run: |
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain none
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            export PATH="$HOME/.cargo/bin:$PATH"
+          fi
+          rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        if: ${{ !env.ACT }}
+      - name: Install dist (pinned in dist-workspace.toml)
+        shell: bash
+        run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.33.1/cargo-dist-installer.sh | sh
+      - run: dist build --artifacts=local --target=${{ matrix.target }}
+      - run: scripts/archive-smoke.sh "target/distrib/dejaview-${{ matrix.target }}.tar.xz"

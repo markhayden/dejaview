@@ -52,7 +52,8 @@ tag.
 - [ ] 2.8 Gateway profile candidates (optional)
 - [x] 2.9 provider-data.md
 - [x] 2.10a Packaging for the registry
-- [ ] 2.10b Binary distribution and live smoke
+- [x] 2.10b Binary distribution and live smoke (record: docs/reviews/m2-live-smoke.md)
+- [ ] Follow-up from the live smoke: the default budget (`retries = 3`, `repair_output_tokens = 32000`, `spend_cap_usd = 2.00`) plans an envelope above the default cap on Gemini 3.8 Flash and GPT-6.1 Terra, so a default config refuses to run on two of three vendors; decide the defaults at the M2 checkpoint
 - [ ] Checkpoint M2 → tag `m2`
 
 ## M3 Evaluation sets and baseline

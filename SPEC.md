@@ -1424,6 +1424,9 @@ Exit codes for `check`: 0 pass, 1 fail, 2 unsure, 3 error or cancelled, 64 usage
 
 ```
 Cargo.toml                      workspace
+dist-workspace.toml             release archives: targets, the archive smoke as the publish gate (`dist` regenerates the release workflow from it)
+.github/workflows/              ci (just check), package (publish dry run, install from the packaged crates, release archive dry run), release (generated), archive-smoke (called by release)
+examples/                       one ready-to-run config per use case
 crates/
   dejaview-core/                config, obligations, instances, checklist, prompt, state machine, repair, schema, aggregation, decision, journal, report, cache, ledger, frames
     rules/                      base rule sets and profiles/, embedded at build time
@@ -1435,7 +1438,7 @@ crates/
   dejaview-eval/                set manifests, hashing, sealing, matrix runner, metrics, bootstrap, gates
   dejaview-cli/                 the binary
 tools/python/                   dejaview-tools uv project (MCP server, segmenter, MODEL.md, uv.lock, bundle build, tests)
-scripts/                        repository checks, the credential scanner, publish and install-from-registry scripts
+scripts/                        repository checks, the credential scanner, publish, install-from-registry, archive and live smoke scripts
 schemas/                        generated JSON Schemas: submission, envelope, manifest, config, report, tools/
 fixtures/
   adapters/<adapter>/           recorded conversations per capability combination

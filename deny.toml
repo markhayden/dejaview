@@ -17,6 +17,7 @@ allow = [
   "0BSD",
   "Unlicense",
   "MPL-2.0",   # file-level copyleft; acceptable for a binary that does not modify such files
+  "CDLA-Permissive-2.0",   # Mozilla's root-certificate data, bundled by rustls-platform-verifier
 ]
 
 [advisories]

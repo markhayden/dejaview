@@ -41,7 +41,7 @@ tag.
 - [x] 2.1 Model catalog and capability validation
 - [x] 2.2 Wire schema transformations
 - [x] 2.3 Image preparation and preflight
-- [ ] 2.4 Privacy enforcement before any live call
+- [x] 2.4 Privacy enforcement before any live call
 - [ ] 2.5a Anthropic adapter and replay harness
 - [ ] 2.5b Anthropic recordings → tag `m2.1`
 - [ ] 2.6a Gemini adapter

@@ -139,6 +139,8 @@ fn dry_run_with_a_live_model_passes_the_wire_check() {
         "provider.profile=\"anthropic\"",
         "--set",
         "provider.model=\"claude-opus-5-5\"",
+        "--set",
+        "privacy.account=\"anthropic:org-test\"",
         "--job",
         "fixtures/jobs/pair.toml",
         "--dry-run",
@@ -150,4 +152,28 @@ fn dry_run_with_a_live_model_passes_the_wire_check() {
         String::from_utf8_lossy(&o.stderr)
     );
     assert!(String::from_utf8_lossy(&o.stdout).contains("Checklist:"));
+}
+
+/// Consent is bound to the profile: an account for another provider is refused before anything
+/// runs, and the account id is not echoed.
+#[test]
+fn check_refuses_an_account_that_does_not_consent_to_the_profile() {
+    let o = dejaview(&[
+        "check",
+        "--config",
+        "fixtures/config/minimal.toml",
+        "--set",
+        "provider.profile=\"anthropic\"",
+        "--set",
+        "provider.model=\"claude-opus-5-5\"",
+        "--set",
+        "privacy.account=\"openai:org-55512\"",
+        "--job",
+        "fixtures/jobs/pair.toml",
+        "--dry-run",
+    ]);
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert_eq!(o.status.code(), Some(64), "{err}");
+    assert!(err.contains("needs the prefix `anthropic:`"), "{err}");
+    assert!(!err.contains("org-55512"), "{err}");
 }

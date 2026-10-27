@@ -200,6 +200,7 @@ pub async fn check(
         cap_usd: config.budget.spend_cap_usd,
         envelope: None,
         cache: cache_status.clone(),
+        recipient: provider.recipient(),
     };
     if cache_status.is_hit() {
         header.write(&dir)?;

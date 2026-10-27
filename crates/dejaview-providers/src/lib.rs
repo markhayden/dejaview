@@ -2,5 +2,7 @@
 //! endpoint profiles, model catalog and the fixtures player. Errors are `dejaview_core::Error`.
 
 pub mod catalog;
+pub mod http;
 pub mod prepare;
+pub mod privacy;
 pub mod wire;

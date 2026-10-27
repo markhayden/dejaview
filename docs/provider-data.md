@@ -1,12 +1,30 @@
 # Data leaving the machine, per profile
 
 For every shipped endpoint profile: what the harness enforces at request level, what the operator
-must configure on the account (retention, no training, gateway logging and caching), and what the
-provider does not expose for verification. Columns defined in task 2.4; rows filled in task 2.9.
+must configure on the account, and what the provider does not expose for verification. Rows are
+filled when a profile's fixtures are recorded (task 2.9).
+
+- **Enforced by the harness.** Request-level settings the adapter always sends or refuses, which
+  the recorded fixtures prove: for example OpenAI `store = false`, a gateway's upstream allowlist,
+  no cross-host redirects, no filenames or paths, no image metadata, credentials only in the one
+  header the scheme names.
+- **Attested by the operator.** Account settings the harness cannot see and the `[privacy]
+  account` entry attests to: data retention, no training on inputs, gateway logging and caching
+  switched off, the region the account is pinned to.
+- **Not verifiable.** What the provider does not expose at all: internal retention of abuse-review
+  samples, the resize or re-encoding applied to images, which hardware region served a request.
+
+Consent (`[privacy] cloud_calls = true` and `account`) is bound to the profile: the account must
+carry the profile's prefix (`anthropic:…` for the `anthropic` profile, `google:…` for
+`google-ai-studio`, `openai:…` for `openai`), so a config cannot be pointed at another provider
+without the attestation changing with it. The decision header records the recipient chain
+observed: profile, host, upstream provenance where a gateway reports one, and the resolved model.
 
 | Profile | Enforced by the harness | Attested by the operator | Not verifiable |
 |---|---|---|---|
-| (none shipped yet) | | | |
+| `anthropic` | (2.5b) | | |
+| `google-ai-studio` | (2.6b) | | |
+| `openai` | (2.7b) | | |
 
 ## Model catalog provenance
 

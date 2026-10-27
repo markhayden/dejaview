@@ -42,6 +42,9 @@ pub struct Catalog {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Profile {
+    /// The prefix a `[privacy] account` must carry to consent to this profile (`anthropic` for
+    /// `anthropic:org-…`).
+    pub account: String,
     pub adapter: String,
     pub base_url: String,
     /// May contain `{model}`.
@@ -283,6 +286,14 @@ impl Catalog {
                 return Err(resolve(format!(
                     "profile {id:?}: base_url, path, auth.header and auth.env must be set"
                 )));
+            }
+            if p.account.is_empty() || p.account.contains(':') {
+                return Err(resolve(format!(
+                    "profile {id:?}: account must be a plain prefix such as \"anthropic\""
+                )));
+            }
+            if !p.base_url.starts_with("https://") {
+                return Err(resolve(format!("profile {id:?}: base_url must be https")));
             }
         }
         for (id, m) in &self.models {

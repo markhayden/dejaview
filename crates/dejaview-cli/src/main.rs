@@ -183,11 +183,19 @@ fn check(args: &CheckArgs) -> i32 {
             return EXIT_USAGE;
         }
     };
-    // Resolve-time check against the catalog: profile, model, controls, image size, allowances.
-    // The scripted pair passes in testkit builds, and in a dry run, where nothing is sent.
-    if let Err(e) = dejaview_providers::catalog::Catalog::shipped()
-        .and_then(|c| c.check_config(&config, cfg!(feature = "testkit") || args.dry_run))
-    {
+    // Resolve-time checks against the catalog (profile, model, controls, image size, allowances)
+    // and the consent binding. The scripted pair passes in testkit builds, and in a dry run,
+    // where nothing is sent.
+    if let Err(e) = dejaview_providers::catalog::Catalog::shipped().and_then(|c| {
+        c.check_config(&config, cfg!(feature = "testkit") || args.dry_run)?;
+        match c.profile(&config.provider.profile) {
+            Some(profile) => {
+                dejaview_providers::privacy::consent(&config, &config.provider.profile, profile)
+                    .map(|_| ())
+            }
+            None => Ok(()),
+        }
+    }) {
         eprintln!("dejaview: {e}");
         return EXIT_USAGE;
     }

@@ -963,8 +963,9 @@ fallback to another model or provider.
 ### Data leaving the machine
 
 The harness refuses to run unless `[privacy] cloud_calls = true` and `account` names the
-provider or gateway account the operator attests to. Consent is bound to the profile id, the
-account, and the profile's upstream allowlist; the report records the recipient chain actually
+provider or gateway account the operator attests to, as `<prefix>:<account id>` where the prefix
+is the one the profile declares (`anthropic`, `google`, `openai`). Consent is bound to the profile
+id, the account, and the profile's upstream allowlist; the report records the recipient chain actually
 observed (profile, base URL host, upstream provenance, resolved model). `docs/provider-data.md`
 lists, per profile, what the harness enforces at request level (for example OpenAI
 `store = false`, Vercel `only`), what the operator must configure on the account (retention, no

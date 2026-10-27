@@ -130,6 +130,11 @@ pub trait Provider: Send + Sync {
     fn prep_version(&self) -> &str {
         "canonical"
     }
+    /// Who receives the requests; recorded in the decision header. `None` when nothing leaves
+    /// the machine (the scripted provider).
+    fn recipient(&self) -> Option<crate::report::Recipient> {
+        None
+    }
 }
 
 #[cfg(test)]

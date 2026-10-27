@@ -8,6 +8,7 @@ catalog_version = 1
 
 # ---- endpoint profiles shipped at first release (API-key schemes only) -------------------------
 [profiles.anthropic]
+account = "anthropic"
 adapter = "anthropic-messages"
 base_url = "https://api.anthropic.com"
 path = "/v1/messages"
@@ -15,6 +16,7 @@ auth = { scheme = "api-key-header", header = "x-api-key", env = "ANTHROPIC_API_K
 headers = { anthropic-version = "2023-06-01" }
 
 [profiles.google-ai-studio]
+account = "google"
 adapter = "gemini-generate-content"
 base_url = "https://generativelanguage.googleapis.com"
 path = "/v1beta/models/{model}:generateContent"
@@ -22,6 +24,7 @@ auth = { scheme = "api-key-header", header = "x-goog-api-key", env = "GEMINI_API
 headers = {}
 
 [profiles.openai]
+account = "openai"
 adapter = "openai-responses"
 base_url = "https://api.openai.com"
 path = "/v1/responses"

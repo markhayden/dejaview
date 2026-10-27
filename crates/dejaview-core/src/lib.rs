@@ -37,6 +37,9 @@ pub enum Error {
     /// An image could not be read or decoded.
     #[error("image: {0}")]
     Image(String),
+    /// A credential the configured auth scheme needs is missing.
+    #[error("auth: {0}")]
+    Auth(String),
     /// A request would exceed a provider's image limits (count, size, bytes); never downscaled
     /// silently.
     #[error("image_limit: {0}")]
@@ -85,6 +88,7 @@ impl Error {
             Error::Budget(_) => "budget",
             Error::Cancelled(_) => "cancelled",
             Error::ImageLimit(_) => "image_limit",
+            Error::Auth(_) => "auth",
             Error::Submission(_) => "submission_invalid",
             Error::NoSubmission(_) => "no_submission",
             Error::ModelOutput(_) => "model_output",

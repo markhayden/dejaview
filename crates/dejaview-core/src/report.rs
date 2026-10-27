@@ -64,6 +64,20 @@ pub struct DecisionHeader {
     pub envelope: Option<Envelope>,
     /// How the cache figured: on a hit, `source` names the decision this one is a copy of.
     pub cache: CacheStatus,
+    /// Who receives the data (SPEC "Data leaving the machine"); `None` for the scripted provider.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recipient: Option<Recipient>,
+}
+
+/// The recipient chain of a decision's requests: the profile, the host the requests go to, the
+/// upstream provider when a gateway reports one, and the resolved model id.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Recipient {
+    pub profile: String,
+    pub host: String,
+    pub upstream: Option<String>,
+    pub model: String,
 }
 
 impl DecisionHeader {

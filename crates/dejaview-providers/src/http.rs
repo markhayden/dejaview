@@ -97,7 +97,10 @@ impl Client {
         headers: &[(String, String)],
         body: &serde_json::Value,
     ) -> Result<Response> {
-        let mut req = self.inner.post(url).json(body);
+        // The body is serialised here and the headers are exactly the adapter's: it names the
+        // content type itself, so nothing is added or doubled.
+        let bytes = serde_json::to_vec(body)?;
+        let mut req = self.inner.post(url).body(bytes);
         for (name, value) in headers {
             req = req.header(name.as_str(), value.as_str());
         }

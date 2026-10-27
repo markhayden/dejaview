@@ -446,3 +446,25 @@ async fn gemini_replay_fails_when_a_thought_signature_moves_or_changes() {
         "{err}"
     );
 }
+
+#[test]
+fn gemini_fills_null_fields_the_model_left_out_of_a_submission() {
+    // Once the tools are known, a submission with null-valued fields omitted is completed.
+    let (p, _) = provider("gemini-4-argon", "", json!({}));
+    let (t, im) = (tools(), images());
+    p.build_body(&request(
+        &history("fc_1", vec![call_part(Some("fc_1"))]),
+        &t,
+        &im,
+    ))
+    .unwrap();
+    let submit = json!({ "candidates": [{ "content": { "parts": [{ "functionCall": { "id": "fc_9", "name": "submit_verdict", "args": {
+        "schema_version": 1, "findings": [], "opinion": { "verdict": "pass", "reason": "r" },
+        "items": [{ "id": "chk:ob:SF1@candidate", "disposition": "held", "confidence": "confident", "reason": "r", "evidence": [] }]
+    } } }] }, "finishReason": "STOP" }] });
+    let r = p.parse_response(&submit.to_string(), None).unwrap();
+    let item = &r.tool_calls[0].arguments["items"][0];
+    assert_eq!(item["allowed_by"], Value::Null);
+    assert_eq!(item["location"], Value::Null);
+    dejaview_core::submission::validate_schema(&r.tool_calls[0].arguments).unwrap();
+}

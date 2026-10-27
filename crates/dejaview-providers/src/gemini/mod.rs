@@ -45,6 +45,8 @@ pub struct GeminiProvider {
     transport: Arc<dyn Transport>,
     url: String,
     tools: Mutex<Option<Vec<Value>>>,
+    /// Canonical schemas by tool name, for normalising call arguments.
+    canonical: Mutex<BTreeMap<String, Value>>,
     thinking_level: Option<String>,
     media_resolution: Option<String>,
     final_turn: FinalTurn,
@@ -154,6 +156,7 @@ impl GeminiProvider {
             transport,
             url,
             tools: Mutex::new(None),
+            canonical: Mutex::new(BTreeMap::new()),
             thinking_level: control("thinking_level"),
             media_resolution: control("media_resolution"),
             final_turn,
@@ -206,6 +209,11 @@ impl GeminiProvider {
         let tools = vec![json!({ "functionDeclarations": declarations })];
         if let Ok(mut cache) = self.tools.lock() {
             *cache = Some(tools.clone());
+        }
+        if let Ok(mut canonical) = self.canonical.lock() {
+            for d in defs {
+                canonical.insert(d.name.clone(), d.input_schema.clone());
+            }
         }
         Ok(tools)
     }
@@ -374,6 +382,20 @@ impl GeminiProvider {
         Ok(out)
     }
 
+    /// Call arguments in canonical form (SPEC "Wire schemas"): what the provider left out, dropped
+    /// or respelled is put back before validation.
+    fn normalize_arguments(&self, name: &str, arguments: Value) -> Value {
+        match self
+            .canonical
+            .lock()
+            .ok()
+            .and_then(|c| c.get(name).cloned())
+        {
+            Some(schema) => crate::wire::normalize(&schema, arguments),
+            None => arguments,
+        }
+    }
+
     /// A response body into the harness's view; every model part is kept for the echo.
     pub fn parse_response(
         &self,
@@ -425,10 +447,12 @@ impl GeminiProvider {
                         synthetic_id(part)
                     }
                 };
+                let arguments =
+                    self.normalize_arguments(&name, fc.get("args").cloned().unwrap_or(json!({})));
                 tool_calls.push(ToolCall {
                     id,
                     name,
-                    arguments: fc.get("args").cloned().unwrap_or(json!({})),
+                    arguments,
                 });
             } else if let Some(t) = part.get("text").and_then(Value::as_str)
                 && part.get("thought") != Some(&Value::Bool(true))

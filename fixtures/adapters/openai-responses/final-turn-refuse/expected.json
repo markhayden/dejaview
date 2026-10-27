@@ -1,0 +1,15 @@
+{
+  "model": "gpt-6.1-sol",
+  "terminal": "error",
+  "verdict": null,
+  "error": "submission: finding 0: observation RC1 is not on image source",
+  "repairs": [
+    [
+      "rejected",
+      "stray_call"
+    ]
+  ],
+  "turns": 3,
+  "tool_calls": 2,
+  "cost_usd": 0.01001
+}

@@ -45,9 +45,10 @@ tag.
 - [x] 2.5a Anthropic adapter and replay harness
 - [x] 2.5b Anthropic recordings → tag `m2.1`
 - [x] 2.6a Gemini adapter
-- [ ] 2.6b Gemini recordings
+- [x] 2.6b Gemini recordings
 - [x] 2.7a OpenAI adapter
-- [ ] 2.7b OpenAI recordings
+- [x] 2.7b OpenAI recordings
+- [ ] Follow-up from the recordings: models cite the `SF3` exemption as if it waived `SF1`; reword the exemption text or the rejection so the first submission lands (seen on Gemini and Anthropic)
 - [ ] 2.8 Gateway profile candidates (optional)
 - [ ] 2.9 provider-data.md
 - [ ] 2.10a Packaging for the registry

@@ -1,0 +1,10 @@
+{
+  "model": "gemini-4-argon",
+  "terminal": "verdict",
+  "verdict": "fail",
+  "error": null,
+  "repairs": [],
+  "turns": 3,
+  "tool_calls": 2,
+  "cost_usd": 0.021433999999999998
+}

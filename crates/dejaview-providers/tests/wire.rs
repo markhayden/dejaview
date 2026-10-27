@@ -320,3 +320,78 @@ fn wire_committed_snapshots_match_the_transformation() {
         );
     }
 }
+
+#[test]
+fn wire_normalize_fills_required_nullable_fields_a_provider_left_out() {
+    // Gemini omits null-valued fields: they come back where the canonical schema requires a
+    // nullable property; a missing non-nullable property stays missing for the validator.
+    let nullable = json!({
+        "type": "object", "additionalProperties": false, "required": ["id", "allowed_by", "location"],
+        "properties": {
+            "id": { "type": "string" },
+            "allowed_by": { "type": ["string", "null"] },
+            "location": { "anyOf": [ { "$ref": "#/$defs/Loc" }, { "type": "null" } ] }
+        },
+        "$defs": { "Loc": { "type": "object", "additionalProperties": false, "required": ["frame", "fov"],
+                            "properties": { "frame": { "type": "string" }, "fov": { "type": ["number", "null"] } } } }
+    });
+    let filled = normalize(
+        &nullable,
+        json!({ "id": "x", "location": { "frame": "raw:candidate" } }),
+    );
+    assert_eq!(
+        filled,
+        json!({ "id": "x", "allowed_by": null, "location": { "frame": "raw:candidate", "fov": null } })
+    );
+    assert!(accepts(&nullable, &filled));
+    assert_eq!(
+        normalize(&nullable, json!({ "allowed_by": null })),
+        json!({ "allowed_by": null, "location": null }),
+        "id is not nullable and stays missing"
+    );
+}
+
+#[test]
+fn wire_openai_strict_mode_gets_bare_references_and_unions_for_nullable_arrays() {
+    // Both rules were learned from the live API: a `$ref` with a sibling description and a type
+    // array on an array were rejected as invalid schemas.
+    let wire = transform(
+        Adapter::OpenaiResponses,
+        &caps("gpt-6.1-sol"),
+        "submit_verdict",
+        &submission::canonical_schema(),
+    )
+    .unwrap();
+    let finding_location = &wire.schema["$defs"]["Finding"]["properties"]["location"];
+    assert_eq!(
+        finding_location,
+        &json!({ "$ref": "#/$defs/Location" }),
+        "{finding_location}"
+    );
+    let bbox = &wire.schema["$defs"]["Location"]["properties"]["bbox"];
+    assert!(bbox.get("type").is_none(), "{bbox}");
+    assert_eq!(bbox["anyOf"][1], json!({ "type": "null" }));
+    assert_eq!(bbox["anyOf"][0]["type"], "array");
+    assert_eq!(bbox["anyOf"][0]["minItems"], 4);
+    assert!(
+        bbox.get("description").is_some(),
+        "the description stays on the property"
+    );
+    // Primitive nullables keep the type array; Anthropic keeps both forms as they were.
+    assert_eq!(
+        wire.schema["$defs"]["Location"]["properties"]["fov"]["type"],
+        json!(["number", "null"])
+    );
+    let anthropic = transform(
+        Adapter::AnthropicMessages,
+        &caps("claude-opus-5-5"),
+        "submit_verdict",
+        &submission::canonical_schema(),
+    )
+    .unwrap();
+    assert_eq!(
+        anthropic.schema["$defs"]["Location"]["properties"]["bbox"]["type"],
+        json!(["array", "null"])
+    );
+    assert!(accepts(&wire.schema, &example_submission()));
+}

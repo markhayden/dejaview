@@ -64,6 +64,8 @@ pub struct AnthropicProvider {
     transport: Arc<dyn Transport>,
     url: String,
     tools: Mutex<Option<Vec<Value>>>,
+    /// Canonical schemas by tool name, for normalising call arguments.
+    canonical: Mutex<BTreeMap<String, Value>>,
     effort: Option<String>,
     prefix_mismatch: Option<String>,
     final_turn: FinalTurn,
@@ -136,6 +138,7 @@ impl AnthropicProvider {
             transport,
             url,
             tools: Mutex::new(None),
+            canonical: Mutex::new(BTreeMap::new()),
             effort: control("effort"),
             prefix_mismatch: control(PREFIX_CHECK_CONTROL),
             final_turn,
@@ -211,6 +214,11 @@ impl AnthropicProvider {
                 .collect();
         if let Ok(mut cache) = self.tools.lock() {
             *cache = Some(tools.clone());
+        }
+        if let Ok(mut canonical) = self.canonical.lock() {
+            for d in defs {
+                canonical.insert(d.name.clone(), d.input_schema.clone());
+            }
         }
         Ok(tools)
     }
@@ -379,6 +387,20 @@ impl AnthropicProvider {
         Ok(out)
     }
 
+    /// Call arguments in canonical form (SPEC "Wire schemas"): what the provider left out, dropped
+    /// or respelled is put back before validation.
+    fn normalize_arguments(&self, name: &str, arguments: Value) -> Value {
+        match self
+            .canonical
+            .lock()
+            .ok()
+            .and_then(|c| c.get(name).cloned())
+        {
+            Some(schema) => crate::wire::normalize(&schema, arguments),
+            None => arguments,
+        }
+    }
+
     /// A response body into the harness's view, with every block kept for the echo.
     pub fn parse_response(&self, body: &str, request_id: Option<String>) -> Result<TurnResponse> {
         let parsed: wire::MessageResponse = serde_json::from_str(body)
@@ -408,7 +430,10 @@ impl AnthropicProvider {
                         .and_then(Value::as_str)
                         .unwrap_or_default()
                         .to_string();
-                    let arguments = block.get("input").cloned().unwrap_or(Value::Null);
+                    let arguments = self.normalize_arguments(
+                        &name,
+                        block.get("input").cloned().unwrap_or(Value::Null),
+                    );
                     if id.is_empty() || name.is_empty() {
                         return Err(Error::Provider("tool_use block without id or name".into()));
                     }

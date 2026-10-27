@@ -84,6 +84,11 @@ struct Rules {
     close_objects: bool,
     /// Every property required, optional ones made nullable (OpenAI strict mode).
     require_all: bool,
+    /// A `$ref` node carries no other keyword (OpenAI strict mode rejects a sibling description).
+    bare_refs: bool,
+    /// A nullable array or object is written as `anyOf` with `null` rather than a type array
+    /// (OpenAI strict mode accepts type arrays for primitives only).
+    nullable_structural_as_union: bool,
     strict: bool,
 }
 
@@ -126,6 +131,8 @@ fn rules(adapter: Adapter, caps: &Capabilities) -> Option<Rules> {
             recursion_allowed: false,
             close_objects: true,
             require_all: false,
+            bare_refs: false,
+            nullable_structural_as_union: false,
             strict: true,
         }),
         Adapter::GeminiGenerateContent => Some(Rules {
@@ -138,6 +145,8 @@ fn rules(adapter: Adapter, caps: &Capabilities) -> Option<Rules> {
             recursion_allowed: false,
             close_objects: false,
             require_all: false,
+            bare_refs: false,
+            nullable_structural_as_union: false,
             strict: false,
         }),
         Adapter::OpenaiResponses => Some(Rules {
@@ -150,6 +159,8 @@ fn rules(adapter: Adapter, caps: &Capabilities) -> Option<Rules> {
             recursion_allowed: true,
             close_objects: true,
             require_all: true,
+            bare_refs: true,
+            nullable_structural_as_union: true,
             strict: caps.strict_tools,
         }),
     }
@@ -390,8 +401,9 @@ pub fn check_tool_set(
 }
 
 /// A wire payload in canonical form: `null` dropped from properties the canonical schema leaves
-/// optional (OpenAI's nullable emulation), and enum strings restored to the canonical spelling
-/// (Anthropic does not guarantee the capitalisation of enum values).
+/// optional (OpenAI's nullable emulation), `null` supplied for required nullable properties a
+/// provider left out (Gemini omits null-valued fields), and enum strings restored to the canonical
+/// spelling (Anthropic does not guarantee the capitalisation of enum values).
 pub fn normalize(canonical: &Value, payload: Value) -> Value {
     let defs = definitions(canonical);
     let mut v = payload;
@@ -425,6 +437,14 @@ fn normalize_at(schema: &Value, defs: &BTreeMap<String, Value>, v: &mut Value, d
                 o.retain(|k, val| {
                     !(val.is_null() && props.contains_key(k) && !required.contains(k.as_str()))
                 });
+                for (k, p) in props {
+                    if required.contains(k.as_str())
+                        && !o.contains_key(k)
+                        && accepts_null(resolve(p, defs), defs)
+                    {
+                        o.insert(k.clone(), Value::Null);
+                    }
+                }
                 for (k, val) in o.iter_mut() {
                     if let Some(p) = props.get(k) {
                         normalize_at(p, defs, val, depth + 1);
@@ -454,6 +474,20 @@ fn normalize_at(schema: &Value, defs: &BTreeMap<String, Value>, v: &mut Value, d
         }
         _ => {}
     }
+}
+
+/// Whether a schema admits `null`: a `null` type, a type array holding it, or a union alternative.
+fn accepts_null(schema: &Value, defs: &BTreeMap<String, Value>) -> bool {
+    match schema.get("type") {
+        Some(Value::String(t)) if t == "null" => return true,
+        Some(Value::Array(a)) if a.iter().any(|t| t == "null") => return true,
+        _ => {}
+    }
+    schema
+        .get("anyOf")
+        .or(schema.get("oneOf"))
+        .and_then(Value::as_array)
+        .is_some_and(|alts| alts.iter().any(|a| accepts_null(resolve(a, defs), defs)))
 }
 
 /// Whether a payload value plausibly belongs to an alternative: by declared type, or by an enum.
@@ -883,6 +917,43 @@ impl Transformer<'_> {
             o.insert("enum".into(), Value::Array(values));
             self.changes
                 .push(format!("{path}/anyOf: enums merged into one enum"));
+        }
+        // A reference stands alone where the provider allows nothing beside it.
+        if self.rules.bare_refs && o.contains_key("$ref") {
+            let extra: Vec<String> = o.keys().filter(|k| *k != "$ref").cloned().collect();
+            for k in extra {
+                o.remove(&k);
+                self.changes
+                    .push(format!("{path}/{k}: removed (beside $ref)"));
+            }
+        }
+        // A nullable array or object becomes a union with null.
+        if self.rules.nullable_structural_as_union
+            && let Some(Value::Array(types)) = o.get("type")
+            && types.iter().any(|t| t == "null")
+            && types.iter().any(|t| t == "array" || t == "object")
+        {
+            let kept: Vec<Value> = types.iter().filter(|t| *t != "null").cloned().collect();
+            let mut inner = std::mem::take(o);
+            inner.insert(
+                "type".into(),
+                if kept.len() == 1 {
+                    kept[0].clone()
+                } else {
+                    Value::Array(kept)
+                },
+            );
+            let description = inner.remove("description");
+            o.insert(
+                "anyOf".into(),
+                json!([Value::Object(inner), { "type": "null" }]),
+            );
+            if let Some(d) = description {
+                o.insert("description".into(), d);
+            }
+            self.changes.push(format!(
+                "{path}/type: nullable array or object written as anyOf with null"
+            ));
         }
     }
 }

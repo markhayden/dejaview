@@ -47,8 +47,7 @@
             "type": "array"
           },
           "location": {
-            "$ref": "#/$defs/Location",
-            "description": "Where it is; findings always have a location."
+            "$ref": "#/$defs/Location"
           },
           "obligation_ids": {
             "description": "One to eight rule ids as numbered under Obligations, for example `SF4`; never checklist item ids.",
@@ -142,16 +141,20 @@
         "description": "A location as a tagged record with nullable fields (see SPEC \"Frames and locations\"). The\nfields `kind` needs are set; every other field is null.",
         "properties": {
           "bbox": {
-            "description": "`[left, top, right, bottom]` as fractions of the frame's width and height, each between 0 and 1 (never pixels).",
-            "items": {
-              "type": "number"
-            },
-            "maxItems": 4,
-            "minItems": 4,
-            "type": [
-              "array",
-              "null"
-            ]
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "maxItems": 4,
+                "minItems": 4,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`[left, top, right, bottom]` as fractions of the frame's width and height, each between 0 and 1 (never pixels)."
           },
           "fov": {
             "description": "Degrees, 10 to 120, for `view`.",
@@ -165,8 +168,7 @@
             "type": "string"
           },
           "kind": {
-            "$ref": "#/$defs/LocationKind",
-            "description": "`bbox` and `polygon` take coordinates; `view` takes yaw, pitch and fov; `whole_image` and `absent` take nothing."
+            "$ref": "#/$defs/LocationKind"
           },
           "pitch": {
             "description": "Degrees, -90 to 90, for `view`.",
@@ -176,19 +178,23 @@
             ]
           },
           "polygon": {
-            "description": "Three to sixty-four `[x, y]` points as fractions of the frame's width and height, between 0 and 1.",
-            "items": {
-              "items": {
-                "type": "number"
+            "anyOf": [
+              {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "maxItems": 2,
+                  "minItems": 2,
+                  "type": "array"
+                },
+                "type": "array"
               },
-              "maxItems": 2,
-              "minItems": 2,
-              "type": "array"
-            },
-            "type": [
-              "array",
-              "null"
-            ]
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Three to sixty-four `[x, y]` points as fractions of the frame's width and height, between 0 and 1."
           },
           "yaw": {
             "description": "Degrees, -180 to 180, for `view` on an equirectangular frame.",
@@ -275,10 +281,14 @@
     "/$defs/Disposition/oneOf: rewritten as anyOf",
     "/$defs/Disposition/anyOf/1/const: rewritten as enum",
     "/$defs/Disposition/anyOf: enums merged into one enum",
+    "/$defs/Finding/properties/location/description: removed (beside $ref)",
     "/$defs/Location/properties/bbox/items/format: removed (double)",
+    "/$defs/Location/properties/bbox/type: nullable array or object written as anyOf with null",
     "/$defs/Location/properties/fov/format: removed (double)",
+    "/$defs/Location/properties/kind/description: removed (beside $ref)",
     "/$defs/Location/properties/pitch/format: removed (double)",
     "/$defs/Location/properties/polygon/items/items/format: removed (double)",
+    "/$defs/Location/properties/polygon/type: nullable array or object written as anyOf with null",
     "/$defs/Location/properties/yaw/format: removed (double)"
   ]
 }

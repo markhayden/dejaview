@@ -40,6 +40,8 @@ pub struct OpenAiProvider {
     transport: Arc<dyn Transport>,
     url: String,
     tools: Mutex<Option<Vec<Value>>>,
+    /// Canonical schemas by tool name, for normalising call arguments.
+    canonical: Mutex<BTreeMap<String, Value>>,
     reasoning_effort: Option<String>,
     image_detail: Option<String>,
     final_turn: FinalTurn,
@@ -90,6 +92,8 @@ struct ResponseUsage {
 struct TokenDetails {
     #[serde(default)]
     cached_tokens: u64,
+    #[serde(default)]
+    cache_write_tokens: u64,
 }
 
 impl OpenAiProvider {
@@ -149,6 +153,7 @@ impl OpenAiProvider {
             transport,
             url,
             tools: Mutex::new(None),
+            canonical: Mutex::new(BTreeMap::new()),
             reasoning_effort: control("reasoning_effort"),
             image_detail: control("image_detail"),
             final_turn,
@@ -199,6 +204,11 @@ impl OpenAiProvider {
                 .collect();
         if let Ok(mut cache) = self.tools.lock() {
             *cache = Some(tools.clone());
+        }
+        if let Ok(mut canonical) = self.canonical.lock() {
+            for d in defs {
+                canonical.insert(d.name.clone(), d.input_schema.clone());
+            }
         }
         Ok(tools)
     }
@@ -330,6 +340,20 @@ impl OpenAiProvider {
         Ok(out)
     }
 
+    /// Call arguments in canonical form (SPEC "Wire schemas"): what the provider left out, dropped
+    /// or respelled is put back before validation.
+    fn normalize_arguments(&self, name: &str, arguments: Value) -> Value {
+        match self
+            .canonical
+            .lock()
+            .ok()
+            .and_then(|c| c.get(name).cloned())
+        {
+            Some(schema) => crate::wire::normalize(&schema, arguments),
+            None => arguments,
+        }
+    }
+
     /// A response body into the harness's view; every output item is kept for the echo.
     pub fn parse_response(
         &self,
@@ -402,8 +426,10 @@ impl OpenAiProvider {
                         .and_then(Value::as_str)
                         .unwrap_or("{}");
                     // Arguments that are not JSON stay a string: the tool argument check rejects them.
-                    let arguments =
-                        serde_json::from_str(raw).unwrap_or(Value::String(raw.to_string()));
+                    let arguments = self.normalize_arguments(
+                        &name,
+                        serde_json::from_str(raw).unwrap_or(Value::String(raw.to_string())),
+                    );
                     tool_calls.push(ToolCall {
                         id: call_id,
                         name,
@@ -450,7 +476,7 @@ impl OpenAiProvider {
                     .saturating_sub(parsed.usage.input_tokens_details.cached_tokens),
                 output_tokens: parsed.usage.output_tokens,
                 cache_read_tokens: parsed.usage.input_tokens_details.cached_tokens,
-                cache_write_tokens: 0,
+                cache_write_tokens: parsed.usage.input_tokens_details.cache_write_tokens,
             },
             provider_request_id: header_request_id.or(parsed.id),
         })

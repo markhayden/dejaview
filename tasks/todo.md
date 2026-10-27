@@ -44,9 +44,9 @@ tag.
 - [x] 2.4 Privacy enforcement before any live call
 - [x] 2.5a Anthropic adapter and replay harness
 - [ ] 2.5b Anthropic recordings → tag `m2.1`
-- [ ] 2.6a Gemini adapter
+- [x] 2.6a Gemini adapter
 - [ ] 2.6b Gemini recordings
-- [ ] 2.7a OpenAI adapter
+- [x] 2.7a OpenAI adapter
 - [ ] 2.7b OpenAI recordings
 - [ ] 2.8 Gateway profile candidates (optional)
 - [ ] 2.9 provider-data.md

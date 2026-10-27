@@ -23,8 +23,8 @@ observed: profile, host, upstream provenance where a gateway reports one, and th
 | Profile | Enforced by the harness | Attested by the operator | Not verifiable |
 |---|---|---|---|
 | `anthropic` | Credential only in `x-api-key`; `anthropic-version` pinned; HTTPS to `api.anthropic.com` with same-origin redirects only; no `temperature`, `top_p`, `top_k`, `metadata`, `stream` or server-side fallback parameters; `thinking: adaptive` with the prefix check when configured; tools with `strict: true` and the wire schema; images as base64 at the catalog's native size without metadata; the final turn as a mid-conversation system message, `tool_removal` blocks or a forced `tool_choice` only where the catalog allows | (2.5b) | (2.5b) |
-| `google-ai-studio` | (2.6b) | | |
-| `openai` | (2.7b) | | |
+| `google-ai-studio` | Credential only in `x-goog-api-key`, never in the URL; HTTPS to `generativelanguage.googleapis.com` with same-origin redirects only; no `temperature`, `topP`, `topK` or cached-content parameters; tools as `functionDeclarations` with `parametersJsonSchema` (references inlined); images as `inlineData` at the catalog's native size without metadata; `functionResponse` paired by id with the call, or without an id only when the response carried none; function-calling mode `ANY` restricted to `submit_verdict` only where the mechanism is `forced` | (2.6b) | (2.6b) |
+| `openai` | Credential only in `Authorization: Bearer`; HTTPS to `api.openai.com` with same-origin redirects only; `store = false` and `include = ["reasoning.encrypted_content"]` on every request; `truncation = "disabled"`; no `temperature`, `top_p`, `metadata` or `previous_response_id`; function tools with `strict: true` and the wire schema; images as data URLs at the catalog's native size without metadata; `function_call_output` paired by `call_id`; reasoning items echoed as received | (2.7b) | (2.7b) |
 
 ## Model catalog provenance
 
@@ -63,6 +63,19 @@ recordings:
 | Anthropic | A prepared image at the native long edge may still exceed the 4,784-token tier and be downscaled by the provider | The token formula (⌈w/28⌉ × ⌈h/28⌉) and the long-edge figure are both documented; which wins for a square image is not. The ledger bounds every image at the maximum. |
 | OpenAI | The request payload limit (512 MB) stands in for the per-image byte limit | No per-image limit is stated. |
 | Gemini | No maximum pixel dimension is enforced before the 20 MB inline request limit | None is documented. |
+
+Wire assumptions of the Gemini and OpenAI adapters (2.6a, 2.7a), re-verified by the recordings:
+
+| Adapter | Assumption | Why |
+|---|---|---|
+| Gemini | `generateContent` serves `gemini-4-argon` and `gemini-3.8-flash` | Google's guides now lead with the Interactions API; the model pages list neither surface, and the `generateContent` reference still documents thought signatures and function calls for current models. |
+| Gemini | `generationConfig.thinkingConfig.thinkingLevel` takes the lowercase level (`low`, `medium`, `high`) | The guides show the Interactions API field; the `generateContent` enum casing is not shown. |
+| Gemini | Media resolution is a per-part `mediaResolution.level` of `MEDIA_RESOLUTION_*` | The reference lists the enum on `Part`; the guide documents only the Interactions API field. |
+| Gemini | Images returned by tools travel as `functionResponse.parts[].inlineData` | The reference documents the field; no guide shows it. |
+| Gemini | Every model part is echoed verbatim, so thought signatures stay where they were | The thinking guide says to resend every thought block exactly as received. |
+| OpenAI | Images returned by tools travel as `input_image` parts in `function_call_output.output` | The reference says the output may be an array of text, image or file parts. |
+| OpenAI | The final-turn instruction is a `developer` message mid-conversation | Developer and system messages are accepted input items; acceptance mid-history is confirmed by recording. |
+| OpenAI | The request id is the `x-request-id` header | Not stated on the pages read. |
 
 Two prices in the catalog are introductory and dated: `gemini-4-argon` to 2026-11-30 and
 `gemini-3.8-flash` to 2026-12-31. The entries carry the later prices in a comment; re-pin them when

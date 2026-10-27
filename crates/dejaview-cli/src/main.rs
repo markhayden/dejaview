@@ -467,20 +467,22 @@ fn select_provider(args: &CheckArgs, config: &mut Config) -> Result<Box<dyn Prov
             }
         }
     };
+    let id = &config.provider.profile;
     match model.adapter.as_str() {
-        "anthropic-messages" => AnthropicProvider::new(
-            config,
-            &config.provider.profile,
-            profile,
-            model,
-            cred,
-            transport,
+        "anthropic-messages" => AnthropicProvider::new(config, id, profile, model, cred, transport)
+            .map(|p| Box::new(p) as Box<dyn Provider>)
+            .map_err(|e| e.to_string()),
+        "gemini-generate-content" => dejaview_providers::gemini::GeminiProvider::new(
+            config, id, profile, model, cred, transport,
         )
         .map(|p| Box::new(p) as Box<dyn Provider>)
         .map_err(|e| e.to_string()),
-        other => Err(format!(
-            "adapter {other} is not implemented yet (Gemini arrives with task 2.6a, OpenAI with 2.7a)"
-        )),
+        "openai-responses" => dejaview_providers::openai::OpenAiProvider::new(
+            config, id, profile, model, cred, transport,
+        )
+        .map(|p| Box::new(p) as Box<dyn Provider>)
+        .map_err(|e| e.to_string()),
+        other => Err(format!("adapter {other} is not implemented")),
     }
 }
 

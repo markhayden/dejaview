@@ -3,7 +3,9 @@
 
 pub mod anthropic;
 pub mod catalog;
+pub mod gemini;
 pub mod http;
+pub mod openai;
 pub mod prepare;
 pub mod privacy;
 pub mod replay;

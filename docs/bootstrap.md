@@ -40,3 +40,17 @@ container on this machine, before anything is pushed. It validates the workflow 
 the pinned toolchain and tools as the runner would, and runs `just check` under GNU tools rather
 than the macOS ones. GitHub's cache action and runner image specifics are the only parts it does
 not reproduce.
+
+## Credentials
+
+dejaview reads API keys from the environment only and never writes them to disk. Keep them in a
+`.env` file (git ignores it; `.env.example` lists the names) and load it into the shell before a
+live run:
+
+```sh
+set -a; source .env; set +a
+```
+
+The `DEJAVIEW_*_ACCOUNT` entries feed the `[privacy] account` attestation through `${…}` expansion
+in the config, for example `account = "anthropic:${DEJAVIEW_ANTHROPIC_ACCOUNT}"`.
+

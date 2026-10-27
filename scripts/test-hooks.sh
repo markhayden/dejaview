@@ -19,7 +19,10 @@ expect_scan_ok  scripts/scan-secrets.sh       "the scanner's own source"
 expect_scan_ok  scripts/hooks/pre-commit      "the hook's own source"
 expect_scan_ok  scripts/synthetic-tokens.txt  "the synthetic token list"
 expect_scan_ok  fixtures/synthetic-secrets/example.env "a fixture using only synthetic tokens"
-tree="$(mktemp)"; git ls-files -z | xargs -0 cat > "$tree" 2>/dev/null
+# Every tracked file that is present; a file deleted in the working tree but still in the index
+# (for example a recording being replaced) is skipped rather than killing the run under set -e.
+tree="$(mktemp)"
+git ls-files -z | while IFS= read -r -d '' f; do [ -f "$f" ] && cat "$f" || true; done > "$tree"
 expect_scan_ok  "$tree" "the whole tracked tree"
 
 # --- scanner: negative cases ---------------------------------------------------------------

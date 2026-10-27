@@ -87,7 +87,7 @@ fn key_input(config: &Config) -> KeyInput {
         &setup.images,
         &setup.prepared,
         &tools,
-        "scripted",
+        &dejaview_testkit::ScriptedProvider::from_json("[]").unwrap(),
         "test",
     )
 }

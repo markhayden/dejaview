@@ -37,6 +37,10 @@ pub enum Error {
     /// An image could not be read or decoded.
     #[error("image: {0}")]
     Image(String),
+    /// A request would exceed a provider's image limits (count, size, bytes); never downscaled
+    /// silently.
+    #[error("image_limit: {0}")]
+    ImageLimit(String),
     /// The provider answered in a way the harness cannot continue from. Never retried.
     #[error("provider: {0}")]
     Provider(String),
@@ -80,6 +84,7 @@ impl Error {
             Error::Tool(_) => "tool",
             Error::Budget(_) => "budget",
             Error::Cancelled(_) => "cancelled",
+            Error::ImageLimit(_) => "image_limit",
             Error::Submission(_) => "submission_invalid",
             Error::NoSubmission(_) => "no_submission",
             Error::ModelOutput(_) => "model_output",

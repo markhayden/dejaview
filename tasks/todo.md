@@ -40,7 +40,7 @@ tag.
 ## M2 Provider adapters
 - [x] 2.1 Model catalog and capability validation
 - [x] 2.2 Wire schema transformations
-- [ ] 2.3 Image preparation and preflight
+- [x] 2.3 Image preparation and preflight
 - [ ] 2.4 Privacy enforcement before any live call
 - [ ] 2.5a Anthropic adapter and replay harness
 - [ ] 2.5b Anthropic recordings → tag `m2.1`

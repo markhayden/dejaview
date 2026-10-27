@@ -839,9 +839,11 @@ The catalog records per model: accepted formats; maximum accepted dimensions and
 image; the native size at which the provider stops resizing; the per-request image count limit
 and any stricter per-image limit above a count; the per-request byte limit; the image token
 estimate; provider-specific detail controls. Preparation is deterministic and versioned
-(`prep_version`): resize the canonical image with Lanczos to the native size, encode JPEG at a
-pinned quality or PNG when alpha is present, strip metadata, record the transformation and the
-prepared SHA-256. Preflight runs against the whole outgoing provider history on every turn,
+(`prep_version`, currently `1`): fit the canonical image's long edge to the native size (or the
+config's lower `images.max_long_edge`) with Lanczos3, never upscaling; encode JPEG at quality 90,
+or PNG when the image carries an alpha channel; write no metadata; record the source and prepared
+dimensions and the prepared SHA-256. Each provider reports its `prep_version` (the scripted
+provider sends canonical pixels and reports `canonical`), and the cache key carries it. Preflight runs against the whole outgoing provider history on every turn,
 counting historical and tool-result images; a request that would exceed any limit is
 `error: image_limit`, never a silent downscale. Tool images are prepared the same way before they
 reach the model; tool manifests bound their count and size so the bound is computable.

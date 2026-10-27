@@ -49,12 +49,18 @@ pub struct CanonicalImage {
     pub projection: Projection,
     /// Whether the file carried an ICC profile (recorded, not applied).
     pub has_icc_profile: bool,
+    /// Whether the file carried an alpha channel; the plane is kept in `alpha` for preparation.
+    pub has_alpha: bool,
     /// Non-fatal notes, for example the 2:1 aspect ratio treated as flat.
     pub warnings: Vec<String>,
     /// The canonical pixels, shared with tools; not serialised.
     #[serde(skip)]
     #[schemars(skip)]
     pub pixels: Option<Arc<image::RgbImage>>,
+    /// The alpha plane when the file had one (same dimensions as `pixels`); not serialised.
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub alpha: Option<Arc<image::GrayImage>>,
 }
 
 /// Loads one image spec, resolving a relative path against `base`.
@@ -87,6 +93,12 @@ pub fn load(spec: &ImageSpec, base: &Path, bounds: &DecodeBounds) -> Result<Cano
     let mut dynamic = DynamicImage::from_decoder(decoder)
         .map_err(|e| Error::Image(format!("{}: cannot decode: {e}", spec.id)))?;
     dynamic.apply_orientation(orientation);
+    let has_alpha = dynamic.color().has_alpha();
+    let alpha = has_alpha.then(|| {
+        let rgba = dynamic.to_rgba8();
+        let plane: Vec<u8> = rgba.pixels().map(|p| p.0[3]).collect();
+        image::GrayImage::from_raw(rgba.width(), rgba.height(), plane)
+    });
     let rgb = dynamic.to_rgb8();
 
     let mut warnings = Vec::new();
@@ -115,8 +127,10 @@ pub fn load(spec: &ImageSpec, base: &Path, bounds: &DecodeBounds) -> Result<Cano
         canonical_sha256: hex(&Sha256::digest(rgb.as_raw())),
         projection,
         has_icc_profile,
+        has_alpha,
         warnings,
         pixels: Some(Arc::new(rgb)),
+        alpha: alpha.flatten().map(Arc::new),
     })
 }
 

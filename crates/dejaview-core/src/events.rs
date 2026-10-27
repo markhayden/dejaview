@@ -73,7 +73,7 @@ pub struct Resolved {
     pub tools: Vec<String>,
 }
 
-/// Step 2 (a stub until task 2.3).
+/// Step 2: the preparation the images went through (`prep_version` names the provider's).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Prepared {
     pub prep_version: String,

@@ -125,6 +125,11 @@ pub trait Provider: Send + Sync {
     fn pricing(&self) -> Option<&dyn crate::ledger::Pricing> {
         None
     }
+    /// The image preparation this provider applies (SPEC "Image preparation"); part of the cache
+    /// key. `canonical` means the canonical pixels are sent as they are.
+    fn prep_version(&self) -> &str {
+        "canonical"
+    }
 }
 
 #[cfg(test)]

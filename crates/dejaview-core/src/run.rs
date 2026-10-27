@@ -160,7 +160,7 @@ pub async fn check(
             &s.images,
             &s.prepared,
             tools,
-            provider.id(),
+            provider,
             harness_version,
         )
         .key()?;
@@ -567,7 +567,7 @@ async fn drive(
     }))?;
     // Prepare is a stub until task 2.3; the event exists so the journal's shape is final.
     journal.append(&Event::Prepared(events::Prepared {
-        prep_version: "canonical".into(),
+        prep_version: provider.prep_version().to_string(),
         images: state.images.len(),
     }))?;
 

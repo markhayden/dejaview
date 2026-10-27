@@ -36,6 +36,16 @@ Wire schema assumptions (task 2.2) carried the same way, re-verified by the reco
 | OpenAI | `const` is sent as a one-value `enum`; `default` is removed | Neither keyword appears in the supported-schemas list. |
 | Anthropic | `minItems` above 1 is removed; `maxItems` removed | "Array constraints beyond `minItems` of 0 or 1" are unsupported in strict mode. |
 
+Image handling the documentation does not describe (task 2.3), carried as assumptions until the
+recordings:
+
+| Provider | Assumption | Why |
+|---|---|---|
+| all | The provider does no processing beyond its documented downscale; the harness fits the long edge to the catalog's native size and sends JPEG at quality 90, or PNG when alpha is present | Only the resize behaviour at the native size is documented. |
+| Anthropic | A prepared image at the native long edge may still exceed the 4,784-token tier and be downscaled by the provider | The token formula (⌈w/28⌉ × ⌈h/28⌉) and the long-edge figure are both documented; which wins for a square image is not. The ledger bounds every image at the maximum. |
+| OpenAI | The request payload limit (512 MB) stands in for the per-image byte limit | No per-image limit is stated. |
+| Gemini | No maximum pixel dimension is enforced before the 20 MB inline request limit | None is documented. |
+
 Two prices in the catalog are introductory and dated: `gemini-4-argon` to 2026-11-30 and
 `gemini-3.8-flash` to 2026-12-31. The entries carry the later prices in a comment; re-pin them when
 the dates pass.

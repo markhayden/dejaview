@@ -67,6 +67,10 @@
           "description": "SHA-256 of the canonical pixels (8-bit RGB, row-major, after orientation), lowercase hex.",
           "type": "string"
         },
+        "has_alpha": {
+          "description": "Whether the file carried an alpha channel; the plane is kept in `alpha` for preparation.",
+          "type": "boolean"
+        },
         "has_icc_profile": {
           "description": "Whether the file carried an ICC profile (recorded, not applied).",
           "type": "boolean"
@@ -118,6 +122,7 @@
         "canonical_sha256",
         "projection",
         "has_icc_profile",
+        "has_alpha",
         "warnings"
       ],
       "type": "object"

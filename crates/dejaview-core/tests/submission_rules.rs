@@ -207,7 +207,8 @@ fn allowed_change_requires_an_applicable_exemption() {
     let it = item_mut(&mut v, "chk:ob:RC3@candidate");
     it["disposition"] = serde_json::json!("allowed_change");
     it["allowed_by"] = serde_json::json!("RC4");
-    expect_err(&f, &v, "does not waive RC3");
+    expect_err(&f, &v, "RC4 waives nothing");
+    expect_err(&f, &v, "the item is `held`");
     let mut v = f.valid();
     let it = item_mut(&mut v, "chk:ob:RC3@candidate");
     it["disposition"] = serde_json::json!("allowed_change");
@@ -260,15 +261,18 @@ fn location_rules_wrong_kind_for_projection_and_unknown_frame() {
     expect_err(&f, &v, "x0 < x1");
 }
 
+fn finding(
+    ids: Vec<&str>,
+    dispo: &str,
+    allowed_by: Option<&str>,
+    loc: serde_json::Value,
+) -> serde_json::Value {
+    serde_json::json!({ "obligation_ids": ids, "disposition": dispo, "confidence": "confident", "reason": "r", "allowed_by": allowed_by, "location": loc, "evidence": [] })
+}
+
 #[test]
 fn finding_rules() {
     let f = Fixture::pip();
-    let finding = |ids: Vec<&str>,
-                   dispo: &str,
-                   allowed_by: Option<&str>,
-                   loc: serde_json::Value| {
-        serde_json::json!({ "obligation_ids": ids, "disposition": dispo, "confidence": "confident", "reason": "r", "allowed_by": allowed_by, "location": loc, "evidence": [] })
-    };
     // A valid violation finding on the candidate citing RC1.
     let mut v = f.valid();
     v["findings"] = serde_json::json!([finding(
@@ -295,7 +299,7 @@ fn finding_rules() {
         None,
         whole("raw:candidate")
     )]);
-    expect_err(&f, &v, "cites only observe obligations");
+    expect_err(&f, &v, "cite observe rules only");
     // Observed, valid.
     let mut v = f.valid();
     v["findings"] = serde_json::json!([finding(
@@ -352,4 +356,28 @@ fn finding_rules() {
     let mut v = f.valid();
     v["findings"] = serde_json::json!([finding(vec!["RC1"], "held", None, whole("raw:candidate"))]);
     assert!(validate_schema(&v).is_err());
+}
+
+/// An exemption with `waives = []` states what may change and nothing more: naming it in
+/// `allowed_by` or citing it as an obligation is rejected with the disposition to use instead.
+#[test]
+fn an_exemption_that_waives_nothing_is_explained_not_just_refused() {
+    let f = Fixture::pip();
+    let mut v = f.valid();
+    v["findings"] = serde_json::json!([finding(
+        vec!["RC4"],
+        "violation",
+        None,
+        whole("raw:candidate")
+    )]);
+    expect_err(&f, &v, "RC4 waives nothing");
+    expect_err(&f, &v, "cite the obligation the change bears on");
+    let mut v = f.valid();
+    v["findings"] = serde_json::json!([finding(
+        vec!["RC1"],
+        "allowed_change",
+        Some("RC4"),
+        bbox("raw:candidate", [0.1, 0.1, 0.3, 0.3])
+    )]);
+    expect_err(&f, &v, "RC4 waives nothing");
 }

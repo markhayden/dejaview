@@ -127,14 +127,14 @@ pub const SHIPPED_BASES: &[&str] = &[
 /// The shipped rule sets, embedded at build time. Keys are base names and `<base>/<profile>`.
 pub fn shipped(name: &str) -> Option<&'static str> {
     match name {
-        "source-fidelity" => Some(include_str!("../../../rules/source-fidelity.toml")),
+        "source-fidelity" => Some(include_str!("../rules/source-fidelity.toml")),
         "source-fidelity/architecture" => Some(include_str!(
-            "../../../rules/profiles/source-fidelity-architecture.toml"
+            "../rules/profiles/source-fidelity-architecture.toml"
         )),
-        "reference-consistency" => Some(include_str!("../../../rules/reference-consistency.toml")),
-        "reality-checks" => Some(include_str!("../../../rules/reality-checks.toml")),
-        "brief-compliance" => Some(include_str!("../../../rules/brief-compliance.toml")),
-        "product-fidelity" => Some(include_str!("../../../rules/product-fidelity.toml")),
+        "reference-consistency" => Some(include_str!("../rules/reference-consistency.toml")),
+        "reality-checks" => Some(include_str!("../rules/reality-checks.toml")),
+        "brief-compliance" => Some(include_str!("../rules/brief-compliance.toml")),
+        "product-fidelity" => Some(include_str!("../rules/product-fidelity.toml")),
         _ => None,
     }
 }

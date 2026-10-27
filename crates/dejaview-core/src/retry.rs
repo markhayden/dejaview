@@ -176,6 +176,7 @@ mod tests {
         Ok(TurnResponse {
             text: vec![],
             tool_calls: vec![],
+            content: vec![],
             stop_reason: StopReason::EndTurn,
             usage: Default::default(),
             provider_request_id: None,
@@ -208,11 +209,13 @@ mod tests {
         let provider = Scripted(Mutex::new(script.into()));
         let sleeper = Recorder::default();
         let mut seen = Vec::new();
+        let images = std::collections::BTreeMap::new();
         let request = TurnRequest {
             system: "",
             history: &[],
             tools: &[],
             max_output_tokens: 1,
+            images: &images,
         };
         let result = block_on(send_with_retries(
             &provider,

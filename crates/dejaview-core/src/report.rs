@@ -64,6 +64,22 @@ pub struct DecisionHeader {
     pub envelope: Option<Envelope>,
     /// How the cache figured: on a hit, `source` names the decision this one is a copy of.
     pub cache: CacheStatus,
+    /// Who receives the data (SPEC "Data leaving the machine"); `None` for the scripted provider.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recipient: Option<Recipient>,
+}
+
+/// The recipient chain of a decision's requests: the profile, the host the requests go to, the
+/// upstream provider when a gateway reports one, and the resolved model id.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Recipient {
+    pub profile: String,
+    pub host: String,
+    pub upstream: Option<String>,
+    pub model: String,
+    /// The API version or path the adapter speaks (`2023-06-01`, `v1beta`, `v1`).
+    pub api_version: String,
 }
 
 impl DecisionHeader {
@@ -152,6 +168,8 @@ pub struct RunReport {
     pub finding_rows: Vec<Row>,
     pub verdict: Option<Verdict>,
     pub error: Option<ErrorEntry>,
+    /// Wall time from the first journal line to the last, in milliseconds.
+    pub wall_ms: u64,
 }
 
 /// One model turn: a request, and its response if one came back.
@@ -259,6 +277,10 @@ impl RunReport {
             finding_rows: Vec::new(),
             verdict: None,
             error: None,
+            wall_ms: match (lines.first(), lines.last()) {
+                (Some(a), Some(b)) => b.unix_ms.saturating_sub(a.unix_ms),
+                _ => 0,
+            },
         };
         for line in lines {
             match &line.event {

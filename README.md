@@ -81,7 +81,10 @@ The method is the brief's: measure first, then earn each tool.
 Rust workspace, one binary, an optional Python tool pack over MCP, provider adapters written
 against recorded fixtures. The harness core (milestones M0 and M1) runs a job end to end against a
 scripted provider: rules, checklist, tool turns, repairs, ledger, journal, report, cache, and the
-MCP transport with a provisioned pack; live provider adapters are milestone M2. Nothing is measured
+MCP transport with a provisioned pack; the three direct provider adapters (Anthropic, Google AI
+Studio, OpenAI) are written against recorded conversations and smoked live from the release
+archives (milestone M2). Install with `cargo install dejaview` or from a release archive, copy a
+config from [`examples/`](examples/) and set the one environment variable it names. Nothing is measured
 yet; results land under [`docs/results/`](docs/results/) as they are produced. Plan: [`PLAN.md`](PLAN.md). Decisions: [`docs/adr/`](docs/adr/). External
 reviews of the spec and plan: [`docs/reviews/`](docs/reviews/). Developer setup:
 [`docs/bootstrap.md`](docs/bootstrap.md).

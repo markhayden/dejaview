@@ -271,7 +271,7 @@ fn obligations_section_snapshot_architecture() {
         "hidden_ok rendered"
     );
     assert!(
-        text.contains("waives no obligation above"),
+        text.contains("waives nothing and is never an `allowed_by`"),
         "SF3 with waives = []"
     );
     assert!(text.contains("SF4 (observe; on candidate)") && text.contains("`observed` findings"));

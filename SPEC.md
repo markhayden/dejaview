@@ -312,7 +312,7 @@ binding is therefore trusted data from rules and config, covers consumer require
 depends on fixed ids inside a tool.
 
 ```toml
-# rules/source-fidelity.toml (generic base; ships in the binary)
+# crates/dejaview-core/rules/source-fidelity.toml (generic base; ships in the binary)
 [rules]
 use_case = "source-fidelity"
 version = 1
@@ -338,7 +338,7 @@ text = "The candidate is derived from the source: same scene, same camera, same 
 id = "SF3"
 kind = "allowed"
 waives = []
-text = "Changes the job requirements list as allowed are not violations. Cite the requirement that allows them."
+text = "Changes the job requirements permit are not violations."
 
 [[rule]]
 id = "SF4"
@@ -347,7 +347,7 @@ text = "Any other change is noted with its location."
 ```
 
 ```toml
-# rules/profiles/source-fidelity-architecture.toml (the prototype's venue case, a named profile)
+# crates/dejaview-core/rules/profiles/source-fidelity-architecture.toml (the prototype's venue case, a named profile)
 [rules]
 use_case = "source-fidelity"
 profile = "architecture"
@@ -375,7 +375,10 @@ ignore = ["chair", "table", "person", "plant", "curtain", "lamp", "car"]
 In the architectural profile a change to furniture is reported as an `observed` finding citing
 SF4 while SF4 is enabled; it is never an `allowed_change` on SF1, because SF3 waives nothing. An
 exemption with `waives = []` supplies permission context only: it neither satisfies a mandatory
-item nor overrides an enabled observation instruction. Structure covered by dressing is `hidden`
+item nor overrides an enabled observation instruction. The prompt says so next to the rule, and
+a submission that names it in `allowed_by` anyway is rejected with the disposition to use
+instead (`held` where the obligation still holds). Models read "allowed" as an invitation to
+cite the rule, so the rule text itself never asks them to cite anything. Structure covered by dressing is `hidden`
 on SF1, recorded because `hidden_ok` is set. A job requirement of kind `allowed` with
 `waives = ["SF1"]` and a `condition` is how a consumer permits a specific structural change.
 
@@ -746,8 +749,13 @@ per model:
   block per tool other than `submit_verdict`, leaving the definitions in `tools`, and still
   answers a stray call with an error result.
 
-Each mechanism has adapter fixtures, including the transition into the final turn and a stray
-call during it. A configuration whose model supports none is rejected at resolve time.
+The harness marks the final turn by appending the instruction as a `System` message; the adapter
+renders it by the mechanism in force. The mechanism is the first the catalog lists for the model
+unless `[provider] controls = { final_turn = "…" }` names another supported one; the thinking
+prefix check is `controls.prefix_mismatch_behavior = "error" | "drop_block"` on models with the
+thinking-binding beta (owner decision 2 sets `error` while recording). Each mechanism has adapter
+fixtures, including the transition into the final turn and a stray call during it. A
+configuration whose model supports none is rejected at resolve time.
 
 ## Providers
 
@@ -755,26 +763,32 @@ call during it. A configuration whose model supports none is rejected at resolve
 
 ```rust
 pub trait Provider: Send + Sync {
-    fn id(&self) -> &'static str;                            // "anthropic-messages"
-    fn capabilities(&self, model: &ModelSpec) -> Capabilities; // from the catalog
-    fn wire_schema(&self, canonical: &Schema, model: &ModelSpec) -> Result<Schema>;
-    fn prepare_images(&self, imgs: &[CanonicalImage], model: &ModelSpec) -> Result<Vec<PreparedImage>>;
-    fn preflight(&self, req: &TurnRequest<'_>, model: &ModelSpec) -> Result<RequestBound>;
-    fn classify(&self, resp: &RawResponse) -> ResponseClass;    // complete, non-replayable, error
-    fn send<'a>(&'a self, req: TurnRequest<'a>)
-        -> Pin<Box<dyn Future<Output = Result<TurnResponse>> + Send + 'a>>;
+    fn id(&self) -> &str;                                              // "anthropic-messages"
+    fn send<'a>(&'a self, req: TurnRequest<'a>) -> SendFuture<'a>;     // one round trip, no retries
+    fn pricing(&self) -> Option<&dyn Pricing>;                         // the catalog entry
+    fn prep_version(&self) -> &str;                                    // part of the cache key
+    fn prepare_image(&self, id: &str, pixels: &DynamicImage) -> Result<Prepared>;
+    fn recipient(&self) -> Option<Recipient>;                          // profile, host, upstream, model
 }
 ```
 
 `Provider` is dyn-compatible and used as `Box<dyn Provider>`; `send` returns a boxed `Send`
-future. `TurnRequest` carries the system prompt, the provider history as adapter-owned opaque
-blocks plus the harness's typed view of them, tool definitions, the model id, the control settings
-allowed by the catalog, and the output token limit. `TurnResponse` carries text blocks, tool
-calls (adapter call id, name, parsed arguments), the stop reason, usage, the provider request id,
-upstream provenance where a gateway returns it, and the opaque blocks to echo. `preflight`
-returns the request's upper-bound cost and rejects it when any catalog limit would be exceeded.
+future. The adapter is built from the catalog entry (capabilities, limits, prices, betas), the
+profile, the credential and an injected transport, so the capability, wire-schema and preflight
+steps of the request are the adapter's own: it transforms the tool schemas once (`wire`), runs
+preflight over every outgoing request (`prepare::preflight`) and maps controls as the catalog
+allows. `TurnRequest` carries the system prompt, the history (the harness's typed view, in which
+adapter-owned opaque blocks appear as `Opaque { adapter, block }` and the final-turn instruction as
+a `System` message), the frozen tool definitions, the output token limit and the prepared bytes of
+every image the history names. `TurnResponse` carries text blocks, tool calls (adapter call id,
+name, parsed arguments), the assistant content in the provider's order including the opaque blocks
+to echo, the stop reason, usage (uncached, cache-read and cache-write tokens), and the provider
+request id. The harness appends that content to the history unchanged.
 
-The HTTP client is injected (`reqwest` with `rustls` in the binary; a fixture player in tests).
+The transport is injected (`http::Client`, reqwest with rustls in the binary; `replay::Player` for
+recorded conversations, `replay::Recorder` around the client when recording). `dejaview check
+--replay <dir>` runs a decision against a recording without a credential; `--record <dir>` writes
+one, secrets stripped.
 
 ### Wire schemas
 
@@ -793,10 +807,23 @@ stay in canonical validation.
   required, optional values nullable; unions only in the documented `anyOf` form; remove
   unsupported keywords per the catalog.
 
-The harness normalises a wire payload back to canonical form before validation. `submit_verdict`
-and every enabled tool schema must pass the wire transformation for the selected model at resolve
-time; a tool whose schema cannot be represented is refused with the reason, before any billable
-request.
+Common to every adapter (`dejaview-providers::wire`, `WIRE_VERSION`): `oneOf` becomes `anyOf`; a
+union of plain enums becomes one enum; metadata (`$schema`, `title`) and `format` values the
+provider does not list are dropped; the constraint keywords the catalog names for the model are
+removed; `allOf`, `not`, conditionals, `patternProperties`, external references and any keyword
+outside the wire subset are refused. Gemini receives references inlined (its documentation does not
+state that `$defs` is accepted), with `const` as a one-value enum. Every removal and rewrite is
+recorded with the schema as a JSON pointer, and the transformed `submit_verdict` schema per adapter
+is committed under `fixtures/schemas/`.
+
+The harness normalises a wire payload back to canonical form before validation: `null` is dropped
+from properties the canonical schema leaves optional (OpenAI's nullable emulation) and enum strings
+are restored to the canonical spelling (Anthropic does not guarantee their capitalisation).
+`submit_verdict` and every enabled tool schema must pass the wire transformation for the selected
+model at resolve time, and the set must fit the provider's limits (Anthropic strict mode: 20 strict
+tools, 24 optional and 16 union-typed parameters per request; OpenAI: 5,000 properties, 10 levels,
+1,000 enum values, 120,000 characters per schema); a tool whose schema cannot be represented is
+refused with the reason, before any billable request.
 
 ### Protocol requirements
 
@@ -826,9 +853,11 @@ The catalog records per model: accepted formats; maximum accepted dimensions and
 image; the native size at which the provider stops resizing; the per-request image count limit
 and any stricter per-image limit above a count; the per-request byte limit; the image token
 estimate; provider-specific detail controls. Preparation is deterministic and versioned
-(`prep_version`): resize the canonical image with Lanczos to the native size, encode JPEG at a
-pinned quality or PNG when alpha is present, strip metadata, record the transformation and the
-prepared SHA-256. Preflight runs against the whole outgoing provider history on every turn,
+(`prep_version`, currently `1`): fit the canonical image's long edge to the native size (or the
+config's lower `images.max_long_edge`) with Lanczos3, never upscaling; encode JPEG at quality 90,
+or PNG when the image carries an alpha channel; write no metadata; record the source and prepared
+dimensions and the prepared SHA-256. Each provider reports its `prep_version` (the scripted
+provider sends canonical pixels and reports `canonical`), and the cache key carries it. Preflight runs against the whole outgoing provider history on every turn,
 counting historical and tool-result images; a request that would exceed any limit is
 `error: image_limit`, never a silent downscale. Tool images are prepared the same way before they
 reach the model; tool manifests bound their count and size so the bound is computable.
@@ -889,14 +918,18 @@ missing credential is `error: auth`.
 
 ### Model catalog
 
-`providers/catalog.toml`, versioned, part of the cache key. Per model id: adapter; context and
+`crates/dejaview-providers/catalog.toml`, versioned, part of the cache key. Per model id: adapter; context and
 output limits; the image fields above; prices per million input, output and cached tokens, and
 any per-image price; `verified` date and source URL; capabilities: `forced_tool_choice`,
 `strict_tools`, `strict_unsupported_keywords`, `function_call_ids`, `parallel_tools`,
 `system_messages_in_history`, `final_turn` (the mechanisms supported, see "Final turn
-mechanics"), `sampling`, `thinking` (control name and allowed values), required headers or
-betas. Config
-settings not supported by the model's capabilities are rejected at resolve time. Candidate first
+mechanics"), `sampling`, `prefill`, the controls a config may set (name, allowed values,
+default: the vendor's thinking control and, where one exists, the image detail control), required
+headers or betas. Fields the documentation does not state are listed per entry under `unverified`
+and recorded in `docs/provider-data.md` until recordings confirm them. The file also carries the
+shipped endpoint profiles (adapter, endpoint, API-key scheme, static headers). Config settings not
+supported by the model's capabilities are rejected at resolve time; the test-only `fake` profile
+and `fake-model` pass only in binaries built with the `testkit` feature. Candidate first
 entries, re-verified at M2: `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`,
 `gemini-4-argon`, `gemini-3.8-flash`, and the current OpenAI vision models. Preview models are
 excluded.
@@ -906,11 +939,14 @@ excluded.
 Two ledgers: per job (`budget.spend_cap_usd`) and per evaluation (`matrix.spend_cap_usd`),
 shared across concurrent decisions with atomic operations. The unit of reservation is the
 **decision envelope**: the upper bound of every request the decision can make (per run: tool
-turns, the final turn, the repair including a reissue at `repair_output_tokens`; times decision
-runs), each bounded by the history it could carry (prior prompts, prior model output at the
+turns, the final turn, every repair the budget allows (`repairs`) at `repair_output_tokens`;
+times decision runs), each bounded by the history it could carry (prior prompts, prior model output at the
 output allowance, tool outputs at their manifest byte and image bounds, request framing, image
-token estimates) at catalog prices, plus any per-image price, with every request counted once per
-possible attempt (1 plus `retries`). The envelope is reserved once at step 3.
+token estimates) at catalog prices, plus any per-image price, with every request counted once,
+plus a per-run **retry reserve** of `retries` times the largest request bound. A retryable failure
+is charged at its bound, so the reserve pays for `retries` failures anywhere in the run; a retry
+the balance cannot cover is refused and the run ends with `error: budget` rather than overrunning
+the envelope. The envelope is reserved once at step 3.
 
 Each billable attempt transfers its bound from the envelope's unallocated balance to an attempt
 hold; total reserved spending never increases. When the provider reports usage, the hold is
@@ -944,8 +980,9 @@ fallback to another model or provider.
 ### Data leaving the machine
 
 The harness refuses to run unless `[privacy] cloud_calls = true` and `account` names the
-provider or gateway account the operator attests to. Consent is bound to the profile id, the
-account, and the profile's upstream allowlist; the report records the recipient chain actually
+provider or gateway account the operator attests to, as `<prefix>:<account id>` where the prefix
+is the one the profile declares (`anthropic`, `google`, `openai`). Consent is bound to the profile
+id, the account, and the profile's upstream allowlist; the report records the recipient chain actually
 observed (profile, base URL host, upstream provenance, resolved model). `docs/provider-data.md`
 lists, per profile, what the harness enforces at request level (for example OpenAI
 `store = false`, Vercel `only`), what the operator must configure on the account (retention, no
@@ -1377,7 +1414,10 @@ dejaview eval run --matrix matrix.toml --out eval-out/<name>
 dejaview eval report eval-out/<name>
 dejaview eval gate --matrix matrix.toml --tool regions --set <sealed set>
 dejaview eval canary --config dejaview.toml
-dejaview catalog show claude-opus-5-5
+dejaview check --config dejaview.toml --job job.toml --replay fixtures/adapters/anthropic-messages/first-look
+dejaview check --config dejaview.toml --job job.toml --record recordings/first-look
+dejaview catalog show claude-opus-5-5 [--json]
+dejaview catalog list [--json]
 ```
 
 Exit codes for `check`: 0 pass, 1 fail, 2 unsure, 3 error or cancelled, 64 usage error, after
@@ -1387,18 +1427,21 @@ Exit codes for `check`: 0 pass, 1 fail, 2 unsure, 3 error or cancelled, 64 usage
 
 ```
 Cargo.toml                      workspace
+dist-workspace.toml             release archives: targets, the archive smoke as the publish gate (`dist` regenerates the release workflow from it)
+.github/workflows/              ci (just check), package (publish dry run, install from the packaged crates, release archive dry run), release (generated), archive-smoke (called by release)
+examples/                       one ready-to-run config per use case
 crates/
   dejaview-core/                config, obligations, instances, checklist, prompt, state machine, repair, schema, aggregation, decision, journal, report, cache, ledger, frames
+    rules/                      base rule sets and profiles/, embedded at build time
+    prompts/                    versioned system prompt templates, embedded
   dejaview-providers/           Provider trait, adapters, wire schemas, endpoint profiles, catalog, auth schemes, fixtures player
+    catalog.toml                model catalog and the shipped endpoint profiles, embedded
+    profiles/*.toml             gateway profiles with upstream contracts, embedded (2.8)
   dejaview-tools/               Tool trait, built-ins, MCP client, manifest registry, envelope, projections, provisioning
   dejaview-eval/                set manifests, hashing, sealing, matrix runner, metrics, bootstrap, gates
   dejaview-cli/                 the binary
 tools/python/                   dejaview-tools uv project (MCP server, segmenter, MODEL.md, uv.lock, bundle build, tests)
-rules/                          base rule sets and profiles/, embedded at build time
-providers/
-  profiles/*.toml               endpoint profiles, embedded
-  catalog.toml                  model catalog, embedded
-prompts/                        versioned system prompt templates
+scripts/                        repository checks, the credential scanner, publish, install-from-registry, archive and live smoke scripts
 schemas/                        generated JSON Schemas: submission, envelope, manifest, config, report, tools/
 fixtures/
   adapters/<adapter>/           recorded conversations per capability combination
@@ -1547,8 +1590,10 @@ explicit commands.
 
 ## Open questions
 
-1. Exact image limits, prices, capabilities and strict-schema keyword lists per model, read from
-   the providers' documentation and model lists at M2 and pinned in the catalog.
+1. Closed 2026-10-27 (M2 checkpoint): image limits, prices, capabilities and strict-schema
+   keyword lists per model were read from the providers' documentation on the catalog's
+   `verified` dates and re-verified by the recordings; what the documentation did not state is
+   listed in docs/provider-data.md with the recording that confirmed or corrected it.
 2. Whether `rmcp` meets the MCP needs listed under Transports; ADR at M4.
 3. Which image models generate the public sets and under which licence; decided with the first
    set in M3 and recorded per item.

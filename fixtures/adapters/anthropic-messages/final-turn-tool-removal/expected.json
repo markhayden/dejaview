@@ -1,0 +1,15 @@
+{
+  "model": "claude-opus-5-5",
+  "terminal": "verdict",
+  "verdict": "unsure",
+  "error": null,
+  "repairs": [
+    [
+      "rejected",
+      "invalid_submission"
+    ]
+  ],
+  "turns": 3,
+  "tool_calls": 1,
+  "cost_usd": 0.09365199999999999
+}

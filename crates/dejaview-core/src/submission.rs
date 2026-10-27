@@ -32,9 +32,11 @@ pub struct Submission {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ItemDisposition {
+    /// The checklist item id exactly as listed, for example `chk:ob:SF1@candidate`.
     pub id: String,
     pub disposition: Disposition,
     pub confidence: Confidence,
+    /// One to a few sentences; at most 600 characters.
     pub reason: String,
     /// Exemption id; required when `disposition = allowed_change`, null otherwise.
     pub allowed_by: Option<String>,
@@ -43,16 +45,22 @@ pub struct ItemDisposition {
     pub evidence: Vec<String>,
 }
 
-/// Something the model noticed beyond the checklist.
+/// Something the model noticed beyond the checklist: a violation or allowed change not covered by
+/// an item, or an observation under an `observe` rule.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Finding {
+    /// One to eight rule ids as numbered under Obligations, for example `SF4`; never checklist item ids.
     pub obligation_ids: Vec<String>,
     pub disposition: FindingDisposition,
     pub confidence: Confidence,
+    /// One to a few sentences; at most 600 characters.
     pub reason: String,
+    /// Exemption id when `disposition = allowed_change`, null otherwise.
     pub allowed_by: Option<String>,
+    /// Where it is; findings always have a location.
     pub location: Location,
+    /// Tool call ids from this run used as evidence.
     pub evidence: Vec<String>,
 }
 
@@ -81,7 +89,9 @@ impl From<FindingDisposition> for Disposition {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Opinion {
+    /// Your own overall call: `pass`, `fail` or `unsure`.
     pub verdict: String,
+    /// At most 600 characters.
     pub reason: String,
 }
 
@@ -277,17 +287,24 @@ fn validate_findings(sub: &Submission, ctx: &ValidationContext<'_>) -> Result<()
             } else if let Some(ob) = ctx.resolved.observations.iter().find(|o| &o.id == id) {
                 if !ob.targets.iter().any(|t| Some(t) == root.as_ref()) {
                     return Err(Error::Submission(format!(
-                        "{tag}: observation {id} is not on image {root:?}"
+                        "{tag}: observation {id} is not on image {}",
+                        root.as_deref().unwrap_or("?")
                     )));
                 }
                 cited_observe += 1;
-            } else if ctx.resolved.exemptions.iter().any(|e| &e.id == id) {
-                return Err(Error::Submission(format!(
-                    "{tag}: {id} is an exemption; cite the obligation it waives and name it in allowed_by"
-                )));
+            } else if let Some(ex) = ctx.resolved.exemptions.iter().find(|e| &e.id == id) {
+                return Err(Error::Submission(if ex.waives.is_empty() {
+                    format!(
+                        "{tag}: {id} waives nothing; cite the obligation the change bears on, or an observe rule"
+                    )
+                } else {
+                    format!(
+                        "{tag}: {id} is an exemption; cite the obligation it waives and name it in allowed_by"
+                    )
+                }));
             } else {
                 return Err(Error::Submission(format!(
-                    "{tag}: unknown obligation {id:?}"
+                    "{tag}: unknown obligation {id:?}; obligation_ids take rule ids as numbered under Obligations (for example SF4), not checklist item ids"
                 )));
             }
         }
@@ -295,7 +312,7 @@ fn validate_findings(sub: &Submission, ctx: &ValidationContext<'_>) -> Result<()
             FindingDisposition::Observed => {
                 if !mandatory_instances.is_empty() || cited_observe == 0 {
                     return Err(Error::Submission(format!(
-                        "{tag}: an observed finding cites only observe obligations"
+                        "{tag}: `observed` findings cite observe rules only (such as SF4); a mandatory rule takes violation, allowed_change or cant_tell"
                     )));
                 }
                 if f.allowed_by.is_some() {
@@ -375,6 +392,12 @@ fn check_exemption_applies(
         let inst = ctx.resolved.instance(inst_id).ok_or_else(|| {
             Error::Submission(format!("{who}: internal: unknown instance {inst_id}"))
         })?;
+        if ex.waives.is_empty() {
+            return Err(Error::Submission(format!(
+                "{who}: {allowed_by} waives nothing and is never an allowed_by; if {} still holds there, the item is `held`",
+                inst.obligation_id
+            )));
+        }
         if !ex.applies_to(&inst.obligation_id, &inst.target) {
             return Err(Error::Submission(format!(
                 "{who}: exemption {allowed_by} does not waive {} on {}",

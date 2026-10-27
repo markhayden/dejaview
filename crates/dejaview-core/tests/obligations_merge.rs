@@ -362,6 +362,8 @@ fn job_requirement_ids_must_start_with_rq() {
 #[test]
 fn shipped_files_are_the_ones_on_disk() {
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let disk = std::fs::read_to_string(root.join("rules/source-fidelity.toml")).unwrap();
+    let disk =
+        std::fs::read_to_string(root.join("crates/dejaview-core/rules/source-fidelity.toml"))
+            .unwrap();
     assert_eq!(shipped("source-fidelity").unwrap(), disk);
 }

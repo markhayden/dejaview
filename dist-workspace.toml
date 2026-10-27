@@ -1,0 +1,22 @@
+[workspace]
+members = ["cargo:."]
+
+# Binary distribution (PLAN.md task 2.10b): `dist` builds the `dejaview` archives on a version tag,
+# runs the archive smoke on every architecture before anything is released (host-jobs), and
+# publishes them as a GitHub release. `dist generate` rewrites .github/workflows/release.yml from
+# this file; never edit that workflow by hand.
+[dist]
+# The pinned dist version, also pinned in the justfile (`just bootstrap`).
+cargo-dist-version = "0.33.1"
+ci = "github"
+# Archives only; `cargo install dejaview` is the other supported path (docs/bootstrap.md).
+installers = []
+targets = ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
+hosting = "github"
+# A pull request builds and uploads the archives without releasing: the release dry run.
+pr-run-mode = "upload"
+# The offline smoke on each archive, on its own architecture, as the one publish job; the GitHub
+# release is created at announce, which runs only when that job passed, prereleases included.
+publish-jobs = ["./archive-smoke"]
+publish-prereleases = true
+github-release = "announce"

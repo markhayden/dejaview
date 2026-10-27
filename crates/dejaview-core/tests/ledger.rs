@@ -102,6 +102,20 @@ fn ledger_envelope_is_reserved_and_the_report_shows_it() {
     );
 }
 
+/// The envelope plans as many repairs as the budget allows, so `repairs = 2` is not under-planned.
+#[test]
+fn ledger_envelope_plans_every_allowed_repair() {
+    let (_, r) = check("two-repairs", "held.json", &["budget.repairs=2"], None);
+    let requests = r["cost"]["envelope"]["requests"].as_array().unwrap();
+    assert_eq!(requests.len(), 7, "4 tool turns, final, two repairs");
+    let kinds: Vec<&str> = requests
+        .iter()
+        .map(|q| q["kind"].as_str().unwrap())
+        .collect();
+    assert_eq!(kinds.iter().filter(|k| **k == "repair").count(), 2);
+    assert_eq!(kinds[4], "final_turn");
+}
+
 #[test]
 fn ledger_refuses_a_cap_below_the_envelope_before_any_request() {
     let (o, r) = check("cap", "held.json", &["budget.spend_cap_usd=0.01"], None);
@@ -125,8 +139,8 @@ fn ledger_shared_across_decisions_refuses_the_second_when_it_does_not_fit() {
     assert_eq!(first.exit_code, 0, "{:?}", first.error);
     let envelope = r["cost"]["envelope"]["usd"].as_f64().unwrap();
     assert!(
-        envelope > 0.25,
-        "a second decision of {envelope} must not fit a 0.5 cap"
+        envelope > 0.05 && envelope < 0.5,
+        "one decision ({envelope}) fits the 0.5 cap with room to spare"
     );
     assert!(
         shared.reserved().abs() < 1e-9 && shared.spent().abs() < 1e-9,

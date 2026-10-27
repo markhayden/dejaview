@@ -67,9 +67,6 @@ pub struct KeyImage {
     pub prep_version: String,
 }
 
-/// The preparation the images went through (task 2.3 adds per-model preparation).
-pub const PREP_VERSION: &str = "canonical";
-
 impl KeyInput {
     /// Gathers the key inputs from a resolved decision.
     pub fn gather(
@@ -78,9 +75,11 @@ impl KeyInput {
         images: &[CanonicalImage],
         prepared: &Prepared,
         tools: &ToolRegistry,
-        adapter: &str,
+        provider: &dyn crate::provider::Provider,
         harness_version: &str,
     ) -> KeyInput {
+        let adapter = provider.id();
+        let prep_version = provider.prep_version();
         KeyInput {
             use_case: job.use_case.clone(),
             brief: job.brief.clone(),
@@ -93,7 +92,7 @@ impl KeyInput {
                     projection: i.projection,
                     sha256: i.sha256.clone(),
                     canonical_sha256: i.canonical_sha256.clone(),
-                    prep_version: PREP_VERSION.into(),
+                    prep_version: prep_version.to_string(),
                 })
                 .collect(),
             rules: prepared.summary.clone(),

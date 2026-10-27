@@ -8,7 +8,7 @@ use crate::obligations::{Kind, Resolved};
 pub const PROMPT_VERSION: &str = "v1";
 
 /// The versioned prompt template, embedded at build time.
-pub const TEMPLATE: &str = include_str!("../../../prompts/v1.md");
+pub const TEMPLATE: &str = include_str!("../prompts/v1.md");
 
 /// The numbered Obligations section: rules first, then job requirements, each with its targets
 /// (and evidence) named, kinds in words; then the brief in a delimited data block; then the
@@ -70,7 +70,10 @@ pub fn obligations_section(resolved: &Resolved, job: &Job) -> String {
                 clean(&ex.text)
             );
             if ex.waives.is_empty() {
-                line.push_str(" This states what may change; it waives no obligation above.");
+                line.push_str(
+                    " This states what may change; it waives nothing and is never an `allowed_by`. \
+                     Where such a change leaves the obligations above intact, mark the item `held`.",
+                );
             } else {
                 line.push_str(&format!(" May waive: {}.", clean(&ex.waives.join(", "))));
                 if let Some(c) = &ex.condition {

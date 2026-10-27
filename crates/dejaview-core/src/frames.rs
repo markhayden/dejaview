@@ -11,16 +11,24 @@ use serde::{Deserialize, Serialize};
 use crate::job::Projection;
 use crate::{Error, Result};
 
-/// A location as a tagged record with nullable fields (see SPEC "Frames and locations").
+/// A location as a tagged record with nullable fields (see SPEC "Frames and locations"). The
+/// fields `kind` needs are set; every other field is null.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Location {
+    /// A frame id as given in the conversation, for example `raw:candidate` or a crop a tool returned.
     pub frame: String,
+    /// `bbox` and `polygon` take coordinates; `view` takes yaw, pitch and fov; `whole_image` and `absent` take nothing.
     pub kind: LocationKind,
+    /// `[left, top, right, bottom]` as fractions of the frame's width and height, each between 0 and 1 (never pixels).
     pub bbox: Option<[f64; 4]>,
+    /// Three to sixty-four `[x, y]` points as fractions of the frame's width and height, between 0 and 1.
     pub polygon: Option<Vec<[f64; 2]>>,
+    /// Degrees, -180 to 180, for `view` on an equirectangular frame.
     pub yaw: Option<f64>,
+    /// Degrees, -90 to 90, for `view`.
     pub pitch: Option<f64>,
+    /// Degrees, 10 to 120, for `view`.
     pub fov: Option<f64>,
 }
 

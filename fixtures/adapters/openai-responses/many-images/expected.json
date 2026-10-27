@@ -1,0 +1,10 @@
+{
+  "model": "gpt-6.1-terra",
+  "terminal": "verdict",
+  "verdict": "pass",
+  "error": null,
+  "repairs": [],
+  "turns": 1,
+  "tool_calls": 0,
+  "cost_usd": 0.160278
+}

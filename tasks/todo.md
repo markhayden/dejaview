@@ -38,21 +38,26 @@ tag.
 - [x] Checkpoint M1 → tag `m1` (2026-10-26; `just check` under a minute, docs filled, review and coverage passes applied: docs/reviews/m1-checkpoint.md)
 
 ## M2 Provider adapters
-- [ ] 2.1 Model catalog and capability validation
-- [ ] 2.2 Wire schema transformations
-- [ ] 2.3 Image preparation and preflight
-- [ ] 2.4 Privacy enforcement before any live call
-- [ ] 2.5a Anthropic adapter and replay harness
-- [ ] 2.5b Anthropic recordings → tag `m2.1`
-- [ ] 2.6a Gemini adapter
-- [ ] 2.6b Gemini recordings
-- [ ] 2.7a OpenAI adapter
-- [ ] 2.7b OpenAI recordings
+- [x] 2.1 Model catalog and capability validation
+- [x] 2.2 Wire schema transformations
+- [x] 2.3 Image preparation and preflight
+- [x] 2.4 Privacy enforcement before any live call
+- [x] 2.5a Anthropic adapter and replay harness
+- [x] 2.5b Anthropic recordings → tag `m2.1`
+- [x] 2.6a Gemini adapter
+- [x] 2.6b Gemini recordings
+- [x] 2.7a OpenAI adapter
+- [x] 2.7b OpenAI recordings
+- [x] Follow-up from the recordings: models cited the `SF3` exemption in `allowed_by`; the rule text no longer asks them to cite anything, the rendered hint and the rejection name `held` as the disposition to use, and every vendor was re-recorded (2026-10-27)
 - [ ] 2.8 Gateway profile candidates (optional)
-- [ ] 2.9 provider-data.md
-- [ ] 2.10a Packaging for the registry
-- [ ] 2.10b Binary distribution and live smoke
-- [ ] Checkpoint M2 → tag `m2`
+- [x] 2.9 provider-data.md
+- [x] 2.10a Packaging for the registry
+- [x] 2.10b Binary distribution and live smoke (record: docs/reviews/m2-live-smoke.md)
+- [x] Follow-up from the live smoke: the default budget planned an envelope above the default cap on Gemini 3.8 Flash and GPT-6.1 Terra; resolved by the envelope change above
+- [x] Checkpoint M2 review passes (docs/reviews/m2-checkpoint.md); owner review, merge and tag `m2` are the owner's
+- [x] From the M2 review (owner 2026-10-27: "do whatever you need to do"): the envelope plans each request once plus a per-run retry reserve of `retries ×` the largest bound, and a retry the balance cannot cover is refused with `error: budget`; the defaults now fit every shipped model and the examples are back on them
+- [ ] 4.1 follow-up: a run whose tool images can carry the history past `many_image_threshold` fails preflight mid-run with `error: image_limit` after money is spent; at resolve, either prepare at `many_image_max_dimension_px` when the worst case can pass the threshold (and record it in `prep_version`) or refuse before the first call
+- [ ] Recorded from the M2 review, not fixed: transport-error excerpts (up to 2 KB of a provider's error body) reach the journal and stderr without the redaction pass (the credential is never in a response body, so nothing has leaked; route them through the redaction list when the journal gains a redaction step); the `dist` installer in the `package` workflow is fetched by `curl | sh` without a checksum, as the generated release workflow does
 
 ## M3 Evaluation sets and baseline
 - [ ] 3.1 Set manifests, check, fetch, seal

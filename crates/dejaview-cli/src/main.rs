@@ -1,6 +1,7 @@
 //! The `dejaview` binary: argument parsing and wiring only. All behaviour lives in the library
 //! crates.
 
+mod catalog;
 mod eval;
 mod report;
 
@@ -44,6 +45,8 @@ enum Command {
     Report(report::ReportArgs),
     /// Evaluation: the admission gate on a result table (the runner arrives with M3).
     Eval(eval::EvalArgs),
+    /// The model catalog: limits, prices, capabilities and sources per model.
+    Catalog(catalog::CatalogArgs),
 }
 
 #[derive(clap::Args)]
@@ -138,6 +141,13 @@ struct CheckArgs {
     /// without calling any provider.
     #[arg(long)]
     dry_run: bool,
+    /// Replay a recorded conversation (a directory of exchanges) instead of calling the provider;
+    /// no credential is needed and nothing leaves the machine.
+    #[arg(long, value_name = "DIR", conflicts_with = "record")]
+    replay: Option<PathBuf>,
+    /// Record every exchange with the provider into this directory, secrets stripped.
+    #[arg(long, value_name = "DIR")]
+    record: Option<PathBuf>,
     /// Scripted fake provider responses, for tests and debugging only.
     #[cfg(feature = "testkit")]
     #[arg(long)]
@@ -167,18 +177,35 @@ fn main() {
         })) => tools_setup(&args),
         Some(Command::Report(args)) => report::run(&args),
         Some(Command::Eval(args)) => eval::run(&args),
+        Some(Command::Catalog(args)) => catalog::run(&args),
     };
     std::process::exit(code);
 }
 
 fn check(args: &CheckArgs) -> i32 {
-    let config = match Config::load_with_overrides(&args.config, &args.overrides) {
+    let mut config = match Config::load_with_overrides(&args.config, &args.overrides) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("dejaview: {e}");
             return EXIT_USAGE;
         }
     };
+    // Resolve-time checks against the catalog (profile, model, controls, image size, allowances)
+    // and the consent binding. The scripted pair passes in testkit builds, and in a dry run,
+    // where nothing is sent.
+    if let Err(e) = dejaview_providers::catalog::Catalog::shipped().and_then(|c| {
+        c.check_config(&config, cfg!(feature = "testkit") || args.dry_run)?;
+        match c.profile(&config.provider.profile) {
+            Some(profile) => {
+                dejaview_providers::privacy::consent(&config, &config.provider.profile, profile)
+                    .map(|_| ())
+            }
+            None => Ok(()),
+        }
+    }) {
+        eprintln!("dejaview: {e}");
+        return EXIT_USAGE;
+    }
     let job = match load_job(args) {
         Ok(j) => j,
         Err(e) => {
@@ -193,6 +220,12 @@ fn check(args: &CheckArgs) -> i32 {
             return EXIT_USAGE;
         }
     };
+    // Every enabled tool and `submit_verdict` must have a wire form for the selected model, and
+    // the set must fit the provider's limits, before any billable request.
+    if let Err(e) = check_wire_schemas(&config, &tools) {
+        eprintln!("dejaview: {e}");
+        return EXIT_USAGE;
+    }
     if args.dry_run {
         return match dejaview_core::run::resolve_rules(&config, &job, Path::new("."), &tools) {
             Ok(p) => {
@@ -225,7 +258,7 @@ fn check(args: &CheckArgs) -> i32 {
             }
         };
     }
-    let provider: Box<dyn Provider> = match select_provider(args) {
+    let provider: Box<dyn Provider> = match select_provider(args, &mut config) {
         Ok(p) => p,
         Err(message) => {
             eprintln!("dejaview: {message}");
@@ -249,7 +282,13 @@ fn check(args: &CheckArgs) -> i32 {
         }
     };
     let cancel = std::sync::Arc::new(Cancel::new());
-    runtime.spawn(cancel_on_signal(std::sync::Arc::clone(&cancel)));
+    // The handlers are registered here, before the run starts, so a signal that lands during the
+    // run's first synchronous work is caught rather than taking the process down.
+    let signals = {
+        let _guard = runtime.enter();
+        install_signal_handlers()
+    };
+    runtime.spawn(cancel_on_signal(signals, std::sync::Arc::clone(&cancel)));
     let services = Services::new(provider.as_ref(), &tools).with_cancel(&cancel);
     let outcome = runtime.block_on(dejaview_core::run::check(
         &config, &job, job_base, &services, &out_dir, VERSION,
@@ -286,23 +325,47 @@ fn check(args: &CheckArgs) -> i32 {
     }
 }
 
+/// The registered signal streams (unix) or nothing (elsewhere, where `ctrl_c` registers on await).
+#[cfg(unix)]
+type Signals = Option<(tokio::signal::unix::Signal, tokio::signal::unix::Signal)>;
+#[cfg(not(unix))]
+type Signals = ();
+
+/// Registers SIGINT and SIGTERM with the runtime; must run inside a runtime context.
+#[cfg(unix)]
+fn install_signal_handlers() -> Signals {
+    use tokio::signal::unix::{SignalKind, signal};
+    match (
+        signal(SignalKind::interrupt()),
+        signal(SignalKind::terminate()),
+    ) {
+        (Ok(int), Ok(term)) => Some((int, term)),
+        _ => None,
+    }
+}
+
+#[cfg(not(unix))]
+fn install_signal_handlers() -> Signals {}
+
 /// SIGINT or SIGTERM cancels the run; it appends `cancelled` and exits 3.
-async fn cancel_on_signal(cancel: std::sync::Arc<Cancel>) {
+async fn cancel_on_signal(signals: Signals, cancel: std::sync::Arc<Cancel>) {
     #[cfg(unix)]
     {
-        use tokio::signal::unix::{SignalKind, signal};
-        let Ok(mut term) = signal(SignalKind::terminate()) else {
-            let _ = tokio::signal::ctrl_c().await;
-            cancel.cancel();
-            return;
-        };
-        tokio::select! {
-            _ = tokio::signal::ctrl_c() => {}
-            _ = term.recv() => {}
+        match signals {
+            Some((mut int, mut term)) => {
+                tokio::select! {
+                    _ = int.recv() => {}
+                    _ = term.recv() => {}
+                }
+            }
+            None => {
+                let _ = tokio::signal::ctrl_c().await;
+            }
         }
     }
     #[cfg(not(unix))]
     {
+        let _ = signals;
         let _ = tokio::signal::ctrl_c().await;
     }
     cancel.cancel();
@@ -345,22 +408,87 @@ fn load_job(args: &CheckArgs) -> Result<Job, String> {
     }
 }
 
-#[cfg(feature = "testkit")]
-fn select_provider(args: &CheckArgs) -> Result<Box<dyn Provider>, String> {
-    match &args.provider_script {
-        Some(path) => dejaview_testkit::ScriptedProvider::from_path(path)
+/// The provider for this run: the scripted fake (testkit builds, `--provider-script`), a replay of
+/// a recorded conversation, or the live adapter for the configured profile and model over HTTPS,
+/// optionally recording every exchange. The credential joins the redaction list before any run.
+fn select_provider(args: &CheckArgs, config: &mut Config) -> Result<Box<dyn Provider>, String> {
+    use std::sync::Arc;
+
+    use dejaview_providers::anthropic::AnthropicProvider;
+    use dejaview_providers::catalog::{Catalog, FAKE_PROFILE};
+    use dejaview_providers::http::{Client, Transport};
+    use dejaview_providers::privacy::credential;
+    use dejaview_providers::replay::{Player, Recorder};
+    #[cfg(feature = "testkit")]
+    if let Some(path) = &args.provider_script {
+        return dejaview_testkit::ScriptedProvider::from_path(path)
+            .map(|p| Box::new(p) as Box<dyn Provider>)
+            .map_err(|e| e.to_string());
+    }
+    if config.provider.profile == FAKE_PROFILE {
+        return Err("the fake profile runs only with --provider-script in a testkit build".into());
+    }
+    let catalog = Catalog::shipped().map_err(|e| e.to_string())?;
+    let profile = catalog.profile(&config.provider.profile).ok_or_else(|| {
+        format!(
+            "profile {:?} is not in the catalog",
+            config.provider.profile
+        )
+    })?;
+    let model = catalog
+        .model(&config.provider.model)
+        .ok_or_else(|| format!("model {:?} is not in the catalog", config.provider.model))?;
+    // Which request headers and body pointers a recording treats as volatile is the adapter's.
+    let volatile = match model.adapter.as_str() {
+        "anthropic-messages" => AnthropicProvider::volatile(),
+        "gemini-generate-content" => dejaview_providers::gemini::GeminiProvider::volatile(),
+        "openai-responses" => dejaview_providers::openai::OpenAiProvider::volatile(),
+        other => return Err(format!("adapter {other} is not implemented")),
+    };
+    let (cred, transport): (_, Arc<dyn Transport>) = match &args.replay {
+        Some(dir) => {
+            let cred =
+                credential(profile, &|_| Some("replay".into())).map_err(|e| e.to_string())?;
+            let player = Player::load(dir, volatile).map_err(|e| e.to_string())?;
+            (cred, Arc::new(player))
+        }
+        None => {
+            let cred =
+                credential(profile, &|name| std::env::var(name).ok()).map_err(|e| e.to_string())?;
+            config.secrets.push(cred.expose().to_string());
+            let client = Client::new(std::time::Duration::from_secs(
+                config.budget.request_timeout_s,
+            ))
+            .map_err(|e| e.to_string())?;
+            let base: Arc<dyn Transport> = Arc::new(client);
+            match &args.record {
+                Some(dir) => {
+                    let recorder =
+                        Recorder::new(base, dir, vec![cred.expose().to_string()], volatile)
+                            .map_err(|e| e.to_string())?;
+                    (cred, Arc::new(recorder))
+                }
+                None => (cred, base),
+            }
+        }
+    };
+    let id = &config.provider.profile;
+    match model.adapter.as_str() {
+        "anthropic-messages" => AnthropicProvider::new(config, id, profile, model, cred, transport)
             .map(|p| Box::new(p) as Box<dyn Provider>)
             .map_err(|e| e.to_string()),
-        None => Err(
-            "no provider adapter is available yet (adapters arrive in M2); pass --provider-script"
-                .into(),
-        ),
+        "gemini-generate-content" => dejaview_providers::gemini::GeminiProvider::new(
+            config, id, profile, model, cred, transport,
+        )
+        .map(|p| Box::new(p) as Box<dyn Provider>)
+        .map_err(|e| e.to_string()),
+        "openai-responses" => dejaview_providers::openai::OpenAiProvider::new(
+            config, id, profile, model, cred, transport,
+        )
+        .map(|p| Box::new(p) as Box<dyn Provider>)
+        .map_err(|e| e.to_string()),
+        other => Err(format!("adapter {other} is not implemented")),
     }
-}
-
-#[cfg(not(feature = "testkit"))]
-fn select_provider(_args: &CheckArgs) -> Result<Box<dyn Provider>, String> {
-    Err("no provider adapter is available yet (adapters arrive in M2)".into())
 }
 
 fn rules_show(args: &RulesShowArgs) -> i32 {
@@ -442,6 +570,33 @@ fn rules_show(args: &RulesShowArgs) -> i32 {
             EXIT_USAGE
         }
     }
+}
+
+/// The wire transformation of every tool definition for the configured model (SPEC "Wire
+/// schemas"). The scripted pair has no adapter and nothing to check.
+fn check_wire_schemas(
+    config: &Config,
+    tools: &dejaview_core::tool::ToolRegistry,
+) -> dejaview_core::Result<()> {
+    use dejaview_providers::catalog::{Catalog, FAKE_MODEL};
+    use dejaview_providers::wire::{Adapter, check_tool_set};
+    if config.provider.model == FAKE_MODEL {
+        return Ok(());
+    }
+    let catalog = Catalog::shipped()?;
+    let Some(model) = catalog.model(&config.provider.model) else {
+        return Ok(());
+    };
+    let Some(adapter) = Adapter::parse(&model.adapter) else {
+        return Err(dejaview_core::Error::Config(format!(
+            "catalog: model {:?} names an adapter this build lacks: {}",
+            config.provider.model, model.adapter
+        )));
+    };
+    let mut definitions: Vec<dejaview_core::provider::ToolDefinition> =
+        tools.manifests().map(|m| m.tool_definition()).collect();
+    definitions.push(dejaview_core::submission::submit_verdict_tool());
+    check_tool_set(adapter, &model.capabilities, &definitions).map(|_| ())
 }
 
 /// The tools this build knows. Built-ins arrive in M4; the fake tool exists behind `testkit`.

@@ -4,7 +4,7 @@ Rules:
 1. RC1 (must hold; judges candidate; consults ref:pip, ref:bridge) Each reference subject appears in the candidate as the same individual: species or type, build, proportions and distinctive markings match the reference.
 2. RC2 (must hold; judges candidate; consults ref:pip, ref:bridge) Distinctive markings, patterns, colours and features visible in a reference are present and unchanged wherever the subject is visible.
 3. RC3 (must hold; judges candidate; consults ref:pip, ref:bridge) No reference subject is duplicated, merged with another subject, or replaced by a lookalike.
-4. RC4 (allowed; on candidate) Pose, expression, viewpoint, lighting and the surrounding scene may differ from the reference. This states what may change; it waives no obligation above.
+4. RC4 (allowed; on candidate) Pose, expression, viewpoint, lighting and the surrounding scene may differ from the reference. This states what may change; it waives nothing and is never an `allowed_by`. Where such a change leaves the obligations above intact, mark the item `held`.
 5. RC5 (observe; on candidate) Any other difference from a reference is noted with its location. Report such things as `observed` findings; they never change the verdict.
 
 Job requirements:

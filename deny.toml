@@ -17,6 +17,7 @@ allow = [
   "0BSD",
   "Unlicense",
   "MPL-2.0",   # file-level copyleft; acceptable for a binary that does not modify such files
+  "CDLA-Permissive-2.0",   # Mozilla's root-certificate data, bundled by rustls-platform-verifier
 ]
 
 [advisories]
@@ -25,6 +26,9 @@ yanked = "deny"
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+# A path-only dev-dependency has no version and counts as a wildcard; `cargo publish` drops it,
+# which is how the core crate's dev-dependency on the testkit avoids a publish cycle.
+allow-wildcard-paths = true
 
 [sources]
 unknown-registry = "deny"

@@ -1,0 +1,283 @@
+{
+  "adapter": "anthropic-messages",
+  "wire_version": 1,
+  "strict": true,
+  "schema": {
+    "$defs": {
+      "Confidence": {
+        "enum": [
+          "confident",
+          "tentative"
+        ],
+        "type": "string"
+      },
+      "Disposition": {
+        "enum": [
+          "violation",
+          "held",
+          "allowed_change",
+          "hidden",
+          "cant_tell",
+          "observed"
+        ],
+        "type": "string"
+      },
+      "Finding": {
+        "additionalProperties": false,
+        "description": "Something the model noticed beyond the checklist: a violation or allowed change not covered by\nan item, or an observation under an `observe` rule.",
+        "properties": {
+          "allowed_by": {
+            "description": "Exemption id when `disposition = allowed_change`, null otherwise.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confidence": {
+            "$ref": "#/$defs/Confidence"
+          },
+          "disposition": {
+            "$ref": "#/$defs/FindingDisposition"
+          },
+          "evidence": {
+            "description": "Tool call ids from this run used as evidence.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "location": {
+            "$ref": "#/$defs/Location",
+            "description": "Where it is; findings always have a location."
+          },
+          "obligation_ids": {
+            "description": "One to eight rule ids as numbered under Obligations, for example `SF4`; never checklist item ids.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "reason": {
+            "description": "One to a few sentences; at most 600 characters.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "allowed_by",
+          "confidence",
+          "disposition",
+          "evidence",
+          "location",
+          "obligation_ids",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "FindingDisposition": {
+        "description": "Dispositions a finding may carry. `held` and `hidden` belong to checklist items only.",
+        "enum": [
+          "violation",
+          "allowed_change",
+          "cant_tell",
+          "observed"
+        ],
+        "type": "string"
+      },
+      "ItemDisposition": {
+        "additionalProperties": false,
+        "description": "What the model said about one checklist item. Items carry no obligation ids: the checklist\nowns them.",
+        "properties": {
+          "allowed_by": {
+            "description": "Exemption id; required when `disposition = allowed_change`, null otherwise.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confidence": {
+            "$ref": "#/$defs/Confidence"
+          },
+          "disposition": {
+            "$ref": "#/$defs/Disposition"
+          },
+          "evidence": {
+            "description": "Tool call ids from this run used as evidence.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "description": "The checklist item id exactly as listed, for example `chk:ob:SF1@candidate`.",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Location"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "description": "One to a few sentences; at most 600 characters.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "allowed_by",
+          "confidence",
+          "disposition",
+          "evidence",
+          "id",
+          "location",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "Location": {
+        "additionalProperties": false,
+        "description": "A location as a tagged record with nullable fields (see SPEC \"Frames and locations\"). The\nfields `kind` needs are set; every other field is null.",
+        "properties": {
+          "bbox": {
+            "description": "`[left, top, right, bottom]` as fractions of the frame's width and height, each between 0 and 1 (never pixels).",
+            "items": {
+              "type": "number"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "fov": {
+            "description": "Degrees, 10 to 120, for `view`.",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "frame": {
+            "description": "A frame id as given in the conversation, for example `raw:candidate` or a crop a tool returned.",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/$defs/LocationKind",
+            "description": "`bbox` and `polygon` take coordinates; `view` takes yaw, pitch and fov; `whole_image` and `absent` take nothing."
+          },
+          "pitch": {
+            "description": "Degrees, -90 to 90, for `view`.",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "polygon": {
+            "description": "Three to sixty-four `[x, y]` points as fractions of the frame's width and height, between 0 and 1.",
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "yaw": {
+            "description": "Degrees, -180 to 180, for `view` on an equirectangular frame.",
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "bbox",
+          "fov",
+          "frame",
+          "kind",
+          "pitch",
+          "polygon",
+          "yaw"
+        ],
+        "type": "object"
+      },
+      "LocationKind": {
+        "enum": [
+          "bbox",
+          "polygon",
+          "view",
+          "whole_image",
+          "absent"
+        ],
+        "type": "string"
+      },
+      "Opinion": {
+        "additionalProperties": false,
+        "description": "Recorded, never read by aggregation.",
+        "properties": {
+          "reason": {
+            "description": "At most 600 characters.",
+            "type": "string"
+          },
+          "verdict": {
+            "description": "Your own overall call: `pass`, `fail` or `unsure`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "verdict"
+        ],
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "The canonical submission, schema version 1. Every property is required; optional values are\nnullable, so the shape survives every provider's strict mode.",
+    "properties": {
+      "findings": {
+        "items": {
+          "$ref": "#/$defs/Finding"
+        },
+        "type": "array"
+      },
+      "items": {
+        "items": {
+          "$ref": "#/$defs/ItemDisposition"
+        },
+        "type": "array"
+      },
+      "opinion": {
+        "$ref": "#/$defs/Opinion"
+      },
+      "schema_version": {
+        "type": "integer"
+      }
+    },
+    "required": [
+      "findings",
+      "items",
+      "opinion",
+      "schema_version"
+    ],
+    "type": "object"
+  },
+  "changes": [
+    "/properties/schema_version/minimum: removed",
+    "/properties/schema_version/format: removed (uint32)",
+    "/$defs/Disposition/oneOf: rewritten as anyOf",
+    "/$defs/Disposition/anyOf: enums merged into one enum",
+    "/$defs/Location/properties/bbox/maxItems: removed",
+    "/$defs/Location/properties/bbox/minItems: removed (only 0 and 1 are accepted)",
+    "/$defs/Location/properties/bbox/items/format: removed (double)",
+    "/$defs/Location/properties/fov/format: removed (double)",
+    "/$defs/Location/properties/pitch/format: removed (double)",
+    "/$defs/Location/properties/polygon/items/maxItems: removed",
+    "/$defs/Location/properties/polygon/items/minItems: removed (only 0 and 1 are accepted)",
+    "/$defs/Location/properties/polygon/items/items/format: removed (double)",
+    "/$defs/Location/properties/yaw/format: removed (double)"
+  ]
+}

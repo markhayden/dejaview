@@ -2,7 +2,7 @@
 
 Rules and job requirements share one model, the **obligation** (`SPEC.md`, "Obligations"). This
 page is the practical version. Code: `crates/dejaview-core/src/obligations.rs`; shipped sets:
-`rules/`.
+`crates/dejaview-core/rules/`, embedded in the binary at build time.
 
 ## An obligation
 
@@ -19,7 +19,8 @@ hidden_ok = false          # mandatory only: `hidden` is recorded instead of uns
 ```
 
 Exemptions (`kind = "allowed"`) add `waives = ["SF1"]` and a `condition`. An exemption with
-`waives = []` only states what may change; it never waives anything. Observations
+`waives = []` only states what may change; it never waives anything and is never named in
+`allowed_by`: a permitted change that leaves an obligation intact is `held`. Observations
 (`kind = "observe"`) never affect the verdict; the model reports them as `observed` findings.
 
 ## Layering

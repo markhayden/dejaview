@@ -1,0 +1,10 @@
+{
+  "model": "gemini-3.8-flash",
+  "terminal": "verdict",
+  "verdict": "pass",
+  "error": null,
+  "repairs": [],
+  "turns": 1,
+  "tool_calls": 0,
+  "cost_usd": 0.00963825
+}

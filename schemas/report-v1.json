@@ -67,6 +67,10 @@
           "description": "SHA-256 of the canonical pixels (8-bit RGB, row-major, after orientation), lowercase hex.",
           "type": "string"
         },
+        "has_alpha": {
+          "description": "Whether the file carried an alpha channel; the plane is kept in `alpha` for preparation.",
+          "type": "boolean"
+        },
         "has_icc_profile": {
           "description": "Whether the file carried an ICC profile (recorded, not applied).",
           "type": "boolean"
@@ -118,6 +122,7 @@
         "canonical_sha256",
         "projection",
         "has_icc_profile",
+        "has_alpha",
         "warnings"
       ],
       "type": "object"
@@ -321,7 +326,7 @@
       "description": "The decision envelope.",
       "properties": {
         "attempts": {
-          "description": "Billable attempts across the decision.",
+          "description": "Billable attempts the envelope can pay for across the decision: every planned request\nonce, plus `retries` per run.",
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
@@ -332,11 +337,16 @@
           "type": "integer"
         },
         "requests": {
-          "description": "One run's requests, in order; every run is planned the same.",
+          "description": "One run's requests, in order, each planned once; every run is planned the same.",
           "items": {
             "$ref": "#/$defs/PlannedRequest"
           },
           "type": "array"
+        },
+        "retry_reserve_usd": {
+          "description": "Per run, what transport retries may draw: `retries` times the largest request bound.",
+          "format": "double",
+          "type": "number"
         },
         "usd": {
           "format": "double",
@@ -347,6 +357,7 @@
         "usd",
         "decision_runs",
         "requests",
+        "retry_reserve_usd",
         "attempts"
       ],
       "type": "object"
@@ -554,9 +565,10 @@
     },
     "Location": {
       "additionalProperties": false,
-      "description": "A location as a tagged record with nullable fields (see SPEC \"Frames and locations\").",
+      "description": "A location as a tagged record with nullable fields (see SPEC \"Frames and locations\"). The\nfields `kind` needs are set; every other field is null.",
       "properties": {
         "bbox": {
+          "description": "`[left, top, right, bottom]` as fractions of the frame's width and height, each between 0 and 1 (never pixels).",
           "items": {
             "format": "double",
             "type": "number"
@@ -569,6 +581,7 @@
           ]
         },
         "fov": {
+          "description": "Degrees, 10 to 120, for `view`.",
           "format": "double",
           "type": [
             "number",
@@ -576,12 +589,15 @@
           ]
         },
         "frame": {
+          "description": "A frame id as given in the conversation, for example `raw:candidate` or a crop a tool returned.",
           "type": "string"
         },
         "kind": {
-          "$ref": "#/$defs/LocationKind"
+          "$ref": "#/$defs/LocationKind",
+          "description": "`bbox` and `polygon` take coordinates; `view` takes yaw, pitch and fov; `whole_image` and `absent` take nothing."
         },
         "pitch": {
+          "description": "Degrees, -90 to 90, for `view`.",
           "format": "double",
           "type": [
             "number",
@@ -589,6 +605,7 @@
           ]
         },
         "polygon": {
+          "description": "Three to sixty-four `[x, y]` points as fractions of the frame's width and height, between 0 and 1.",
           "items": {
             "items": {
               "format": "double",
@@ -604,6 +621,7 @@
           ]
         },
         "yaw": {
+          "description": "Degrees, -180 to 180, for `view` on an equirectangular frame.",
           "format": "double",
           "type": [
             "number",
@@ -723,11 +741,6 @@
       "additionalProperties": false,
       "description": "One planned request of the envelope.",
       "properties": {
-        "attempts": {
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        },
         "bound_usd": {
           "description": "The bound of one attempt.",
           "format": "double",
@@ -743,7 +756,6 @@
       "required": [
         "kind",
         "shape",
-        "attempts",
         "bound_usd"
       ],
       "type": "object"
@@ -978,6 +990,12 @@
               "type": "null"
             }
           ]
+        },
+        "wall_ms": {
+          "description": "Wall time from the first journal line to the last, in milliseconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
         }
       },
       "required": [
@@ -991,7 +1009,8 @@
         "tool_calls",
         "repairs",
         "items",
-        "finding_rows"
+        "finding_rows",
+        "wall_ms"
       ],
       "type": "object"
     },
@@ -1208,7 +1227,20 @@
     },
     "Usage": {
       "properties": {
+        "cache_read_tokens": {
+          "description": "Input tokens served from the provider's prompt cache (priced at the cached rate).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cache_write_tokens": {
+          "description": "Input tokens written to the provider's prompt cache (priced at the cache-write rate).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
         "input_tokens": {
+          "description": "Uncached input tokens.",
           "format": "uint64",
           "minimum": 0,
           "type": "integer"

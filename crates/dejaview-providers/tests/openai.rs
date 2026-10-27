@@ -156,6 +156,29 @@ fn history() -> Vec<Message> {
     ]
 }
 
+/// The Responses API has no error flag on a function result, so a failed call is prefixed.
+#[test]
+fn openai_marks_a_failed_tool_result_in_its_text() {
+    let (p, _) = provider("gpt-6.1-sol", "", json!({}));
+    let mut h = history();
+    if let ContentBlock::ToolResult {
+        is_error, content, ..
+    } = &mut h[2].content[0]
+    {
+        *is_error = true;
+        *content = "regions: no such image".into();
+    }
+    let body = p.build_body(&request(&h, &tools(), &images())).unwrap();
+    let output = body["input"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["type"] == "function_call_output")
+        .unwrap();
+    let text = output["output"][0]["text"].as_str().unwrap();
+    assert_eq!(text, "error: regions: no such image");
+}
+
 fn images() -> BTreeMap<String, Prepared> {
     let mut m = BTreeMap::new();
     m.insert("candidate".to_string(), prepared("candidate", b"JPEG-A"));

@@ -8,8 +8,18 @@ cd "$(dirname "$0")/.."
 repo="$(pwd)"
 version="$(cargo metadata --format-version 1 --no-deps | python3 -I -c 'import json,sys; m=json.load(sys.stdin); print(next(p["version"] for p in m["packages"] if p["name"]=="dejaview"))')"
 cargo package --workspace --locked --allow-dirty
-stage="${REGISTRY_STAGE_DIR:-$(mktemp -d)}"
-rm -rf "$stage"; mkdir -p "$stage/crates" "$stage/.cargo"
+# The stage is a fresh directory: a caller-named one must not already hold anything (it is wiped
+# at the end), otherwise a scratch directory that is removed on exit.
+if [ -n "${REGISTRY_STAGE_DIR:-}" ]; then
+  stage="$REGISTRY_STAGE_DIR"
+  if [ -e "$stage" ] && [ -n "$(ls -A "$stage")" ]; then
+    echo "REGISTRY_STAGE_DIR $stage exists and is not empty; refusing to use it" >&2; exit 1
+  fi
+else
+  stage="$(mktemp -d)"
+fi
+trap 'rm -rf "$stage"' EXIT
+mkdir -p "$stage/crates" "$stage/.cargo"
 for crate in "$repo"/target/package/*-"$version".crate; do tar xzf "$crate" -C "$stage/crates"; done
 {
   echo "[patch.crates-io]"

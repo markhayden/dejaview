@@ -224,6 +224,106 @@ fn catalog_self_test_catches_an_incomplete_entry() {
     );
 }
 
+/// Cache reads are charged at the cached rate, cache writes at the write rate (the input rate
+/// when the catalog states none), and the long-prompt tier is chosen from the whole prompt.
+#[test]
+fn cost_prices_cache_reads_and_writes_and_tiers_on_the_whole_prompt() {
+    let c = Catalog::shipped().unwrap();
+    let haiku = c.model("claude-haiku-5-5").unwrap();
+    // 10k uncached at $0.10, 1M cache reads at $0.01, 1M cache writes at $0.125: below the tier.
+    let cached = haiku.cost(&Usage {
+        input_tokens: 10_000,
+        output_tokens: 0,
+        cache_read_tokens: 1_000_000,
+        cache_write_tokens: 1_000_000,
+    });
+    let uncached = haiku.cost(&Usage {
+        input_tokens: 10_000,
+        output_tokens: 0,
+        ..Default::default()
+    });
+    assert!((uncached - 0.001).abs() < 1e-12, "{uncached}");
+    // The prompt is 2,010,000 tokens, over the 100k threshold: long-tier prices apply
+    // ($0.50 input, $0.05 cached; the write rate has no long tier and stays at $0.125).
+    let expected = 10_000.0 * 0.50 / 1e6 + 1_000_000.0 * 0.05 / 1e6 + 1_000_000.0 * 0.125 / 1e6;
+    assert!((cached - expected).abs() < 1e-9, "{cached} vs {expected}");
+    // A model without a stated write rate charges writes at its input rate.
+    let terra = c.model("gpt-6.1-terra").unwrap();
+    assert!(terra.prices.cache_write_per_million.is_none());
+    let writes = terra.cost(&Usage {
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_read_tokens: 0,
+        cache_write_tokens: 1_000_000,
+    });
+    assert!(
+        (writes - terra.prices.input_per_million).abs() < 1e-9,
+        "{writes}"
+    );
+}
+
+/// A model whose final turn may remove tools must accept a system message mid-conversation,
+/// since that is where the removal blocks travel.
+#[test]
+fn catalog_self_test_ties_tool_removal_to_system_messages() {
+    let text = dejaview_providers::catalog::SHIPPED.replacen(
+        "system_messages_in_history = true\nfinal_turn = [\"refuse\", \"tool_removal\"]",
+        "system_messages_in_history = false\nfinal_turn = [\"refuse\", \"tool_removal\"]",
+        1,
+    );
+    assert_ne!(text, dejaview_providers::catalog::SHIPPED);
+    let err = Catalog::parse(&text).unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("tool_removal but system_messages_in_history is false"),
+        "{err}"
+    );
+}
+
+/// Task 2.1: the self-test names the rule a broken profile or header breaks, one mutation of the
+/// shipped catalog per rule.
+#[test]
+fn catalog_self_test_names_each_broken_profile_rule() {
+    let cases: &[(&str, &str, &str)] = &[
+        (
+            "catalog_version = 1",
+            "catalog_version = 7",
+            "catalog_version must be",
+        ),
+        (
+            "adapter = \"anthropic-messages\"",
+            "adapter = \"anthropic-complete\"",
+            "unknown adapter",
+        ),
+        (
+            "scheme = \"api-key-header\", header = \"x-api-key\"",
+            "scheme = \"basic\", header = \"x-api-key\"",
+            "unknown auth scheme",
+        ),
+        (
+            "account = \"anthropic\"",
+            "account = \"anthropic:org\"",
+            "account must be a plain prefix",
+        ),
+        (
+            "base_url = \"https://api.anthropic.com\"",
+            "base_url = \"http://api.anthropic.com\"",
+            "base_url must be https",
+        ),
+    ];
+    for (from, to, message) in cases {
+        let text = dejaview_providers::catalog::SHIPPED.replacen(from, to, 1);
+        assert_ne!(
+            text,
+            dejaview_providers::catalog::SHIPPED,
+            "{from} not in the catalog"
+        );
+        let err = Catalog::parse(&text).unwrap_err();
+        assert_eq!(err.class(), "resolve", "{err}");
+        assert!(err.to_string().contains(message), "{from} -> {to}: {err}");
+    }
+}
+
 /// Task 2.9: every shipped profile has its data-leaving row in docs/provider-data.md, and every
 /// shipped model is named there, so a new catalog entry cannot ship without its disclosure.
 #[test]

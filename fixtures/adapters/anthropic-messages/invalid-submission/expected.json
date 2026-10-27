@@ -3,13 +3,8 @@
   "terminal": "verdict",
   "verdict": "unsure",
   "error": null,
-  "repairs": [
-    [
-      "rejected",
-      "invalid_submission"
-    ]
-  ],
-  "turns": 2,
+  "repairs": [],
+  "turns": 1,
   "tool_calls": 0,
-  "cost_usd": 0.062772
+  "cost_usd": 0.030392
 }

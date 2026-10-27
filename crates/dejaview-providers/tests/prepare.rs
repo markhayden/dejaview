@@ -246,6 +246,27 @@ fn preflight_counts_tool_images_and_fails_at_the_many_image_threshold_before_sen
     assert_eq!(preflight(&lim, &request(&twenty, &big)).unwrap().images, 20);
 }
 
+/// One image over the model's per-request count is refused before sending, whatever its size.
+#[test]
+fn preflight_refuses_one_image_over_the_per_request_count() {
+    let lim = limits("claude-haiku-5-5");
+    let count = lim.max_per_request + 1;
+    let ids: Vec<String> = (0..count).map(|i| format!("img{i}")).collect();
+    let history = conversation(&ids);
+    let mut set = BTreeMap::new();
+    for id in &ids {
+        set.insert(id.clone(), fake_prepared(id, 64, 1_000));
+    }
+    let err = preflight(&lim, &request(&history, &set)).unwrap_err();
+    assert!(
+        err.to_string().contains(&format!(
+            "{count} images in the request exceed the model's limit of {} per request",
+            lim.max_per_request
+        )),
+        "{err}"
+    );
+}
+
 #[test]
 fn preflight_enforces_count_bytes_dimensions_and_formats() {
     let lim = limits("gemini-4-argon");

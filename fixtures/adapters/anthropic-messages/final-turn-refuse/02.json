@@ -50,12 +50,15 @@
         {
           "content": [
             {
-              "signature": "CAQS1QcKEAgTGAI4AUIIdGhpbmtpbmcSDEBmPuvXhdR8Admj1BoMtae+d+pdZNM1jfyhIjBcgCgRSh6WUeU7mgI0lQ9OqNm2x/knGZjXSKoeQb/D9vdkCOQXmVCjMTFlZc48IZIq8gYl80bKKAQrKUHHD4piuMOJMEmoEGpPrWrNiPFMQ/ZzvwVe6RMSZpO4GGFNn+uzWl4uxGNYrHvm1CW5Ad//bZtR8U1PBfJlyzAyvlNq+0Xhd/w32EV8q9sln2bWQ8z8WZJu0bP0hzOK8FKeZFWDBX7w+1GEdD6jcwVSpY/ZQYQozifJj4X2JnQm8vFswlQmiQcXeIyMMucEM6bCMMYKCe90VPm8eT3D8vflCR4O7lQEMSOBRGFH2kfYbxDXwAokZiwYbQ2ct+HaVUe3tvLorPArCdL/RFy9UxNYdmxdBjYjhwE5xIOT7KuDOmJLkO2HFEwWM3l/RTxIZmsoqAQu6c6oThIU3BSsA5mAyMxMrSkbtUYQ/msGbuyGOARq6jwPhNT68/qFl/bU0jfGQpgGvYPRm0Ne+tgRmEdYCbhnanS7Y2jHVIqkWHhtHvcrBPMjftr4sQx4opiSDL+Uz0d/3jQqxTpyzKrogQq1n5TsCmWY97yqf9lmGSkssETfVGPnHd0aWKLbidMm+3IgMpUkVEJDNrBDLMFGWikJdiseELieZoygUGRRAl+3aq3b+PidkJ/di6Aj0ghEdNw3pbExS+2QDgMMtiWQR0xaRXBv+R0ADag10vFP4IqcFAhGuFbfCwSnGC8Q8+DhNKJvUuCniSCRLp4iiDAx+oOWri9iSY34xdNS/rToVROC9y88zMJdNXWUP0Qe4K/E+3wDB+IEQfjBeBiWQA1IlRuMi7VgyY4Oma6dIcBjdVzaFymaoQEs3qflNxDZ/nebaIfupJ1hTbyvurdijbt5TXL662n7Y84X6BdTtv0+rpGkGewdqqbRxPDfOvk3Cu+BAHeyjszmgg5lvESxahW9GkpK0MSPzCp6l+SsDdUdVg99gRuCiRpiLqVraui/4MITyq9tc00UZvm53K1ICrkUYQ08YNmxHiBiTG5vmwtPQwrNuQvljHSRsoL78kIzhMqk/QOr+B2rWhaq1UyHt4DjBNxVKzl5wbq5AssoaYT+1qX5Tt2g8RMfBlEHDWlhde8MZ9JMiS/qsoZd7z6cjtLLua8VmKY4P1O0/zy3GrU5tWqetLF7lcbmYNpRjDX+eDdRx++QQM815i/LnwyOCZqhOBoBo7S17znW0w8t2NN9VslW1xeZ14KtLuX3TMLkctqMY66kSQRYTOZjKSMYAQ==",
+              "signature": "CAQSqwYKEAgTGAI4AUIIdGhpbmtpbmcSDNj4uK7siTVEo1Jw2RoMf+AhO/9oyLuRBG7HIjDSS6HU81lfElUX4153z1t7hGj95nX8x0vbwqA1s3r25W/FpPVjh87u7dVyc9k6jqcqyAWBYUJdQBi0qm58ql+O+MfSTy8v6E/Izq8xG+ktPNHDwGTemCbGJnCqD9VFDcIskfx82xpHq87PV/tSsLBqWRhKdJzQKq7daD9US1mrk4vdWQBpDMWvVHcPeztOuJCXFqNqrfJDQOKtoILcIgHUa11+iNs5aup8yTeFFlX86uB/wyLgv8wGA0VilchoOnPpHsCEbFhDwX2zfdsK8St9j8+3graRQmv8x7fet7+yJa4EDpqeI2L6OvOKOBB0dPf0wF+fS0ifoqZuzo5hLyT27yDW4hAikvLJLW2uzIdWOAEqMFX3MFu+Td6I0F0X/4K9bqnBmpsukTcx+eL+Zx0IOpOB55/dVxRGpBgaZAH2H9iykjT8i3cnMqb+ImMaIYM8BVx4SKCjMQq7IxXjauYGE59B0GXbBHAVl61eKHGdZ3YuQhQxv+RZz0q0H7Wbh8B+bcXy716Xcg+09MyLNc8ImTi16JrbDb4+2tkPj0YmzqAO1haTdi6HMS+jLzT1Yy8GY4Dn1jMToffgpJH0Qu2YJxXgTARMTtTPVoVPACoghC/VkHe3oP8EZGWAfDMb0O1WL4xPo2S/OtHpblwvQ4r4Yje6i52O9OwMYjgWksnZ5ef00fLb0LFlh1KdmUOb9SDJBkmaGeiFd9u9ic5tmTCS8O531IctqT2qiSjKXJMqqEljs+Sn/pZZu4UzguFgvZbp7iGzkPGPjPehV9qhF0GU/eeU34WAnxcpxdq3kodYOax1yYlBbBjOixboZ1LxHnj+V0Amyd+QCzpWYWQ0JVt59jPwZ7ED4vSWrlbSPOjpkhXyq3/FJs4+uAxf4R7/w4GCGV78gShKQ+fk1uoby89gWf5cFegrXh+THpvsojGICiY9WrNJQmqx1GlPJ3xhGBuxY5TFFUSoUf3tWNgs9YN/XIgPsqoTjxFnnMjhknjrdjqHcRzOMMtgBYS1GAE=",
               "thinking": "",
               "type": "thinking"
             },
             {
-              "id": "toolu_01H3AnmW1e5w9o28G8bcgL6c",
+              "caller": {
+                "type": "direct"
+              },
+              "id": "toolu_015D1aiZGqpFc63H3aGQJM63",
               "input": {
                 "image": "candidate"
               },
@@ -69,7 +72,7 @@
           "content": [
             {
               "content": "{\"call_id\":\"call:1\",\"images\":[],\"measurements\":[],\"regions\":[{\"checklist_item\":\"chk:ev:1:0\",\"label\":\"floor -> pool\",\"location\":{\"bbox\":[0.1,0.1,0.3,0.3],\"fov\":null,\"frame\":\"raw:candidate\",\"kind\":\"bbox\",\"pitch\":null,\"polygon\":null,\"yaw\":null},\"score\":0.9},{\"checklist_item\":\"chk:ev:1:1\",\"label\":\"wall\",\"location\":{\"bbox\":[0.6,0.6,0.9,0.9],\"fov\":null,\"frame\":\"raw:candidate\",\"kind\":\"bbox\",\"pitch\":null,\"polygon\":null,\"yaw\":null},\"score\":0.9}],\"status\":\"ok\",\"summary\":\"scripted regions\"}",
-              "tool_use_id": "toolu_01H3AnmW1e5w9o28G8bcgL6c",
+              "tool_use_id": "toolu_015D1aiZGqpFc63H3aGQJM63",
               "type": "tool_result"
             },
             {
@@ -399,13 +402,13 @@
     "status": 200,
     "headers": {
       "content-type": "application/json",
-      "request-id": "req_011CgT1trb81oCEbLTkuakQ9"
+      "request-id": "req_011CgTVJPx3wR15s1dms1vgg"
     },
     "body": {
       "container": null,
       "content": [
         {
-          "signature": "CAQSgQoKEAgTGAI4AUIIdGhpbmtpbmcSDAEbMmsN9jLhADKFuhoMWKEA1t35eVZt877JIjCDcBgmBQk4kgzMY9PSi/5uTkI9PeXKd8r4lidPFqMlUTXLZKhU59z1i/qFijSECTMqngn5sKixXkz+riq/ewqKjhuFqXOlBcY4qRkSq2MNVjDYxWijXTp6Nx0NmoL1el0PvJHGY2vlMao3r3dcInp5lbK06xoddelziR5z9zCg93nXF3HWPAYDwMaqok+9V/yo4WtdfYSg3suSdXDzpRlgREUb82Ybtan0xqcRCtoY0iw9hdu951WzuQsINQXr5KX7MLC917D4OheeCaWtdoSuam23UH/2HEWOgziuOBYCwa4DX2S7/oaAy7wqm6XIxl8ur1KtHmsMN7EhMcR9P6e022F3J8HwZNWr7kPe58HL6t97fAdV3c7LLa9DMApS+afwiAjKkfj0am0F4QdAqrnl1fqWbqmDB7hF4WmEUeHF8n419ulWRn0TfRWrms/e211e4d5s/aePgGgIcIaKTwDkXqr7T4U78b281Y8K3y7Rv25u4j9NVUrsBHv3ThdyIA8eKB+luKmHn3HM3Tpxp7InVwFMg7KCJ2uWNI8VitMDZB+z/oJz3y7K6VGBPTb1ZFw4V5yhz0igr5QZwhPQ8hwB4pBY+fdD1Eg5CTncDddLUDxqx7A0M5G+7nPIqIOUMSojCWANQOfJlJQq5GEUESuH/rjor8gkYJ9MJM5muR2h/5atMqHjN1gDwWyKprd+H/8/QojxWJiX20fQYKjeUZThFOC2o6DrkcucePoEY4Fr9NfWxQarpzvSxNvGHkRCBqEZ4Rnx6AlPbcmrxUthe+eei+93O7sQTu023/IvzgQJT55qs05wSuXnFDHhP0k+zeIWONRXEE3TKZiw4BHrs2mq6gq6lguqoHrsfo6WL9sJptzUGhRE/ZytLbgvFl4uw+KeTnGeqfXRGHtibO6+2N9Cs9vnSURDiseFd4e74xSLaiXQuqVA0S0edK882nggk3NRaBFKzZfhxMcXw+95RzAR2ZjCifc1IWPr4VIcAy7qxtKo95lRHn69jEUZe7yDapFFXbRmpFdmaQJ1iOCAI2quWMYbwQnzpDLCA7db34tlGzTtzsvf4rh9qbmmg2HTp5wvzM/aA53TT9xrW7KO94x5fCmPiYLSO8xz7Q1JtVTiCIHKO83IUWlbTSH7tPA4TqZ36/37qFcjRLIVoWjCAJJkEkkcew3hDk3MtdIfq2faZauihW9N+Q1Lce9hINgDNPc5o/NIhyDV3GQz+Ao78B2v5FcYDnHR/mudoNul7Fd4/bSi9+1vNGptx94M9tMzVN5HjqvPnU08I8gy6gCWpqwNgg+4zu08vqvV50I9ydTaQALWurPJMcweH5pBHElLf/f7eMK9bS4t57JrTMFdYCnZNh5fdcadtXjPUmXR/qWaHb2eHAsvLdHSugTwOgLNIK85qYtNyOcfqpQPlkNAZYvq8ZPnt4yvSE76DkNkG5z83sCEoO/T5fTwm+/7EZM7mAWKLlpOFn327ay/vlzYuO3PgASAckEEdmM0Wive9eClDZIjVYj9x4aEzPFgyRF+qUwWTYzkx3UMkxgG2Rj2cLCnPJAXm+wBokoCTQ+MH3NGi9H5WmKXc3/WY0hmcr7tXF8XpDYiERKZ42fL50B2EFK6LlQ4/b9nzIJxp4xRNrNfTa0YAQ==",
+          "signature": "CAQSsQoKEAgTGAI4AUIIdGhpbmtpbmcSDJuIhjLlDrU7JdUhkRoMOiHyVlmS14OMiogRIjDlxpayEnCtDrFpJDpwm1yBL3WaSwDI11gdsbrCpCcWh9vMdydPu6ykCoEwBfOfRM0qzgmdqQ9tTjPbpq65OssEMarl+6E790ALuyM4I9sR4U+APTX8pMDFhlQjeJhUsTajrM0jHDcDrrIvDDsXhsMpqlr/xLR7SL3tXndyVPyeAvwSLdHFcXMxWXe/3EvIEEqx3HOBK104liM90nAD7DanOS4AJbwcf/Ot21P+o26tBXfiV+/HXJqHdOQUIGsisXtdwb5BTC8fRfMMxYSZovEPUKC/iowpYwcHOqjtMTeziC5g6ia0h2MXH6A54jzxc0E/jHM9x7k3SU7jRnn/x/yRrdBERRQ6pg+wnTNWRejj86a+wxiys/ClrLxv5m6Msc2jB3nxpE7q/Rl0vbQhRABQmE/9vWRjI8fHbcYRW6xtCUjYn24QAtn8ORrsVzy4x256T9PLvHANOU5cJwWD2PmMmCisT8Si9c8rnQQosMBAZg4EnjCEjjQS8Xes8azhbVnRDdp39ReAunzfKW0urtPqkjfSGKf8j0u7e9ku/SZUHQZGoWF8KavJUL2Sa0gS5X0l9KGknUPw0got3G7jGT0nVZdOExIu3X3btpJcoToV64LMRbN2D14ivb6rSccouSbd38FI2/uG1yP//fefwBWGxXK5+Q24P94o1aal01kxQeKR/TsYLr8uZmU0eCRLvlPkaZbNkP4bhXcHKG+Azp47dfZD3KzGm/B4oCAyym3xkVU5hYG4tcXsvYROu/gKEYDFMBn4mk+O/riU9SNP9736jJLyak34Mmd6QUQsriNYOZ10nDm9+pFny51pxK4UxNd2vKJ+9IhvqP3zEL1xEBOdGLHsK6DYjcljBePYm3+wYH6NxvYnXy8H1ghWdXJ9TQMLgCHABUuUYP5MJma3hd/sCv9La/5Zq58Xis6fUDHJn88RvT5YPoBwQXpTu7anAT1oQ30y5SzuC46EaB05TKFON/zSth/hxK/4SNlxTfxFgQZFrPYeWaAnuLaKK9uNIfgng/LMjjg7i1Ow0FWsmm/Ny4efQBrcw8RV0qMtDE9L6jdeOOMaJ5rg8AGfgVVWz6n0PBdG43pkoHW/JPNajn5j7De7TKMyHTTfjN0oLODHhJBhpH6K7QSchAfAFnetzOgIUx5lh6YxqBrBKRkRr4cb9Yl254a3GPE3E1ha/PVRDWyi6sLioe2rAZ870w+NSCoy0VYy92gZS+p4K0zoxSpF87pTo6flz4DdFS31z29uPGVxHon6sSBZyVLi5nafL7bk+AIc4J6uSq+eLfiTJQghlL8G4Zpyu9jZdLbxIupkcsfrzhUYY38P9KrQlAcZG7wSpW7n96ee7FRivralauTevkmOKvDJ0wrtjV22s5UWsGGUF0QVBtiYGiv2CEO0rbz6zj4QQ5rzpll4p9o4QrogR2cILxg9z+kfIB8Hocie3kjxCEpUWJDKcFXd+22kR3eCuoL0/bt9FjD2L5CqrI4g5HPs/bA2wNObyTPsi2e79ppUndPD+enwtJoqUDH4UYr2gCzCgdPau/G/ETW1Irv80GM0Yx5pyk18Lh4S3u0cGtJtWKQgA3L1Rek9Zkw0fch8JCBAB7XrkeqXOPr6QEJTvMqQqx59qX2fqYdf8zgCdmiaHvORkGIZO3/jh2IIRmzfmHCrTyp6ZU8qDlpxNEmp4qwvMWhNqdv16SYKNX2Gd/UYAQ==",
           "thinking": "",
           "type": "thinking"
         },
@@ -413,16 +416,100 @@
           "caller": {
             "type": "direct"
           },
-          "id": "toolu_01XUdaTwuMb2CsFexa8det2d",
+          "id": "toolu_01X3TZNjiMMKVYEdncA7A9Tj",
           "input": {
-            "image": "source"
+            "findings": [
+              {
+                "allowed_by": null,
+                "confidence": "confident",
+                "disposition": "observed",
+                "evidence": [
+                  "call:1"
+                ],
+                "location": {
+                  "bbox": null,
+                  "fov": null,
+                  "frame": "raw:source",
+                  "kind": "absent",
+                  "pitch": null,
+                  "polygon": null,
+                  "yaw": null
+                },
+                "obligation_ids": [
+                  "RC1"
+                ],
+                "reason": "fake_regions ran on the candidate only. The harness then said the tool budget was used up and blocked any further call, so the required call on the source could not be made."
+              }
+            ],
+            "items": [
+              {
+                "allowed_by": null,
+                "confidence": "tentative",
+                "disposition": "violation",
+                "evidence": [
+                  "call:1"
+                ],
+                "id": "chk:ob:SF1@candidate",
+                "location": {
+                  "bbox": [
+                    0.35,
+                    0.2,
+                    0.65,
+                    0.6
+                  ],
+                  "fov": null,
+                  "frame": "raw:candidate",
+                  "kind": "bbox",
+                  "pitch": null,
+                  "polygon": null,
+                  "yaw": null
+                },
+                "reason": "There is a solid white square in the centre of the candidate that is not in the source. It covers part of the scene, so the scene's structure is not kept, which the brief protects."
+              },
+              {
+                "allowed_by": null,
+                "confidence": "tentative",
+                "disposition": "held",
+                "evidence": [],
+                "id": "chk:ob:SF2@candidate",
+                "location": null,
+                "reason": "The colour gradient, framing and size (64x48) are the same. I see no rotation, stretching or cropping."
+              },
+              {
+                "allowed_by": null,
+                "confidence": "tentative",
+                "disposition": "cant_tell",
+                "evidence": [
+                  "call:1"
+                ],
+                "id": "chk:ev:1:0",
+                "location": null,
+                "reason": "The tool labels this region as floor turned into pool, which would change what the floor is. At 64x48 I can't confirm this in the image."
+              },
+              {
+                "allowed_by": null,
+                "confidence": "tentative",
+                "disposition": "cant_tell",
+                "evidence": [
+                  "call:1"
+                ],
+                "id": "chk:ev:1:1",
+                "location": null,
+                "reason": "The tool flags a wall region. At this resolution I can't see any change to its shape or position."
+              }
+            ],
+            "opinion": {
+              "reason": "The white square added in the centre breaks the structure the brief says to keep.",
+              "verdict": "fail"
+            },
+            "schema_version": 1
           },
-          "name": "fake_regions",
+          "name": "submit_verdict",
           "type": "tool_use"
         }
       ],
       "diagnostics": null,
-      "id": "msg_011CgT1trygvamvaxjH4DNak",
+      "id": "msg_011CgTVJQGQpu8V1sJTxdn1y",
       "input_transformations": [],
       "model": "claude-opus-5-5",
       "role": "assistant",
@@ -438,10 +525,10 @@
         "cache_creation_input_tokens": 0,
         "cache_read_input_tokens": 0,
         "inference_geo": "global",
-        "input_tokens": 4488,
-        "output_tokens": 243,
+        "input_tokens": 4433,
+        "output_tokens": 1020,
         "output_tokens_details": {
-          "thinking_tokens": 193
+          "thinking_tokens": 223
         },
         "service_tier": "standard",
         "speed": "standard"

@@ -270,11 +270,18 @@ impl OpenAiProvider {
                             ContentBlock::ToolResult {
                                 tool_use_id,
                                 content,
+                                is_error,
                                 images,
-                                ..
                             } => {
+                                // The Responses API has no error flag on a function result, so
+                                // a failed call says so in its text.
+                                let content = if *is_error {
+                                    format!("error: {content}")
+                                } else {
+                                    content.clone()
+                                };
                                 let output = if images.is_empty() {
-                                    Value::String(content.clone())
+                                    Value::String(content)
                                 } else {
                                     let mut parts =
                                         vec![json!({ "type": "input_text", "text": content })];

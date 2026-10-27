@@ -55,7 +55,9 @@ pub fn consent(config: &Config, profile_id: &str, profile: &Profile) -> Result<C
 /// The account with its id shortened, for messages.
 fn redact_account(account: &str) -> String {
     match account.split_once(':') {
-        Some((p, id)) if id.len() > 4 => format!("{p}:{}…", &id[..2]),
+        Some((p, id)) if id.chars().count() > 4 => {
+            format!("{p}:{}…", id.chars().take(2).collect::<String>())
+        }
         _ => account.to_string(),
     }
 }

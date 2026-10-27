@@ -15,6 +15,9 @@ if [ -f "$archive.sha256" ]; then
   expected="$(awk '{print $1}' "$archive.sha256")"
   actual="$(shasum -a 256 "$archive" | awk '{print $1}')"
   [ "$expected" = "$actual" ] || { echo "checksum mismatch for $archive" >&2; exit 1; }
+elif [ "${REQUIRE_CHECKSUM:-0}" = "1" ]; then
+  # CI always has the checksum file dist wrote beside the archive; its absence is a broken build.
+  echo "no checksum file beside $archive" >&2; exit 1
 fi
 
 work="$(mktemp -d)"

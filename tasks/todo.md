@@ -54,7 +54,10 @@ tag.
 - [x] 2.10a Packaging for the registry
 - [x] 2.10b Binary distribution and live smoke (record: docs/reviews/m2-live-smoke.md)
 - [ ] Follow-up from the live smoke: the default budget (`retries = 3`, `repair_output_tokens = 32000`, `spend_cap_usd = 2.00`) plans an envelope above the default cap on Gemini 3.8 Flash and GPT-6.1 Terra, so a default config refuses to run on two of three vendors; decide the defaults at the M2 checkpoint
-- [ ] Checkpoint M2 → tag `m2`
+- [x] Checkpoint M2 review passes (docs/reviews/m2-checkpoint.md); owner review, merge and tag `m2` are the owner's
+- [ ] Owner decision from the M2 review: the envelope formula. Today every request is planned at `1 + retries` full attempts, which is why the default cap refuses two of three vendors; the reviewer recommends planning each request once plus a run-wide retry reserve of `retries ×` the largest single bound, which amends SPEC "Cost ledger" and lets the defaults stand
+- [ ] 4.1 follow-up: a run whose tool images can carry the history past `many_image_threshold` fails preflight mid-run with `error: image_limit` after money is spent; at resolve, either prepare at `many_image_max_dimension_px` when the worst case can pass the threshold (and record it in `prep_version`) or refuse before the first call
+- [ ] Recorded from the M2 review, not fixed: transport-error excerpts (up to 2 KB of a provider's error body) reach the journal and stderr without the redaction pass (the credential is never in a response body, so nothing has leaked; route them through the redaction list when the journal gains a redaction step); the `dist` installer in the `package` workflow is fetched by `curl | sh` without a checksum, as the generated release workflow does
 
 ## M3 Evaluation sets and baseline
 - [ ] 3.1 Set manifests, check, fetch, seal

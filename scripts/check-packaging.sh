@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # Every asset a crate embeds with include_str!/include_bytes! must sit inside that crate and be in
 # the file list `cargo package` would ship, or the published crate cannot build. Checks every
-# workspace member; CRATE_DIRS overrides the list (space-separated, for the self-test). Prints the
-# embedded assets per crate.
+# workspace member; CRATE_DIRS overrides the list (one directory per line, for the self-test).
+# Prints the embedded assets per crate.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 if [ -z "${CRATE_DIRS:-}" ]; then
-  CRATE_DIRS="$(cargo metadata --format-version 1 --no-deps | python3 -I -c 'import json,sys,os; m=json.load(sys.stdin); print(" ".join(os.path.dirname(p["manifest_path"]) for p in m["packages"]))')"
+  CRATE_DIRS="$(cargo metadata --format-version 1 --no-deps | python3 -I -c 'import json,sys,os; m=json.load(sys.stdin); print("\n".join(os.path.dirname(p["manifest_path"]) for p in m["packages"]))')"
 fi
 status=0
-for crate in $CRATE_DIRS; do
-  listing="$(cd "$crate" && cargo package --list --allow-dirty 2>/dev/null)" || { echo "$crate: cargo package --list failed" >&2; status=1; continue; }
+while IFS= read -r crate; do
+  [ -n "$crate" ] || continue
+  listing="$(cd "$crate" && cargo package --list --allow-dirty 2>&1)" || { echo "$crate: cargo package --list failed: $listing" >&2; status=1; continue; }
   python3 -I - "$crate" "$listing" <<'PY' || status=1
 import pathlib, re, sys
 crate = pathlib.Path(sys.argv[1]).resolve()
@@ -39,6 +40,6 @@ else:
     print(f"{name}: embeds nothing")
 sys.exit(1 if bad else 0)
 PY
-done
+done <<< "$CRATE_DIRS"
 [ "$status" -eq 0 ] && echo "packaging ok"
 exit "$status"

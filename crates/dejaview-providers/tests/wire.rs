@@ -134,8 +134,24 @@ fn wire_refuses_unrepresentable_constructs_with_the_reason() {
         "type": "object", "additionalProperties": false, "required": ["tags"],
         "properties": { "tags": { "type": "object", "additionalProperties": { "type": "string" } } }
     });
+    let root_array = json!({ "type": "array", "items": { "type": "string" } });
+    let unknown_keyword = json!({
+        "type": "object", "additionalProperties": false, "required": ["a"],
+        "properties": { "a": { "type": "string", "contentMediaType": "text/plain" } }
+    });
     for (adapter, model) in ADAPTERS {
         let c = caps(model);
+        let err = transform(adapter, &c, "odd", &root_array).unwrap_err();
+        assert!(
+            err.to_string().contains("the root must be an object"),
+            "{err}"
+        );
+        let err = transform(adapter, &c, "odd", &unknown_keyword).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("\"contentMediaType\" is not in the wire subset"),
+            "{err}"
+        );
         let err = transform(adapter, &c, "odd", &pattern_props).unwrap_err();
         assert_eq!(err.class(), "resolve");
         assert!(

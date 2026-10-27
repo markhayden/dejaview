@@ -135,6 +135,19 @@ async fn replay_serves_a_recording_and_ignores_volatile_headers() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+#[test]
+fn replay_refuses_a_directory_with_no_exchanges() {
+    let dir = tmp("empty");
+    write(&dir, &[]);
+    std::fs::write(dir.join("expected.json"), "{}").unwrap();
+    let err = match Player::load(&dir, Volatile::common()) {
+        Ok(_) => panic!("an empty recording loaded"),
+        Err(e) => e,
+    };
+    assert!(err.to_string().contains("holds no exchanges"), "{err}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[tokio::test]
 async fn replay_fails_when_a_thinking_block_is_dropped_or_a_real_header_changes() {
     let player = Player::new(recording(), Volatile::common());
@@ -249,7 +262,14 @@ async fn recorder_writes_exchanges_with_secrets_stripped_that_the_player_replays
         seen: Mutex::new(Vec::new()),
         response: Response {
             status: 200,
-            headers: [("request-id".to_string(), "req_9".to_string()), ("set-cookie".to_string(), "sid=1".to_string())].into_iter().collect(),
+            headers: [
+                ("request-id".to_string(), "req_9".to_string()),
+                ("set-cookie".to_string(), "sid=1".to_string()),
+                ("anthropic-organization-id".to_string(), "org-SYNTHETIC-ORG".to_string()),
+                ("anthropic-ratelimit-tokens-remaining".to_string(), "99".to_string()),
+            ]
+            .into_iter()
+            .collect(),
             body: json!({ "id": "msg_9", "content": [{ "type": "text", "text": format!("echo {key}") }], "stop_reason": "end_turn", "usage": { "input_tokens": 1, "output_tokens": 1 } }).to_string(),
         },
     });
@@ -270,10 +290,20 @@ async fn recorder_writes_exchanges_with_secrets_stripped_that_the_player_replays
         text.contains(REDACTED) && !text.contains("set-cookie"),
         "{text}"
     );
+    // Only the response headers the adapters read are kept; organisation ids and rate-limit
+    // state never reach the recording.
+    assert!(
+        !text.contains("SYNTHETIC-ORG") && !text.contains("ratelimit"),
+        "{text}"
+    );
     let recorded = load(&dir).unwrap();
     assert_eq!(recorded.len(), 1);
     assert_eq!(recorded[0].request.headers["x-api-key"], REDACTED);
     assert_eq!(recorded[0].response.headers["request-id"], "req_9");
+    assert_eq!(
+        recorded[0].response.headers.keys().collect::<Vec<_>>(),
+        ["request-id"]
+    );
     // The recording replays against the same request (the key differs, which is volatile).
     let player = Player::load(&dir, Volatile::common()).unwrap();
     let mut scrubbed = body.clone();

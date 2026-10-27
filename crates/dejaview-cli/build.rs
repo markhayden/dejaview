@@ -8,26 +8,32 @@ fn main() {
         .or_else(git_sha)
         .unwrap_or_else(|| "unknown".to_string());
     println!("cargo:rustc-env=DEJAVIEW_GIT_SHA={sha}");
-    // `--git-path` resolves correctly inside worktrees, where `.git` is a file.
-    if let Some(head) = Command::new("git")
-        .args(["rev-parse", "--git-path", "HEAD"])
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-    {
-        println!("cargo:rerun-if-changed={head}");
+    // Rebuild when the commit changes: HEAD itself (a checkout), the ref it points at (a new
+    // commit on the same branch) and packed-refs (after `git gc`). `--git-path` resolves inside
+    // worktrees, where `.git` is a file.
+    let branch = git(&["rev-parse", "--symbolic-full-name", "HEAD"]).unwrap_or_default();
+    for path in ["HEAD", branch.as_str(), "packed-refs"] {
+        if path.is_empty() {
+            continue;
+        }
+        if let Some(p) = git(&["rev-parse", "--git-path", path]) {
+            println!("cargo:rerun-if-changed={p}");
+        }
     }
 }
 
-fn git_sha() -> Option<String> {
+fn git(args: &[&str]) -> Option<String> {
     Command::new("git")
-        .args(["rev-parse", "--short=9", "HEAD"])
+        .args(args)
         .output()
         .ok()
         .filter(|o| o.status.success())
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
         .filter(|s| !s.is_empty())
+}
+
+fn git_sha() -> Option<String> {
+    git(&["rev-parse", "--short=9", "HEAD"])
 }
 
 fn packaged_sha() -> Option<String> {

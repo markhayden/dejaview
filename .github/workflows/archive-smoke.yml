@@ -10,6 +10,11 @@ on:
         required: true
         type: string
 
+# The generated caller passes its own permissions and secrets; this job reads the artifacts and
+# needs nothing else.
+permissions:
+  contents: read
+
 jobs:
   smoke:
     name: ${{ matrix.target }}
@@ -35,3 +40,5 @@ jobs:
           path: artifacts
           merge-multiple: true
       - run: scripts/archive-smoke.sh "artifacts/dejaview-${{ matrix.target }}.tar.xz"
+        env:
+          REQUIRE_CHECKSUM: "1"

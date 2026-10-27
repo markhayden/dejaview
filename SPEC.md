@@ -939,8 +939,8 @@ excluded.
 Two ledgers: per job (`budget.spend_cap_usd`) and per evaluation (`matrix.spend_cap_usd`),
 shared across concurrent decisions with atomic operations. The unit of reservation is the
 **decision envelope**: the upper bound of every request the decision can make (per run: tool
-turns, the final turn, the repair including a reissue at `repair_output_tokens`; times decision
-runs), each bounded by the history it could carry (prior prompts, prior model output at the
+turns, the final turn, every repair the budget allows (`repairs`) at `repair_output_tokens`;
+times decision runs), each bounded by the history it could carry (prior prompts, prior model output at the
 output allowance, tool outputs at their manifest byte and image bounds, request framing, image
 token estimates) at catalog prices, plus any per-image price, with every request counted once per
 possible attempt (1 plus `retries`). The envelope is reserved once at step 3.
@@ -1587,8 +1587,10 @@ explicit commands.
 
 ## Open questions
 
-1. Exact image limits, prices, capabilities and strict-schema keyword lists per model, read from
-   the providers' documentation and model lists at M2 and pinned in the catalog.
+1. Closed 2026-10-27 (M2 checkpoint): image limits, prices, capabilities and strict-schema
+   keyword lists per model were read from the providers' documentation on the catalog's
+   `verified` dates and re-verified by the recordings; what the documentation did not state is
+   listed in docs/provider-data.md with the recording that confirmed or corrected it.
 2. Whether `rmcp` meets the MCP needs listed under Transports; ADR at M4.
 3. Which image models generate the public sets and under which licence; decided with the first
    set in M3 and recorded per item.

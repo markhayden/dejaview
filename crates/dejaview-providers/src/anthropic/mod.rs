@@ -438,14 +438,16 @@ impl AnthropicProvider {
                         return Err(Error::Provider("tool_use block without id or name".into()));
                     }
                     tool_calls.push(ToolCall {
-                        id: id.clone(),
-                        name: name.clone(),
-                        arguments: arguments.clone(),
-                    });
-                    content.push(ContentBlock::ToolUse {
                         id,
                         name,
                         arguments,
+                    });
+                    // Echoed exactly as received, like every other block: the harness works from
+                    // the normalised arguments above, but the prefix check binds the thinking to
+                    // the block the model produced.
+                    content.push(ContentBlock::Opaque {
+                        adapter: ADAPTER_ID.into(),
+                        block,
                     });
                 }
                 // Thinking, redacted thinking and anything newer: echoed as received.

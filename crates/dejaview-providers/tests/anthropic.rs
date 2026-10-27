@@ -365,7 +365,11 @@ fn anthropic_parses_responses_and_keeps_every_block_for_the_echo() {
     assert!(
         matches!(&r.content[0], ContentBlock::Opaque { adapter, block } if adapter == ADAPTER_ID && block["signature"] == "EqQB")
     );
-    assert!(matches!(&r.content[2], ContentBlock::ToolUse { id, .. } if id == "toolu_9"));
+    // The tool_use block is kept as received, not rebuilt from the normalised arguments, so the
+    // echo is byte-exact under the prefix check.
+    assert!(
+        matches!(&r.content[2], ContentBlock::Opaque { adapter, block } if adapter == ADAPTER_ID && block["type"] == "tool_use" && block["id"] == "toolu_9" && block["input"]["image"] == "candidate")
+    );
     // Stop reasons.
     let stop = |s: &str, details: Value| {
         let mut b = json!({ "id": "m", "content": [], "stop_reason": s, "usage": { "input_tokens": 1, "output_tokens": 0 } });

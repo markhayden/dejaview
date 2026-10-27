@@ -17,7 +17,8 @@ Account ids are attestations from the environment and are not recorded here.
 | `google-ai-studio` | `gemini-3.8-flash` | pass | 0 | $0.0125 |
 | `openai` | `gpt-6.1-terra` | pass | 0 | $0.0033 |
 
-Total for the passing run: $0.017. Two earlier runs were refused before any call left the machine
+Total for the passing run: $0.017 (computed before the checkpoint fix that prices prompt-cache
+reads and writes; the true figure is within a cent of it). Two earlier runs were refused before any call left the machine
 for Gemini and OpenAI (below) and cost about $0.002 more on Anthropic. Whole task: about $0.02 of
 the $25 per vendor.
 

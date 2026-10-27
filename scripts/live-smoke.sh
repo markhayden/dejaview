@@ -35,6 +35,7 @@ smoke() { # profile model key-var account-var account-prefix
   local report verdict cost
   report="$(find "$dir" -name report.json | head -n 1)"
   if [ -n "$report" ]; then
+    # A report the reader cannot parse is a failed vendor, not an aborted smoke.
     read -r verdict cost < <(python3 -I - "$report" <<'PY'
 import json, sys
 r = json.load(open(sys.argv[1]))
@@ -42,7 +43,7 @@ verdict = r.get("verdict") or ("error" if r["decision"].get("error") else "none"
 spent = r["cost"]["spent_usd"]
 print(verdict, f'{spent if spent > 0 else 0.0:.4f}')
 PY
-)
+) || { verdict="unreadable-report"; cost="-"; code=99; }
   else
     verdict="no-report"; cost="-"
   fi

@@ -54,5 +54,35 @@ if grep -q 'checksum mismatch' <<< "$out"; then pass=$((pass+1));
 else echo "FAIL: archive-smoke accepted a wrong checksum: $out" >&2; fail=$((fail+1)); fi
 rm -rf "$probe"
 
+# check-packaging: the shipped assets are listed as embedded by the crates that own them.
+out="$(scripts/check-packaging.sh 2>&1)"
+for want in "dejaview-core: embeds .*prompts/v1.md" "dejaview-core: embeds .*rules/source-fidelity.toml" "dejaview-providers: embeds catalog.toml"; do
+  if grep -Eq "$want" <<< "$out"; then pass=$((pass+1));
+  else echo "FAIL: check-packaging did not list '$want': $out" >&2; fail=$((fail+1)); fi
+done
+
+# offline-smoke: a binary that answers every command but exits 3 instead of 64 on the missing
+# credential must fail, and one that prints no SF1 from `rules show` must fail.
+probe="$(mktemp -d)"
+cat > "$probe/dejaview" <<'STUB'
+#!/usr/bin/env bash
+case "$1" in
+  --version) echo "dejaview 0.0.0 (stub)" ;;
+  tools) ;;
+  rules) echo "${STUB_RULES-SF1 must_hold candidate}" ;;
+  check) echo "auth: set ANTHROPIC_API_KEY" >&2; exit "${STUB_CHECK_EXIT-64}" ;;
+esac
+STUB
+chmod +x "$probe/dejaview"
+if scripts/offline-smoke.sh "$probe/dejaview" >/dev/null 2>&1; then pass=$((pass+1));
+else echo "FAIL: offline-smoke rejected a conforming stub" >&2; fail=$((fail+1)); fi
+out="$(STUB_CHECK_EXIT=3 scripts/offline-smoke.sh "$probe/dejaview" 2>&1 || true)"
+if grep -q 'expected exit 64' <<< "$out"; then pass=$((pass+1));
+else echo "FAIL: offline-smoke accepted exit 3 on the missing credential: $out" >&2; fail=$((fail+1)); fi
+out="$(STUB_RULES="nothing" scripts/offline-smoke.sh "$probe/dejaview" 2>&1 || true)"
+if grep -q 'did not print the shipped base' <<< "$out"; then pass=$((pass+1));
+else echo "FAIL: offline-smoke accepted a rules show without SF1: $out" >&2; fail=$((fail+1)); fi
+rm -rf "$probe"
+
 echo "check tests: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

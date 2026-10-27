@@ -438,29 +438,34 @@ fn select_provider(args: &CheckArgs, config: &mut Config) -> Result<Box<dyn Prov
     let model = catalog
         .model(&config.provider.model)
         .ok_or_else(|| format!("model {:?} is not in the catalog", config.provider.model))?;
+    // Which request headers and body pointers a recording treats as volatile is the adapter's.
+    let volatile = match model.adapter.as_str() {
+        "anthropic-messages" => AnthropicProvider::volatile(),
+        "gemini-generate-content" => dejaview_providers::gemini::GeminiProvider::volatile(),
+        "openai-responses" => dejaview_providers::openai::OpenAiProvider::volatile(),
+        other => return Err(format!("adapter {other} is not implemented")),
+    };
     let (cred, transport): (_, Arc<dyn Transport>) = match &args.replay {
         Some(dir) => {
             let cred =
                 credential(profile, &|_| Some("replay".into())).map_err(|e| e.to_string())?;
-            let player =
-                Player::load(dir, AnthropicProvider::volatile()).map_err(|e| e.to_string())?;
+            let player = Player::load(dir, volatile).map_err(|e| e.to_string())?;
             (cred, Arc::new(player))
         }
         None => {
             let cred =
                 credential(profile, &|name| std::env::var(name).ok()).map_err(|e| e.to_string())?;
             config.secrets.push(cred.expose().to_string());
-            let client = Client::new(REQUEST_TIMEOUT).map_err(|e| e.to_string())?;
+            let client = Client::new(std::time::Duration::from_secs(
+                config.budget.request_timeout_s,
+            ))
+            .map_err(|e| e.to_string())?;
             let base: Arc<dyn Transport> = Arc::new(client);
             match &args.record {
                 Some(dir) => {
-                    let recorder = Recorder::new(
-                        base,
-                        dir,
-                        vec![cred.expose().to_string()],
-                        AnthropicProvider::volatile(),
-                    )
-                    .map_err(|e| e.to_string())?;
+                    let recorder =
+                        Recorder::new(base, dir, vec![cred.expose().to_string()], volatile)
+                            .map_err(|e| e.to_string())?;
                     (cred, Arc::new(recorder))
                 }
                 None => (cred, base),
@@ -485,9 +490,6 @@ fn select_provider(args: &CheckArgs, config: &mut Config) -> Result<Box<dyn Prov
         other => Err(format!("adapter {other} is not implemented")),
     }
 }
-
-/// The per-request HTTP timeout: long enough for a high-effort turn, bounded.
-const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
 
 fn rules_show(args: &RulesShowArgs) -> i32 {
     use dejaview_core::obligations::{MergeInput, RulesFile, merge};

@@ -340,13 +340,13 @@
     "status": 200,
     "headers": {
       "content-type": "application/json",
-      "request-id": "req_011CgT1s9mCCXQ2qEdDfq41g"
+      "request-id": "req_011CgTVH3VDu1jnXYYbBNQ9A"
     },
     "body": {
       "container": null,
       "content": [],
       "diagnostics": null,
-      "id": "msg_011CgT1sABEWKJgLKpgmSftB",
+      "id": "msg_011CgTVH3qJVc3cPbBd8azTd",
       "input_transformations": [],
       "model": "claude-opus-5-5",
       "role": "assistant",

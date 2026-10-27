@@ -113,8 +113,8 @@ const FRAMING_BYTES: u64 = 4096;
 /// Headroom on every planned input, since byte-based token estimates are not exact.
 const HEADROOM: f64 = 1.1;
 
-/// Plans the decision envelope: per run, every tool turn, the final turn and the repair, each
-/// bounded by the history it could carry, counted once per possible attempt.
+/// Plans the decision envelope: per run, every tool turn, the final turn and every repair the
+/// budget allows, each bounded by the history it could carry, counted once per possible attempt.
 pub fn plan(config: &Config, input: &PlanInput, pricing: &dyn Pricing) -> Result<Envelope> {
     let b = &config.budget;
     let attempts_per_request = 1 + b.retries;
@@ -128,7 +128,7 @@ pub fn plan(config: &Config, input: &PlanInput, pricing: &dyn Pricing) -> Result
     let max_output = u64::from(config.provider.max_output_tokens);
 
     let mut requests = Vec::new();
-    let total = b.tool_turns + 2;
+    let total = b.tool_turns + 1 + b.repairs;
     for k in 1..=total {
         let prior = u64::from(k - 1);
         let kind = if k <= b.tool_turns {

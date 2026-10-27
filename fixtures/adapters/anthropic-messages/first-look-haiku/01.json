@@ -337,13 +337,13 @@
     "status": 200,
     "headers": {
       "content-type": "application/json",
-      "request-id": "req_011CgT1knZ4XcjMokKGaueJD"
+      "request-id": "req_011CgTVBfvoMpvqjq5DRt9Yk"
     },
     "body": {
       "container": null,
       "content": [
         {
-          "signature": "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",
+          "signature": "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",
           "thinking": "",
           "type": "thinking"
         },
@@ -351,7 +351,7 @@
           "caller": {
             "type": "direct"
           },
-          "id": "toolu_01AVqQy7EBA9pK5C4eCCpkEj",
+          "id": "toolu_01KXdzj3WPcPLjW9iV7s6UoZ",
           "input": {
             "findings": [
               {
@@ -362,9 +362,9 @@
                 "location": {
                   "bbox": [
                     0.25,
-                    0.2,
+                    0.25,
                     0.75,
-                    0.8
+                    0.75
                   ],
                   "fov": null,
                   "frame": "raw:candidate",
@@ -376,45 +376,32 @@
                 "obligation_ids": [
                   "SF4"
                 ],
-                "reason": "The candidate has a flat white square near the center that does not appear in the source, which is a plain gradient. This is an added element; it may be a restyling artifact or a structural change."
+                "reason": "The candidate has a white square near the centre that does not appear in the source, which shows only the plain gradient. This is an added element beyond a restyle and may conflict with 'keep the structure'. It is noted only, not a protected-subject loss."
               }
             ],
             "items": [
               {
                 "allowed_by": null,
                 "confidence": "tentative",
-                "disposition": "cant_tell",
+                "disposition": "held",
                 "evidence": [],
                 "id": "chk:ob:SF1@candidate",
                 "location": null,
-                "reason": "The brief names no specific protected subject or feature, so there is nothing specific to check for identity, shape, position or extent. The source is a gradient with no clear discrete subject to compare against."
+                "reason": "The brief names no specific protected subject. The gradient layout (blue top-left, magenta top-right, green bottom) matches the source's position and extent. The added white square is not a source feature, so no source subject was lost or moved."
               },
               {
                 "allowed_by": null,
-                "confidence": "tentative",
-                "disposition": "violation",
+                "confidence": "confident",
+                "disposition": "held",
                 "evidence": [],
                 "id": "chk:ob:SF2@candidate",
-                "location": {
-                  "bbox": [
-                    0.25,
-                    0.2,
-                    0.75,
-                    0.8
-                  ],
-                  "fov": null,
-                  "frame": "raw:candidate",
-                  "kind": "bbox",
-                  "pitch": null,
-                  "polygon": null,
-                  "yaw": null
-                },
-                "reason": "The candidate appears to share the source's framing and gradient layout, but it adds a white square at the center that is not visible in the source. That departs from 'same scene' and 'derived from the source'. Confidence is tentative because the source is very small."
+                "location": null,
+                "reason": "Same 64x48 frame and same gradient composition and framing as the source, with no visible rotation, stretch or crop. The candidate appears derived from the source scene and camera."
               }
             ],
             "opinion": {
-              "reason": "The candidate keeps the gradient framing, but it adds a central white square absent from the source. That is a tentative derivation failure. No named protected subject exists to check against SF1.",
-              "verdict": "unsure"
+              "reason": "The candidate keeps the source's gradient layout and framing. The only notable difference is an added white square, which I recorded as an observation rather than a violation because the brief names no protected subject.",
+              "verdict": "pass"
             },
             "schema_version": 1
           },
@@ -423,7 +410,7 @@
         }
       ],
       "diagnostics": null,
-      "id": "msg_011CgT1knys6UeiwQky4njmh",
+      "id": "msg_011CgTVBgHNZqyBaEeLQryCG",
       "input_transformations": [],
       "model": "claude-haiku-5-5",
       "role": "assistant",
@@ -440,9 +427,9 @@
         "cache_read_input_tokens": 0,
         "inference_geo": "global",
         "input_tokens": 3053,
-        "output_tokens": 1293,
+        "output_tokens": 1147,
         "output_tokens_details": {
-          "thinking_tokens": 572
+          "thinking_tokens": 489
         },
         "service_tier": "standard",
         "speed": "standard"

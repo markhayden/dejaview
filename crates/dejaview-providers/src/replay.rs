@@ -256,12 +256,17 @@ pub fn first_difference(a: &Value, b: &Value, path: &str) -> Option<String> {
 
 fn short(v: &Value) -> String {
     let s = v.to_string();
-    if s.len() > 80 {
-        format!("{}…", &s[..80])
+    if s.chars().count() > 80 {
+        format!("{}…", s.chars().take(80).collect::<String>())
     } else {
         s
     }
 }
+
+/// Response headers a recording keeps (lowercase): the request ids the adapters report, the retry
+/// hint the run loop reads, and the content type.
+pub const KEPT_RESPONSE_HEADERS: &[&str] =
+    &["content-type", "request-id", "x-request-id", "retry-after"];
 
 fn remove_pointer(v: &mut Value, pointer: &str) {
     let Some((parent, key)) = pointer.rsplit_once('/') else {
@@ -344,11 +349,14 @@ impl Recorder {
                 (k.to_ascii_lowercase(), value)
             })
             .collect();
+        // Only the response headers the adapters read are kept: the rest carry rate-limit state,
+        // organisation and project identifiers, cookies and server details that are not part of
+        // the conversation and must not be committed with it.
         let response_headers: BTreeMap<String, String> = response
             .headers
             .iter()
-            .filter(|(k, _)| !k.starts_with("set-cookie"))
-            .map(|(k, v)| (k.clone(), self.scrub(v)))
+            .filter(|(k, _)| KEPT_RESPONSE_HEADERS.contains(&k.to_ascii_lowercase().as_str()))
+            .map(|(k, v)| (k.to_ascii_lowercase(), self.scrub(v)))
             .collect();
         let response_body: Value =
             serde_json::from_str(&response.body).unwrap_or(Value::String(response.body.clone()));

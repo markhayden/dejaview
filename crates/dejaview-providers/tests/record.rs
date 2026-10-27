@@ -617,25 +617,44 @@ fn record(v: &Vendor) {
     }
 }
 
-/// Every recorded case of one vendor replays to the outcome it reached when recorded.
+/// Every case of one vendor has a recording, every recording replays to the outcome it reached
+/// when recorded with no exchange left unserved, and the report names the recipient chain.
 fn replay(v: &Vendor) {
     let mut replayed = BTreeSet::new();
     for case in cases(v) {
         let dir = fixture_dir(v.adapter, case.name);
-        if !dir.join("expected.json").exists() {
-            continue;
-        }
+        assert!(
+            dir.join("expected.json").exists(),
+            "{}: no recording under {} (record it with DEJAVIEW_LIVE=1)",
+            case.name,
+            dir.display()
+        );
         let expected: Expected =
             serde_json::from_str(&std::fs::read_to_string(dir.join("expected.json")).unwrap())
                 .unwrap();
-        let player = Player::load(&dir, Volatile::common()).unwrap();
-        let (_, reached) = run_case(&case, Arc::new(player), None, &replay_env);
+        let player = Arc::new(Player::load(&dir, Volatile::common()).unwrap());
+        let (outcome, reached) = run_case(&case, player.clone(), None, &replay_env);
         assert_eq!(reached.terminal, expected.terminal, "{}", case.name);
         assert_eq!(reached.verdict, expected.verdict, "{}", case.name);
         assert_eq!(reached.error, expected.error, "{}", case.name);
         assert_eq!(reached.repairs, expected.repairs, "{}", case.name);
         assert_eq!(reached.turns, expected.turns, "{}", case.name);
         assert_eq!(reached.tool_calls, expected.tool_calls, "{}", case.name);
+        assert_eq!(player.remaining(), 0, "{}: unserved exchanges", case.name);
+        // The decision header carries the recipient chain (SPEC "Data leaving the machine").
+        let header: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(outcome.dir.join("decision.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(header["recipient"]["profile"], v.profile, "{}", case.name);
+        assert_eq!(header["recipient"]["model"], case.model, "{}", case.name);
+        assert!(
+            header["recipient"]["host"]
+                .as_str()
+                .is_some_and(|h| !h.is_empty()),
+            "{}: recipient host missing",
+            case.name
+        );
         replayed.insert(case.name);
     }
     eprintln!(
@@ -645,7 +664,13 @@ fn replay(v: &Vendor) {
     );
     // The profile-conformance fixture replays like the case it was taken from.
     let dir = root().join("fixtures/profiles").join(v.profile);
-    if dir.join("expected.json").exists() {
+    assert!(
+        dir.join("expected.json").exists(),
+        "profile {}: no conformance fixture under {}",
+        v.profile,
+        dir.display()
+    );
+    {
         let case = cases(v)
             .into_iter()
             .find(|c| c.name == "first-look")

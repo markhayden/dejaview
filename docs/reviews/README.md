@@ -29,6 +29,7 @@ the tasks that own them.
 | Checkpoint | Record |
 |---|---|
 | M1 | [m1-checkpoint.md](m1-checkpoint.md): code review and coverage findings, each fixed or recorded with its owning task |
+| M2 | [m2-checkpoint.md](m2-checkpoint.md): code review and coverage findings, each fixed or recorded with its owning task; live smoke in [m2-live-smoke.md](m2-live-smoke.md) |
 
 ## Release records
 

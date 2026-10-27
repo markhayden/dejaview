@@ -70,3 +70,5 @@ jobs:
         run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.33.1/cargo-dist-installer.sh | sh
       - run: dist build --artifacts=local --target=${{ matrix.target }}
       - run: scripts/archive-smoke.sh "target/distrib/dejaview-${{ matrix.target }}.tar.xz"
+        env:
+          REQUIRE_CHECKSUM: "1"

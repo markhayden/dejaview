@@ -1,7 +1,7 @@
 {
   "model": "gpt-6.1-sol",
   "terminal": "verdict",
-  "verdict": "pass",
+  "verdict": "fail",
   "error": null,
   "repairs": [
     [
@@ -11,5 +11,5 @@
   ],
   "turns": 2,
   "tool_calls": 0,
-  "cost_usd": 0.002582
+  "cost_usd": 0.0112456
 }

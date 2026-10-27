@@ -15,6 +15,13 @@ model is missing from this page.
 - **Not verifiable.** What the provider does not expose at all: internal retention of abuse-review
   samples, the resize or re-encoding applied to images, which hardware region served a request.
 
+What a recording keeps (`fixtures/adapters/`, `fixtures/profiles/`): the request URL, headers and
+body with every credential replaced by `<redacted>` and the volatile headers blanked; the response
+status, body, and only the response headers the adapters read (`content-type`, `request-id`,
+`x-request-id`, `retry-after`). Rate-limit state, organisation, workspace and project identifiers,
+cookies and server details are dropped at recording time, so a committed fixture carries no
+account identifier.
+
 Consent (`[privacy] cloud_calls = true` and `account`) is bound to the profile: the account must
 carry the profile's prefix (`anthropic:…` for the `anthropic` profile, `google:…` for
 `google-ai-studio`, `openai:…` for `openai`), so a config cannot be pointed at another provider
@@ -78,6 +85,11 @@ Wire assumptions of the Gemini and OpenAI adapters (2.6a, 2.7a), re-verified by 
 | OpenAI | The final-turn instruction is a `developer` message mid-conversation | Confirmed by the `final-turn-refuse` recording. |
 | OpenAI | The request id is the `x-request-id` header | Confirmed by the recordings. Gemini sends no request-id header; its `responseId` in the body stands in. |
 
+Settled cost (`Pricing::cost`) prices uncached input at the input rate, prompt-cache reads at the
+cached rate, prompt-cache writes at the write rate where the catalog states one (the input rate
+otherwise), and output at the output rate; a long-prompt tier is chosen from the whole prompt,
+cached tokens included. Bounds (`Pricing::bound`) assume nothing is cached.
+
 Two prices in the catalog are introductory and dated: `gemini-4-argon` to 2026-11-30 and
 `gemini-3.8-flash` to 2026-12-31. The entries carry the later prices in a comment; re-pin them when
 the dates pass.
@@ -90,22 +102,25 @@ only by a binary built with the `testkit` feature.
 
 ## Confirmed by the Anthropic recordings (2026-10-27)
 
-Fifteen conversations under `fixtures/adapters/anthropic-messages/` (about $0.80 in total)
-confirmed, for `claude-opus-5-5`, `claude-sonnet-5-5` and `claude-haiku-5-5`: the `thinking-binding-controls-2026-08-01` beta
+Fifteen conversations under `fixtures/adapters/anthropic-messages/` (about $0.80 per recording;
+recorded three times on 2026-10-27, last after the M2 checkpoint fixes) confirmed, for `claude-opus-5-5`, `claude-sonnet-5-5` and `claude-haiku-5-5`: the `thinking-binding-controls-2026-08-01` beta
 with `prefix_mismatch_behavior = "error"` accepts an append-only history with thinking blocks
 echoed verbatim; `role: "system"` mid-conversation is accepted after a user turn; `tool_removal`
 blocks under `inline-tools-2026-09-15` are accepted with the tools array unchanged; Haiku 5.5
 accepts `tool_choice: {type: "tool"}` and answers without a thinking block; a request over the
 many-image threshold with every image at 2000 pixels is accepted; the `reasoning_extraction`
-refusal arrives as `stop_reason: "refusal"` with `stop_details` and no content. Opus 5.5 made one
-stray tool call during a final turn delivered as a system message, and the `stray_call` repair
-caught it; the second recording of the same case had it submit directly, so the path is live but
-not deterministic.
+refusal arrives as `stop_reason: "refusal"` with `stop_details` and no content. The final turn is
+not deterministic on Opus 5.5: across three recordings of the same two cases it once made a stray
+tool call (caught by the `stray_call` repair), once submitted directly, and once submitted a
+verdict the validator rejected (an `invalid_submission` repair, then a valid resubmission). Every
+path ended in a verdict. The `tool_use` block is echoed exactly as received since the checkpoint;
+the API accepted the raw echo under the prefix check on every multi-turn case.
 
 ## Confirmed by the Gemini and OpenAI recordings (2026-10-27)
 
 Thirteen conversations per vendor under `fixtures/adapters/gemini-generate-content/` and
-`fixtures/adapters/openai-responses/` (about $0.22 and $0.17) confirmed: Gemini 4 Argon and
+`fixtures/adapters/openai-responses/` (about $0.22 and $0.30 per recording, the OpenAI figure with
+prompt-cache writes priced) confirmed: Gemini 4 Argon and
 Gemini 3.8 Flash answer `generateContent` with `functionCall` parts that carry ids (`call_…`) and
 thought signatures, accept `functionResponse` parts paired by those ids with inline images, and
 omit null-valued fields from function arguments, which the harness now fills back in before
@@ -114,8 +129,12 @@ GPT-6.1 Sol and Terra accept the strict wire schema once every `$ref` stands alo
 arrays are written as `anyOf` with `null` (both learned from live 400s and pinned in the wire
 transformation), echo reasoning items with `store = false`, take images inside
 `function_call_output`, accept a `developer` message mid-conversation, and report
-`cache_write_tokens` and `cached_tokens` in usage. Sol made the stray call during the final turn
-that the Anthropic and Gemini models declined to make, and the repair caught it. Neither Gemini
+`cache_write_tokens` and `cached_tokens` in usage. Sol made a stray call during the final turn in
+both of its recordings, and the repair caught it both times; in the second recording its
+resubmission then placed an observation on an image the rule does not cover and the run ended in
+`error: submission`, which is the harness refusing to turn a bad submission into a verdict. A
+failed tool result reaches Sol with its text prefixed `error: ` (the Responses API has no error
+flag) and the `tool-error` recording shows it carrying on to a verdict. Neither Gemini
 nor OpenAI refused the reasoning-extraction prompt. The first recordings of every vendor had at
 least one model name the `SF3` exemption in `allowed_by`; after the rule text, the rendered hint
 and the rejection were reworded (see docs/rules.md), the second recordings landed every first

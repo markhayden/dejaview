@@ -47,7 +47,8 @@ breaks the cycle between the two crates.
 - `just registry-install-test` (`scripts/registry-install-test.sh`) installs `dejaview` from the
   packaged `.crate` files in a scratch directory outside the repository, with the sibling crates
   supplied from the extracted packages the way crates.io would supply them, then runs the offline
-  smoke.
+  smoke. The stage is removed on exit; `REGISTRY_STAGE_DIR` may name it, and must then be new or
+  empty.
 - `just smoke <binary>` (`scripts/offline-smoke.sh`) is that smoke on any built binary:
   `--version`, `tools list`, `rules show`, and a `check` without a credential that must stop with
   `auth:` and exit 64 before anything leaves the machine.
@@ -76,7 +77,9 @@ stale. The `package` workflow runs the same check.
   builds the archives as workflow artifacts without releasing.
 - Locally, `just archive-build` builds this machine's archive into `target/distrib/` (`dist build`
   for the host target; the other targets cross-compile only on their runners) and
-  `just archive-smoke target/distrib/dejaview-<target>.tar.xz` smokes it, checksum file included.
+  `just archive-smoke target/distrib/dejaview-<target>.tar.xz` smokes it, verifying the checksum
+  file when one sits beside the archive. CI sets `REQUIRE_CHECKSUM=1`, so a missing checksum file
+  fails there.
 - `just live-smoke <binary>` (`scripts/live-smoke.sh`) is the paid smoke behind owner decision 4:
   one `check` per direct profile whose key and account are in the environment, with each vendor's
   cheapest model on the fixture image pair, from any binary (the unpacked archive for a release

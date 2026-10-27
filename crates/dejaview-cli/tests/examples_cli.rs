@@ -100,26 +100,34 @@ fn one_example_config_per_use_case_resolves_in_a_dry_run() {
     }
 }
 
+/// The vendors the live smoke runs, read from its `smoke <profile> <model> <key> <account> <prefix>`
+/// lines so the test cannot drift from the script.
+fn live_smoke_vendors() -> Vec<(String, String, String)> {
+    let script = std::fs::read_to_string(repo_root().join("scripts/live-smoke.sh")).unwrap();
+    let vendors: Vec<(String, String, String)> = script
+        .lines()
+        .filter_map(|l| {
+            let f: Vec<&str> = l.split_whitespace().collect();
+            (f.len() == 6 && f[0] == "smoke").then(|| (f[1].into(), f[2].into(), f[5].into()))
+        })
+        .collect();
+    assert_eq!(
+        vendors.len(),
+        3,
+        "live-smoke.sh runs the three direct profiles"
+    );
+    vendors
+}
+
 #[test]
-fn the_source_fidelity_example_points_at_each_direct_profile_with_set_overrides() {
-    let vendors = [
-        [
-            "provider.profile=anthropic",
-            "provider.model=claude-haiku-5-5",
-            "privacy.account=anthropic:org-example",
-        ],
-        [
-            "provider.profile=google-ai-studio",
-            "provider.model=gemini-3.8-flash",
-            "privacy.account=google:project-example",
-        ],
-        [
-            "provider.profile=openai",
-            "provider.model=gpt-6.1-terra",
-            "privacy.account=openai:org-example",
-        ],
-    ];
-    for sets in vendors {
+fn the_source_fidelity_example_points_at_each_live_smoke_vendor_with_set_overrides() {
+    for (profile, model, prefix) in live_smoke_vendors() {
+        let sets = [
+            format!("provider.profile={profile}"),
+            format!("provider.model={model}"),
+            format!("privacy.account={prefix}:account-example"),
+        ];
+        let sets: Vec<&str> = sets.iter().map(String::as_str).collect();
         let o = dry_run("examples/source-fidelity.toml", "source-fidelity", &sets);
         let err = String::from_utf8_lossy(&o.stderr);
         assert_eq!(o.status.code(), Some(0), "{sets:?}: {err}");

@@ -301,6 +301,16 @@ impl Catalog {
             if !ADAPTERS.contains(&m.adapter.as_str()) {
                 return Err(fail(&format!("unknown adapter {:?}", m.adapter)));
             }
+            if m.capabilities
+                .final_turn
+                .iter()
+                .any(|f| f == "tool_removal")
+                && !m.capabilities.system_messages_in_history
+            {
+                return Err(fail(
+                    "final_turn lists tool_removal but system_messages_in_history is false; the removal blocks travel in a system message",
+                ));
+            }
             if m.status != "stable" {
                 return Err(fail("only stable models are catalogued"));
             }
@@ -537,14 +547,19 @@ fn is_date(s: &str) -> bool {
 
 impl Model {
     /// Prices that apply to a prompt of this many tokens (the long-prompt tier where one exists).
-    fn tier(&self, prompt_tokens: u64) -> (f64, f64) {
+    /// Per-million prices for a prompt of this many tokens (every input token, cached or not):
+    /// input, output and cached input.
+    fn tier(&self, prompt_tokens: u64) -> (f64, f64, f64) {
         match &self.prices.long_prompt {
-            Some(lp) if prompt_tokens > lp.threshold_tokens => {
-                (lp.input_per_million, lp.output_per_million)
-            }
+            Some(lp) if prompt_tokens > lp.threshold_tokens => (
+                lp.input_per_million,
+                lp.output_per_million,
+                lp.cached_input_per_million,
+            ),
             _ => (
                 self.prices.input_per_million,
                 self.prices.output_per_million,
+                self.prices.cached_input_per_million,
             ),
         }
     }
@@ -556,14 +571,23 @@ impl Pricing for Model {
     fn bound(&self, shape: &RequestShape) -> Result<f64> {
         let image_tokens = shape.images * self.images.tokens.max_tokens_per_image();
         let input = shape.input_tokens + image_tokens;
-        let (in_price, out_price) = self.tier(input);
+        let (in_price, out_price, _) = self.tier(input);
         Ok(input as f64 * in_price / 1e6
             + shape.output_tokens as f64 * out_price / 1e6
             + shape.images as f64 * self.prices.per_image)
     }
 
+    /// Settled usage: uncached input at the input rate, cache reads at the cached rate, cache
+    /// writes at the write rate (the input rate when the catalog states none), output at the
+    /// output rate; the long-prompt tier is chosen from the whole prompt.
     fn cost(&self, usage: &Usage) -> f64 {
-        let (in_price, out_price) = self.tier(usage.input_tokens);
-        usage.input_tokens as f64 * in_price / 1e6 + usage.output_tokens as f64 * out_price / 1e6
+        let prompt = usage.input_tokens + usage.cache_read_tokens + usage.cache_write_tokens;
+        let (in_price, out_price, cached_price) = self.tier(prompt);
+        let write_price = self.prices.cache_write_per_million.unwrap_or(in_price);
+        (usage.input_tokens as f64 * in_price
+            + usage.cache_read_tokens as f64 * cached_price
+            + usage.cache_write_tokens as f64 * write_price
+            + usage.output_tokens as f64 * out_price)
+            / 1e6
     }
 }

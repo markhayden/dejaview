@@ -177,3 +177,37 @@ fn check_refuses_an_account_that_does_not_consent_to_the_profile() {
     assert!(err.contains("needs the prefix `anthropic:`"), "{err}");
     assert!(!err.contains("org-55512"), "{err}");
 }
+
+/// Task 2.4 at the binary: a live profile with no credential in the environment stops with the
+/// auth error and the usage exit code before anything is sent, and the variable's name is named.
+#[test]
+fn check_without_a_credential_is_an_auth_error_with_exit_64() {
+    let o = Command::new(env!("CARGO_BIN_EXE_dejaview"))
+        .current_dir(repo_root())
+        .env("DEJAVIEW_ANTHROPIC_ACCOUNT", "org-example")
+        .env_remove("ANTHROPIC_API_KEY")
+        .args([
+            "check",
+            "--config",
+            "fixtures/config/live-anthropic.toml",
+            "--use-case",
+            "source-fidelity",
+            "--candidate",
+            "fixtures/images/candidate-64x48.png",
+            "--source",
+            "fixtures/images/source-64x48.png",
+            "--out",
+            std::env::temp_dir()
+                .join(format!("dejaview-no-key-{}", std::process::id()))
+                .to_str()
+                .unwrap(),
+        ])
+        .output()
+        .unwrap();
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert_eq!(o.status.code(), Some(64), "{err}");
+    assert!(
+        err.contains("auth:") && err.contains("ANTHROPIC_API_KEY"),
+        "{err}"
+    );
+}

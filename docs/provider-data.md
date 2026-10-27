@@ -1,8 +1,9 @@
 # Data leaving the machine, per profile
 
 For every shipped endpoint profile: what the harness enforces at request level, what the operator
-must configure on the account, and what the provider does not expose for verification. Rows are
-filled when a profile's fixtures are recorded (task 2.9).
+must configure on the account, and what the provider does not expose for verification. A row is
+filled when a profile's fixtures are recorded; a catalog test fails when a shipped profile or
+model is missing from this page.
 
 - **Enforced by the harness.** Request-level settings the adapter always sends or refuses, which
   the recorded fixtures prove: for example OpenAI `store = false`, a gateway's upstream allowlist,
@@ -89,21 +90,22 @@ only by a binary built with the `testkit` feature.
 
 ## Confirmed by the Anthropic recordings (2026-10-27)
 
-Fifteen conversations under `fixtures/adapters/anthropic-messages/` (about $1 in total) confirmed,
-for Claude Opus 5.5, Sonnet 5.5 and Haiku 5.5: the `thinking-binding-controls-2026-08-01` beta
+Fifteen conversations under `fixtures/adapters/anthropic-messages/` (about $0.80 in total)
+confirmed, for `claude-opus-5-5`, `claude-sonnet-5-5` and `claude-haiku-5-5`: the `thinking-binding-controls-2026-08-01` beta
 with `prefix_mismatch_behavior = "error"` accepts an append-only history with thinking blocks
 echoed verbatim; `role: "system"` mid-conversation is accepted after a user turn; `tool_removal`
 blocks under `inline-tools-2026-09-15` are accepted with the tools array unchanged; Haiku 5.5
 accepts `tool_choice: {type: "tool"}` and answers without a thinking block; a request over the
 many-image threshold with every image at 2000 pixels is accepted; the `reasoning_extraction`
-refusal arrives as `stop_reason: "refusal"` with `stop_details` and no content. Opus 5.5 follows
-the final-turn instruction, so no stray call during the final turn was recorded live; that path is
-covered by the offline scripted conversations.
+refusal arrives as `stop_reason: "refusal"` with `stop_details` and no content. Opus 5.5 made one
+stray tool call during a final turn delivered as a system message, and the `stray_call` repair
+caught it; the second recording of the same case had it submit directly, so the path is live but
+not deterministic.
 
 ## Confirmed by the Gemini and OpenAI recordings (2026-10-27)
 
 Thirteen conversations per vendor under `fixtures/adapters/gemini-generate-content/` and
-`fixtures/adapters/openai-responses/` (about $0.30 and $0.30) confirmed: Gemini 4 Argon and
+`fixtures/adapters/openai-responses/` (about $0.22 and $0.17) confirmed: Gemini 4 Argon and
 Gemini 3.8 Flash answer `generateContent` with `functionCall` parts that carry ids (`call_…`) and
 thought signatures, accept `functionResponse` parts paired by those ids with inline images, and
 omit null-valued fields from function arguments, which the harness now fills back in before
@@ -114,5 +116,8 @@ transformation), echo reasoning items with `store = false`, take images inside
 `function_call_output`, accept a `developer` message mid-conversation, and report
 `cache_write_tokens` and `cached_tokens` in usage. Sol made the stray call during the final turn
 that the Anthropic and Gemini models declined to make, and the repair caught it. Neither Gemini
-nor OpenAI refused the reasoning-extraction prompt.
+nor OpenAI refused the reasoning-extraction prompt. The first recordings of every vendor had at
+least one model name the `SF3` exemption in `allowed_by`; after the rule text, the rendered hint
+and the rejection were reworded (see docs/rules.md), the second recordings landed every first
+submission that was not meant to fail.
 

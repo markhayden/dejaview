@@ -223,3 +223,26 @@ fn catalog_self_test_catches_an_incomplete_entry() {
         "{err}"
     );
 }
+
+/// Task 2.9: every shipped profile has its data-leaving row in docs/provider-data.md, and every
+/// shipped model is named there, so a new catalog entry cannot ship without its disclosure.
+#[test]
+fn provider_data_documents_every_shipped_profile_and_model() {
+    let doc = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/provider-data.md"),
+    )
+    .unwrap();
+    let c = Catalog::shipped().unwrap();
+    for id in c.profiles.keys() {
+        assert!(
+            doc.contains(&format!("\n| `{id}` |")),
+            "docs/provider-data.md has no row for profile {id}"
+        );
+    }
+    for id in c.models.keys() {
+        assert!(
+            doc.contains(&format!("`{id}`")),
+            "docs/provider-data.md does not name model {id}"
+        );
+    }
+}

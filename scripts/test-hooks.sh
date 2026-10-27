@@ -73,11 +73,11 @@ cp fixtures/synthetic-secrets/example.env "$work/synthetic.env"; git -C "$work" 
 printf 'KEY=\x93sk-ant-%s\x94\n' "$(rep r 30)" > "$work/quoted.txt"; git -C "$work" add quoted.txt; commit_bad "key in smart quotes"
 # --- commit-msg hook: no agent attribution in a message (the patterns are assembled at run time
 # so this file never contains a full match) ---------------------------------------------------
-assistant="Cla""ude"; address="noreply@anthro""pic.com"; generated="Generated ""with ["
+who="Cla""ude"; addr="noreply@anthro""pic.com"; generated="Generated ""with ["
 echo "plain" > "$work/plain.txt"; git -C "$work" add plain.txt
 commit_bad "a change
 
-Co-Authored-By: $assistant Example <$address>"
+Co-Authored-By: $who Example <$addr>"
 git -C "$work" add plain.txt; commit_bad "a change
 
 ${generated}Some Tool](https://example.invalid)"

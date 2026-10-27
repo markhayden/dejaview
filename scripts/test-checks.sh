@@ -86,8 +86,8 @@ rm -rf "$probe"
 
 # check-attribution: a file with an assistant trailer or a "Generated with" line fails; a plain
 # co-author passes. The patterns are assembled at run time so this file never contains a match.
-probe="$(mktemp)"; assistant="Cla""ude"; address="noreply@anthro""pic.com"; generated="Generated ""with ["
-printf 'feat: x\n\nCo-Authored-By: %s Example <%s>\n' "$assistant" "$address" > "$probe"
+probe="$(mktemp)"; who="Cla""ude"; addr="noreply@anthro""pic.com"; generated="Generated ""with ["
+printf 'feat: x\n\nCo-Authored-By: %s Example <%s>\n' "$who" "$addr" > "$probe"
 if scripts/check-attribution.sh "$probe" >/dev/null 2>&1; then echo "FAIL: check-attribution accepted an assistant trailer" >&2; fail=$((fail+1)); else pass=$((pass+1)); fi
 printf 'feat: x\n\n%sTool](https://example.invalid)\n' "$generated" > "$probe"
 if scripts/check-attribution.sh "$probe" >/dev/null 2>&1; then echo "FAIL: check-attribution accepted a Generated-with line" >&2; fail=$((fail+1)); else pass=$((pass+1)); fi

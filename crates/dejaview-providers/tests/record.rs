@@ -222,7 +222,8 @@ fn cases(v: &Vendor) -> Vec<Case> {
             profile: v.profile,
             model: v.primary,
             controls: low.clone(),
-            max_output_tokens: 256,
+            // Too small for any reasoning model's shortest submission, so the cut is certain.
+            max_output_tokens: 64,
             budget: "repair_output_tokens = 8000\n",
             steer: None,
             tool_script: None,

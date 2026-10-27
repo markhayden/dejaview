@@ -338,7 +338,7 @@ text = "The candidate is derived from the source: same scene, same camera, same 
 id = "SF3"
 kind = "allowed"
 waives = []
-text = "Changes the job requirements list as allowed are not violations. Cite the requirement that allows them."
+text = "Changes the job requirements permit are not violations."
 
 [[rule]]
 id = "SF4"
@@ -375,7 +375,10 @@ ignore = ["chair", "table", "person", "plant", "curtain", "lamp", "car"]
 In the architectural profile a change to furniture is reported as an `observed` finding citing
 SF4 while SF4 is enabled; it is never an `allowed_change` on SF1, because SF3 waives nothing. An
 exemption with `waives = []` supplies permission context only: it neither satisfies a mandatory
-item nor overrides an enabled observation instruction. Structure covered by dressing is `hidden`
+item nor overrides an enabled observation instruction. The prompt says so next to the rule, and
+a submission that names it in `allowed_by` anyway is rejected with the disposition to use
+instead (`held` where the obligation still holds). Models read "allowed" as an invitation to
+cite the rule, so the rule text itself never asks them to cite anything. Structure covered by dressing is `hidden`
 on SF1, recorded because `hidden_ok` is set. A job requirement of kind `allowed` with
 `waives = ["SF1"]` and a `condition` is how a consumer permits a specific structural change.
 

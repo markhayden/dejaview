@@ -1,15 +1,15 @@
 {
   "model": "claude-opus-5-5",
-  "terminal": "verdict",
-  "verdict": "unsure",
-  "error": null,
+  "terminal": "error",
+  "verdict": null,
+  "error": "submission: finding 0: observation RC1 is not on image source",
   "repairs": [
     [
       "rejected",
-      "invalid_submission"
+      "stray_call"
     ]
   ],
   "turns": 3,
-  "tool_calls": 1,
-  "cost_usd": 0.10094800000000001
+  "tool_calls": 2,
+  "cost_usd": 0.083216
 }

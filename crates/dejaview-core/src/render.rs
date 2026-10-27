@@ -70,7 +70,10 @@ pub fn obligations_section(resolved: &Resolved, job: &Job) -> String {
                 clean(&ex.text)
             );
             if ex.waives.is_empty() {
-                line.push_str(" This states what may change; it waives no obligation above.");
+                line.push_str(
+                    " This states what may change; it waives nothing and is never an `allowed_by`. \
+                     Where such a change leaves the obligations above intact, mark the item `held`.",
+                );
             } else {
                 line.push_str(&format!(" May waive: {}.", clean(&ex.waives.join(", "))));
                 if let Some(c) = &ex.condition {

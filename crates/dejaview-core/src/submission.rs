@@ -292,10 +292,16 @@ fn validate_findings(sub: &Submission, ctx: &ValidationContext<'_>) -> Result<()
                     )));
                 }
                 cited_observe += 1;
-            } else if ctx.resolved.exemptions.iter().any(|e| &e.id == id) {
-                return Err(Error::Submission(format!(
-                    "{tag}: {id} is an exemption; cite the obligation it waives and name it in allowed_by"
-                )));
+            } else if let Some(ex) = ctx.resolved.exemptions.iter().find(|e| &e.id == id) {
+                return Err(Error::Submission(if ex.waives.is_empty() {
+                    format!(
+                        "{tag}: {id} waives nothing; cite the obligation the change bears on, or an observe rule"
+                    )
+                } else {
+                    format!(
+                        "{tag}: {id} is an exemption; cite the obligation it waives and name it in allowed_by"
+                    )
+                }));
             } else {
                 return Err(Error::Submission(format!(
                     "{tag}: unknown obligation {id:?}; obligation_ids take rule ids as numbered under Obligations (for example SF4), not checklist item ids"
@@ -386,6 +392,12 @@ fn check_exemption_applies(
         let inst = ctx.resolved.instance(inst_id).ok_or_else(|| {
             Error::Submission(format!("{who}: internal: unknown instance {inst_id}"))
         })?;
+        if ex.waives.is_empty() {
+            return Err(Error::Submission(format!(
+                "{who}: {allowed_by} waives nothing and is never an allowed_by; if {} still holds there, the item is `held`",
+                inst.obligation_id
+            )));
+        }
         if !ex.applies_to(&inst.obligation_id, &inst.target) {
             return Err(Error::Submission(format!(
                 "{who}: exemption {allowed_by} does not waive {} on {}",

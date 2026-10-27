@@ -26,7 +26,7 @@ text = "The candidate is derived from the source: same scene, same camera, same 
 id = "SF3"
 kind = "allowed"
 waives = []
-text = "Changes the job requirements list as allowed are not violations. Cite the requirement that allows them."
+text = "Changes the job requirements permit are not violations."
 
 [[rule]]
 id = "SF4"

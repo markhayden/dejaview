@@ -48,7 +48,7 @@ tag.
 - [x] 2.6b Gemini recordings
 - [x] 2.7a OpenAI adapter
 - [x] 2.7b OpenAI recordings
-- [ ] Follow-up from the recordings: models cite the `SF3` exemption as if it waived `SF1`; reword the exemption text or the rejection so the first submission lands (seen on Gemini and Anthropic)
+- [x] Follow-up from the recordings: models cited the `SF3` exemption in `allowed_by`; the rule text no longer asks them to cite anything, the rendered hint and the rejection name `held` as the disposition to use, and every vendor was re-recorded (2026-10-27)
 - [ ] 2.8 Gateway profile candidates (optional)
 - [ ] 2.9 provider-data.md
 - [ ] 2.10a Packaging for the registry

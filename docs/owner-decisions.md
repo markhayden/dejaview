@@ -5,7 +5,7 @@ A blank entry blocks the task named in its row. Dates are when the owner decided
 
 | # | Decision | Needed before | Status |
 |---|---|---|---|
-| 1 | Initial judge-model subset for live fixtures and matrices | 2.1 | 2026-10-26: two per vendor: `claude-opus-5-5`, `claude-sonnet-5-5`, `gemini-4-argon`, `gemini-3.8-flash`, and two OpenAI vision models (frontier and mid-tier) named at 2.1. Proposed from the live model list on 2026-10-26: `gpt-6-astra` (frontier) and `gpt-6.1-sol` (mid-tier); catalogued, awaiting the owner's confirmation |
+| 1 | Initial judge-model subset for live fixtures and matrices | 2.1 | 2026-10-26: two per vendor: `claude-opus-5-5`, `claude-sonnet-5-5`, `gemini-4-argon`, `gemini-3.8-flash`, and two OpenAI vision models (frontier and mid-tier) named at 2.1. Confirmed 2026-10-26 from the live model list: `gpt-6.1-sol` (mid-tier, $2/$10) and `gpt-6.1-terra` (low-tier, $1/$5); the frontier `gpt-6-astra` was declined as cost prohibitive at $10/$50 |
 | 2 | Anthropic account for recordings: enforced-thinking (created on or after 2026-08-31) or not | 2.5b | 2026-10-26: the existing account, with the prefix check switched on per request (`thinking-binding-controls` beta, `prefix_mismatch_behavior = "error"`) during recording |
 | 3 | Spend cap: fixture recordings (all three vendors) | 2.5b | decide before 2.5b |
 | 4 | Spend cap: release and gateway smoke tests | 2.8, 2.10b | decide before 2.8 |
@@ -22,6 +22,8 @@ A blank entry blocks the task named in its row. Dates are when the owner decided
 ## Notes on the decisions
 
 - **1.** Two models per vendor from the start; the rest of the catalog may join after the baseline.
+  For OpenAI the pair is the mid-tier and low-tier model rather than frontier and mid-tier: the
+  frontier model's output price would dominate every matrix row.
 - **2.** The harness sends the thinking-binding controls header with `error` behaviour during fixture
   recording so any history edit fails loudly; the same header is available to consumers.
 - **11.** "Nothing from the prototype" covers its images, outputs, stored views and ONNX export.
@@ -35,5 +37,3 @@ A blank entry blocks the task named in its row. Dates are when the owner decided
 ## Open questions for 3.2a
 
 - Generators and publication licence (ADR 0013).
-- The two OpenAI vision models for decision 1: `gpt-6-astra` and `gpt-6.1-sol` are proposed and
-  catalogued (2.1); the owner confirms or swaps them before the OpenAI recordings (2.7b).

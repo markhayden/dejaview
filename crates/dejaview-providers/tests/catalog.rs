@@ -36,7 +36,7 @@ fn catalog_shipped_parses_and_every_entry_is_complete() {
 }
 
 #[test]
-fn catalog_covers_the_owner_subset_and_the_proposed_openai_pair() {
+fn catalog_covers_the_owner_subset() {
     let c = Catalog::shipped().unwrap();
     for id in [
         "claude-opus-5-5",
@@ -44,7 +44,7 @@ fn catalog_covers_the_owner_subset_and_the_proposed_openai_pair() {
         "claude-haiku-5-5",
         "gemini-4-argon",
         "gemini-3.8-flash",
-        "gpt-6-astra",
+        "gpt-6.1-terra",
         "gpt-6.1-sol",
     ] {
         assert!(c.model(id).is_some(), "{id}");

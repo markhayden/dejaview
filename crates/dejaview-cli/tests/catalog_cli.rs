@@ -47,7 +47,7 @@ fn catalog_show_prints_an_entry_and_list_names_every_model() {
     let out = String::from_utf8_lossy(&o.stdout);
     assert!(
         out.contains("gemini-4-argon")
-            && out.contains("gpt-6.1-sol")
+            && out.contains("gpt-6.1-terra")
             && out.contains("profiles: anthropic, google-ai-studio, openai"),
         "{out}"
     );

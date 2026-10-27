@@ -25,9 +25,11 @@ for crate in "$repo"/target/package/*-"$version".crate; do tar xzf "$crate" -C "
   echo "[patch.crates-io]"
   for dir in "$stage"/crates/*/; do
     name="$(basename "$dir")"; name="${name%-"$version"}"
-    # The binary itself is what gets installed; the testkit is a dev-only dependency the
-    # installed binary never enables, so patching it would only draw an "unused patch" warning.
-    case "$name" in dejaview|dejaview-testkit) continue ;; esac
+    # The binary itself is what gets installed; every other crate, the optional testkit included,
+    # stands in for its crates.io release: cargo resolves an optional dependency even when its
+    # feature is off, then reports the patch unused. Without it the install fails with "no matching
+    # package named dejaview-testkit".
+    case "$name" in dejaview) continue ;; esac
     echo "$name = { path = \"$dir\" }"
   done
 } > "$stage/.cargo/config.toml"

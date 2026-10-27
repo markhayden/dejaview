@@ -96,9 +96,14 @@ jobs:
         name: Build the provisioning test with the network
         run: cargo test -p dejaview-tools --test provisioning --no-run
       # act's container cannot create namespaces; there the same install and call run without one.
+      # GitHub's runners block unprivileged user namespaces (`unshare -r`), so the network namespace
+      # is created with sudo and the test runs inside it as the runner user with its PATH and HOME.
       - if: steps.pack.outputs.present == 'true' && !env.ACT
         name: Install and launch the pack without a network
-        run: unshare -rn env UV_OFFLINE=1 UV_PYTHON_DOWNLOADS=never cargo test --offline -p dejaview-tools --test provisioning -- --ignored
+        run: |
+          sudo unshare -n -- sudo -u "$USER" --preserve-env=PATH,HOME,UV_CACHE_DIR,UV_PYTHON \
+            env UV_OFFLINE=1 UV_PYTHON_DOWNLOADS=never CARGO_TERM_COLOR=always \
+            cargo test --offline -p dejaview-tools --test provisioning -- --ignored
       - if: steps.pack.outputs.present == 'true' && env.ACT
         name: Install and launch the pack (no namespace under act)
         run: env UV_OFFLINE=1 UV_PYTHON_DOWNLOADS=never cargo test --offline -p dejaview-tools --test provisioning -- --ignored

@@ -85,11 +85,11 @@ else echo "FAIL: offline-smoke accepted a rules show without SF1: $out" >&2; fai
 rm -rf "$probe"
 
 # check-attribution: a file with an assistant trailer or a "Generated with" line fails; a plain
-# co-author passes.
-probe="$(mktemp)"
-printf 'feat: x\n\nCo-Authored-By: Claude Example <noreply@anthropic.com>\n' > "$probe"
+# co-author passes. The patterns are assembled at run time so this file never contains a match.
+probe="$(mktemp)"; assistant="Cla""ude"; address="noreply@anthro""pic.com"; generated="Generated ""with ["
+printf 'feat: x\n\nCo-Authored-By: %s Example <%s>\n' "$assistant" "$address" > "$probe"
 if scripts/check-attribution.sh "$probe" >/dev/null 2>&1; then echo "FAIL: check-attribution accepted an assistant trailer" >&2; fail=$((fail+1)); else pass=$((pass+1)); fi
-printf 'feat: x\n\nGenerated with [Tool](https://example.invalid)\n' > "$probe"
+printf 'feat: x\n\n%sTool](https://example.invalid)\n' "$generated" > "$probe"
 if scripts/check-attribution.sh "$probe" >/dev/null 2>&1; then echo "FAIL: check-attribution accepted a Generated-with line" >&2; fail=$((fail+1)); else pass=$((pass+1)); fi
 printf 'feat: x\n\nCo-Authored-By: A Person <person@example.invalid>\n' > "$probe"
 if scripts/check-attribution.sh "$probe" >/dev/null 2>&1; then pass=$((pass+1)); else echo "FAIL: check-attribution rejected a human co-author" >&2; fail=$((fail+1)); fi

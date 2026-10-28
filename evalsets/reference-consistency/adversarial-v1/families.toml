@@ -1,0 +1,4 @@
+# Subject or scene families; a family never appears in more than one split.
+[[family]]
+id = "biscuit"
+description = "Biscuit, a beagle with a black saddle, a white blaze and one brown ear"

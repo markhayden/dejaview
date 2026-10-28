@@ -1,0 +1,25 @@
+# Answer labels adjudicated by the owner from the construction record.
+[[label]]
+item = "honey-card-pass"
+expected = "pass"
+failure_types = []
+words = "the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "honey-card-label"
+expected = "fail"
+failure_types = ["yellow label reading HILL FARM HONEY-changed"]
+words = "the yellow label reading HILL FARM HONEY is changed in the candidate, unlike the references"
+obligation_ids = ["PF2", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "yellow label reading HILL FARM HONEY-changed"
+obligation_ids = ["PF2", "RQ1"]
+bbox = [0.5762, 0.4961, 0.75, 0.6143]

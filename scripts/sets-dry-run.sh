@@ -6,8 +6,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
-for set_id in source-fidelity/houses-v1 reference-consistency/pets-v1 source-fidelity/scenes-v1 reality-checks/people-v1 brief-compliance/stills-v1 product-fidelity/packshots-v1; do
-  plan="fixtures/sets/$(basename "$set_id").plan.toml"
+for set_id in source-fidelity/houses-v1 reference-consistency/pets-v1 source-fidelity/scenes-v1 reality-checks/people-v1 brief-compliance/stills-v1 product-fidelity/packshots-v1 source-fidelity/adversarial-v1 reference-consistency/adversarial-v1 reality-checks/adversarial-v1 brief-compliance/adversarial-v1 product-fidelity/adversarial-v1; do
+  case "$set_id" in */adversarial-v1) plan="fixtures/sets/adversarial-$(dirname "$set_id").plan.toml" ;; *) plan="fixtures/sets/$(basename "$set_id").plan.toml" ;; esac
   (cd scripts/sets && uv run --frozen --offline --no-sync dejaview-sets build \
     --plan "../../$plan" --out "$work/evalsets/$set_id" --owner "$work/owner" --fake)
   draft="$work/owner/$set_id/labels-draft.toml"

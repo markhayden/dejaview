@@ -1,0 +1,12 @@
+[seal]
+sha256 = "94799a46c23d61833f8bb663ceb9f1b7abd08e704d8a692db03b121291bbbedf"
+created = "2026-10-28T03:00:13Z"
+attestation = "Reviewed both items of source-fidelity/adversarial-v1 from the contact sheet on 2026-10-27 and confirmed the labels; no judge or tool ran on these items before they were labelled."
+
+[seal.components]
+items = "bfb185176297078174804a54c051bc16425aa1e0742cf3faa7d606d4e9302e79"
+families = "5364895be4fbb75484bd8f048a1b1f6a50632bbdd4d54a39dc022f678d877ac8"
+jobs = "3cea793fa7d76551a1054251d6b8ac7b3b80211794c37355c0c2e909fd6417d4"
+images = "194b5beb1b6dc508604ccb743952371dc47b3ba21283800d437e788db00a6e3b"
+rules = "5c89a8178b5d389648013f543b02f2933be306ff72f7b27de3168ca47288ec56"
+labels = "321c1f287e9261c749065bf73fb8859ecc07e3d03052e464f4dcd60fd3c57c01"

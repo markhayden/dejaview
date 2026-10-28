@@ -1,0 +1,9 @@
+# Item of reality-checks/adversarial-v1; built by construction, see the owner's record.
+[job]
+use_case = "reality-checks"
+brief = "A photograph of a florist's counter."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/florist-sign-pass/candidate.png", sha256 = "ebfb45badf85faf9be8dc735fc1f9de92665436c95a702771c095e340e5ecbd0" }

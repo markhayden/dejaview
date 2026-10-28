@@ -1,0 +1,21 @@
+# Built by dejaview-sets; labels confirmed by the owner.
+[set]
+id = "brief-compliance/adversarial-v1"
+use_case = "brief-compliance"
+split = "dev"
+licence = "CC-BY-4.0"
+images_repo = "github.com/markhayden/dejaview-evalsets"
+images_rev = "ef25c6aed2c4eb1c9c024bcefe06faa497c9d052"
+labels = "labels.toml"
+families = "families.toml"
+rules = { base = "brief-compliance", version = 1 }
+
+[[item]]
+id = "porch-sign-pass"
+family = "porch"
+job = "items/porch-sign-pass/job.toml"
+
+[[item]]
+id = "porch-sign-no-lantern"
+family = "porch"
+job = "items/porch-sign-no-lantern/job.toml"

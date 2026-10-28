@@ -1,0 +1,35 @@
+# Item of source-fidelity/adversarial-v1; built by construction, see the owner's record.
+[job]
+use_case = "source-fidelity"
+brief = "Restyle the scene; keep the structure and every named subject."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+text = "The wooden garden shed keeps its identity, shape, position and extent relative to the source."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+text = "The blue shed door keeps its identity, shape, position and extent relative to the source."
+
+[[job.requirements]]
+id = "RQ3"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+text = "The wheelbarrow keeps its identity, shape, position and extent relative to the source."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/garden-shed-sign-pass/candidate.png", sha256 = "5d87ff538263efbbeb390d936fe45bf1414f3ffe108f1da4810a347233765542" }
+
+[[job.images]]
+id = "source"
+role = "source"
+source = { path = "families/garden-shed/source.png", sha256 = "7a55406a2c5ec8bd64a56ca8c20c95e3dfc368bab0d865293de1be86210a3c5a" }

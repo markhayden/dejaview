@@ -1,0 +1,4 @@
+# Subject or scene families; a family never appears in more than one split.
+[[family]]
+id = "garden-shed"
+description = "a wooden garden shed with a blue door and a wheelbarrow in front"

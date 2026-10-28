@@ -84,6 +84,43 @@ fn eval_run_completes_a_fake_matrix_and_resumes_without_redoing_it() {
         String::from_utf8_lossy(&o.stderr)
     );
     assert_eq!(std::fs::read(out.join("report.md")).unwrap(), stored);
+    // The results document generator assembles the published write-up from the directory.
+    let doc = out.join("doc");
+    let o = Command::new("python3")
+        .current_dir(repo_root())
+        .args([
+            "-I",
+            "scripts/results-doc.py",
+            out.to_str().unwrap(),
+            "fixtures/matrix/fake-a.toml",
+            doc.to_str().unwrap(),
+            "--bin",
+            env!("CARGO_BIN_EXE_dejaview"),
+        ])
+        .env("DEJAVIEW_EVALSETS_ROOT", "fixtures/evalsets")
+        .output()
+        .unwrap();
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    let readme = std::fs::read_to_string(doc.join("README.md")).unwrap();
+    for needle in [
+        "**These are development sets.**",
+        "## Development sets",
+        "## Adversarial sets",
+        "| fake:fake-model/A | scripted |",
+        "| Detected failures |",
+    ] {
+        assert!(readme.contains(needle), "{needle}: {readme}");
+    }
+    assert!(
+        doc.join("summary.json").is_file()
+            && doc.join("metrics.json").is_file()
+            && doc.join("matrix.toml").is_file()
+    );
     // A subset of sets prints to stdout and writes nothing; an unknown set is refused.
     let before = std::fs::metadata(out.join("report.md"))
         .unwrap()
@@ -450,4 +487,12 @@ fn eval_requalify_records_a_baseline_and_eval_canary_compares_against_it() {
         text.contains(": recommend_disable") && text.contains("nothing was disabled"),
         "{text}"
     );
+    // A spend cap that cannot cover one item refuses before anything is sent.
+    let o = run(
+        "canary",
+        "fixtures/scripts/held.json",
+        &["--spend-cap-usd", "0.001"],
+    );
+    assert_eq!(o.status.code(), Some(64));
+    assert!(String::from_utf8_lossy(&o.stderr).contains("spend cap"));
 }

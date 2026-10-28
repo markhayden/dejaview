@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use dejaview_core::config::Config;
+use dejaview_core::ledger::Ledger;
 use dejaview_core::provider::Provider;
 use dejaview_core::run::{self, Cancel, Services};
 use dejaview_core::tool::ToolRegistry;
@@ -90,6 +91,10 @@ pub struct Summary {
     /// Decisions found started but incomplete at the start of this run, and run again.
     pub partial: Vec<String>,
     pub cancelled: bool,
+    /// The cap no longer covered the next decision's envelope: the run stopped there, without a
+    /// row for it or anything after it. A resume tries again; a larger cap is a new matrix.
+    #[serde(default)]
+    pub budget_exhausted: bool,
     /// The ledger's cumulative spend across every run of this evaluation.
     pub spent_usd: f64,
     pub cap_usd: f64,
@@ -162,7 +167,7 @@ pub(crate) fn cell_config(
             .model
             .controls
             .iter()
-            .map(|(k, v)| format!("{k} = {}", toml_scalar(v)))
+            .map(|(k, v)| format!("{k:?} = {}", toml_scalar(v)))
             .collect();
         overrides.push(format!("provider.controls={{ {} }}", inline.join(", ")));
     }
@@ -234,6 +239,20 @@ pub fn run(plan: &Plan, factories: &dyn Factories, cancel: Option<&Cancel>) -> R
             .into_iter()
             .map(|(name, (manifest, lock))| (name, manifest, lock))
             .collect(),
+        selections: selections
+            .iter()
+            .map(|((arm, use_case), sel)| {
+                let tools = sel
+                    .enabled
+                    .iter()
+                    .map(|t| match sel.projections.get(t) {
+                        Some(p) => format!("{t}:{p}"),
+                        None => t.clone(),
+                    })
+                    .collect();
+                (format!("{arm}@{use_case}"), tools)
+            })
+            .collect(),
         harness_version: plan.harness_version.clone(),
     })?;
     if plan
@@ -256,6 +275,7 @@ pub fn run(plan: &Plan, factories: &dyn Factories, cancel: Option<&Cancel>) -> R
         skipped: 0,
         partial: Vec::new(),
         cancelled: false,
+        budget_exhausted: false,
         spent_usd: 0.0,
         cap_usd: m.spend_cap_usd,
     };
@@ -287,6 +307,22 @@ pub fn run(plan: &Plan, factories: &dyn Factories, cancel: Option<&Cancel>) -> R
                         summary.cancelled = true;
                         break 'outer;
                     }
+                    let config = cell_config(plan, cell, set, &selection)?;
+                    let provider = factories.provider(cell, &config)?;
+                    let tools = factories.tools(&selection, &config)?;
+                    // The cap must still cover this decision's envelope; when it cannot, the run
+                    // stops here rather than recording refusals as results.
+                    if let Some(pricing) = provider.pricing() {
+                        let envelope = run::envelope(&config, job, &set.dir, &tools, pricing)
+                            .map_err(|e| Error::Runner(format!("{id}: {e}")))?;
+                        let remaining = Ledger::cap(&ledger)
+                            - Ledger::spent(&ledger)
+                            - Ledger::reserved(&ledger);
+                        if envelope.usd > remaining + 1e-9 {
+                            summary.budget_exhausted = true;
+                            break 'outer;
+                        }
+                    }
                     if dir.exists()
                         && std::fs::read_dir(&dir)
                             .map(|mut d| d.next().is_some())
@@ -295,9 +331,6 @@ pub fn run(plan: &Plan, factories: &dyn Factories, cancel: Option<&Cancel>) -> R
                         summary.partial.push(id.clone());
                     }
                     std::fs::create_dir_all(&dir).map_err(|e| io(&dir, e))?;
-                    let config = cell_config(plan, cell, set, &selection)?;
-                    let provider = factories.provider(cell, &config)?;
-                    let tools = factories.tools(&selection, &config)?;
                     ledger.begin(&id);
                     let mut services =
                         Services::new(provider.as_ref(), &tools).with_shared_ledger(Some(&ledger));
@@ -355,16 +388,18 @@ pub fn run(plan: &Plan, factories: &dyn Factories, cancel: Option<&Cancel>) -> R
                     };
                     let text = serde_json::to_string_pretty(&result)
                         .map_err(|e| Error::Runner(e.to_string()))?;
-                    std::fs::write(dir.join(RESULT_FILE), text).map_err(|e| io(&dir, e))?;
+                    crate::write_atomic(&dir.join(RESULT_FILE), text.as_bytes())
+                        .map_err(|e| io(&dir, e))?;
                     summary.decisions.push(result);
                     summary.completed += 1;
                 }
             }
         }
     }
-    summary.spent_usd = dejaview_core::ledger::Ledger::spent(&ledger);
+    summary.spent_usd = Ledger::spent(&ledger);
     let text = serde_json::to_string_pretty(&summary).map_err(|e| Error::Runner(e.to_string()))?;
-    std::fs::write(plan.eval_dir.join(SUMMARY_FILE), text).map_err(|e| io(&plan.eval_dir, e))?;
+    crate::write_atomic(&plan.eval_dir.join(SUMMARY_FILE), text.as_bytes())
+        .map_err(|e| io(&plan.eval_dir, e))?;
     crate::summary::write(&plan.eval_dir, &sets, &summary)?;
     Ok(summary)
 }

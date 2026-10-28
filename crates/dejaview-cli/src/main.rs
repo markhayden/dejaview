@@ -659,7 +659,7 @@ fn tools_list(args: &ToolsListArgs) -> i32 {
             return EXIT_USAGE;
         }
     };
-    for pack in &packs {
+    for (pack, _) in &packs {
         known.extend(pack.manifests().iter().cloned());
     }
     let mut listed = Vec::new();
@@ -711,16 +711,26 @@ fn build_tools(args: &CheckArgs, config: &Config) -> Result<ToolRegistry, String
         let _ = args;
         None
     };
-    tools_for_config(config, script)
+    tools_for_config(config, script).map(|(registry, _)| registry)
 }
 
 /// The tool registry for a config: the configured packs, then the built-in (and in a testkit
-/// build the scripted) tools, enabled and ordered as the config says.
-fn tools_for_config(config: &Config, tool_script: Option<&Path>) -> Result<ToolRegistry, String> {
+/// build the scripted) tools, enabled and ordered as the config says; with the lock digest of
+/// the installed pack each enabled pack tool came from (a pack run by `command` has none).
+fn tools_for_config(
+    config: &Config,
+    tool_script: Option<&Path>,
+) -> Result<(ToolRegistry, std::collections::BTreeMap<String, String>), String> {
     // Packs first; a built-in or scripted tool of the same name yields to the pack's.
     let mut available: Vec<Box<dyn Tool>> = Vec::new();
-    for pack in connect_packs(config)? {
-        available.extend(pack.tools());
+    let mut digests = std::collections::BTreeMap::new();
+    for (pack, lock_digest) in connect_packs(config)? {
+        for tool in pack.tools() {
+            if let Some(d) = &lock_digest {
+                digests.insert(tool.manifest().name.clone(), d.clone());
+            }
+            available.push(tool);
+        }
     }
     for tool in available_tools(tool_script)? {
         if !available
@@ -730,8 +740,10 @@ fn tools_for_config(config: &Config, tool_script: Option<&Path>) -> Result<ToolR
             available.push(tool);
         }
     }
-    ToolRegistry::new(available, &config.tools.enabled, &config.tools.order)
-        .map_err(|e| e.to_string())
+    let registry = ToolRegistry::new(available, &config.tools.enabled, &config.tools.order)
+        .map_err(|e| e.to_string())?;
+    digests.retain(|name, _| config.tools.enabled.contains(name));
+    Ok((registry, digests))
 }
 
 fn tools_setup(args: &ToolsSetupArgs) -> i32 {
@@ -765,26 +777,31 @@ fn tools_setup(args: &ToolsSetupArgs) -> i32 {
 
 /// Connects every pack the config names: by `command`, or by `package` and `version` from an
 /// installed bundle.
-fn connect_packs(
-    config: &Config,
-) -> Result<Vec<std::sync::Arc<dejaview_tools::mcp::Pack>>, String> {
+/// A connected pack and, when it came from an installed bundle, that bundle's lock digest.
+type ConnectedPack = (std::sync::Arc<dejaview_tools::mcp::Pack>, Option<String>);
+
+fn connect_packs(config: &Config) -> Result<Vec<ConnectedPack>, String> {
     use dejaview_tools::mcp::{Pack, Spawn, Timeouts};
     use dejaview_tools::provision::{Installed, data_home};
     use std::time::Duration;
     let mut packs = Vec::new();
     for (name, pack) in &config.tools.packs {
-        let spawn = match (&pack.command, &pack.package, &pack.version) {
-            (Some(command), _, _) => Spawn {
-                command: command.clone(),
-                args: pack.args.clone(),
-                declared_env: pack.env.clone(),
-                cwd: None,
-                extra_env: Vec::new(),
-            },
+        let (spawn, lock_digest) = match (&pack.command, &pack.package, &pack.version) {
+            (Some(command), _, _) => (
+                Spawn {
+                    command: command.clone(),
+                    args: pack.args.clone(),
+                    declared_env: pack.env.clone(),
+                    cwd: None,
+                    extra_env: Vec::new(),
+                },
+                None,
+            ),
             (None, Some(package), Some(version)) => {
-                Installed::locate(&data_home(), package, version)
-                    .map_err(|e| e.to_string())?
-                    .spawn(pack.env.clone())
+                let installed =
+                    Installed::locate(&data_home(), package, version).map_err(|e| e.to_string())?;
+                let digest = installed.lock_digest.clone();
+                (installed.spawn(pack.env.clone()), Some(digest))
             }
             _ => continue,
         };
@@ -793,9 +810,10 @@ fn connect_packs(
             call: Duration::from_secs(config.budget.tool_timeout_s),
             shutdown_grace: Duration::from_secs(5),
         };
-        packs.push(
+        packs.push((
             Pack::connect(name, spawn, timeouts, std::env::vars()).map_err(|e| e.to_string())?,
-        );
+            lock_digest,
+        ));
     }
     Ok(packs)
 }

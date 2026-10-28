@@ -1,4 +1,4 @@
-#!/usr/bin/env python3 -I
+#!/usr/bin/env -S python3 -I
 """Writes the results document of a finished evaluation (PLAN.md task 3.8): every metric from
 `dejaview eval report`, development and adversarial sets reported separately, the resolved model
 ids, hosts and API versions from the decision headers, the cost per cell, and copies of the
@@ -12,13 +12,14 @@ from __future__ import annotations
 import argparse
 import collections
 import json
+import os
 import pathlib
 import shutil
 import subprocess
 
 
-def report(binary: str, eval_dir: pathlib.Path, sets: list[str]) -> str:
-    args = [binary, "eval", "report", "--out", str(eval_dir), "--sets", ",".join(sets)]
+def report(binary: str, eval_dir: pathlib.Path, evalsets_root: str, sets: list[str]) -> str:
+    args = [binary, "eval", "report", "--out", str(eval_dir), "--evalsets-root", evalsets_root, "--sets", ",".join(sets)]
     return subprocess.run(args, check=True, capture_output=True, text=True).stdout
 
 
@@ -28,6 +29,7 @@ def main() -> None:
     ap.add_argument("matrix", type=pathlib.Path)
     ap.add_argument("out", type=pathlib.Path, help="the results directory to create")
     ap.add_argument("--bin", default="target/debug/dejaview")
+    ap.add_argument("--evalsets-root", default=os.environ.get("DEJAVIEW_EVALSETS_ROOT", "evalsets"))
     a = ap.parse_args()
     summary = json.loads((a.eval_dir / "summary.json").read_text())
     descriptor = json.loads((a.eval_dir / "descriptor.json").read_text())
@@ -52,7 +54,13 @@ def main() -> None:
 
     a.out.mkdir(parents=True, exist_ok=True)
     shutil.copy(a.matrix, a.out / "matrix.toml")
-    shutil.copy(a.eval_dir / "summary.json", a.out / "summary.json")
+    # The published summary keeps every decision's error class but not the error text, which
+    # may quote a provider's response body.
+    published = json.loads(json.dumps(summary))
+    for d in published["decisions"]:
+        if d.get("error"):
+            d["error"] = f"[{d['error_class']}: text withheld from the published copy]"
+    (a.out / "summary.json").write_text(json.dumps(published, indent=2) + "\n")
     shutil.copy(a.eval_dir / "metrics.json", a.out / "metrics.json")
     shutil.copy(a.eval_dir / "descriptor.json", a.out / "descriptor.json")
 
@@ -78,14 +86,17 @@ def main() -> None:
     counts = collections.Counter(d["cell"] for d in summary["decisions"])
     for cell in sorted(counts):
         r = recipients.get(cell, {})
+        profile = r.get("profile") or ("scripted" if cell.startswith("fake:") else "")
         lines.append(
-            f"| {cell} | {r.get('profile', '')} | {r.get('host', '')} | {r.get('model', '')} | {r.get('api_version', '')} | {counts[cell]} | {errors[cell]} | ${cost[cell]:.4f} |"
+            f"| {cell} | {profile} | {r.get('host', '')} | {r.get('model', '')} | {r.get('api_version', '')} | {counts[cell]} | {errors[cell]} | ${cost[cell]:.4f} |"
         )
     lines += ["", "## Development sets", "", f"Sets: {', '.join(dev)}", ""]
-    lines.append(report(a.bin, a.eval_dir, dev).split("\n", 1)[1].strip())
+    lines.append(report(a.bin, a.eval_dir, a.evalsets_root, dev).split("\n", 1)[1].strip())
     lines += ["", "## Adversarial sets", "", f"Sets: {', '.join(adversarial)}", ""]
     if adversarial:
-        lines.append(report(a.bin, a.eval_dir, adversarial).split("\n", 1)[1].strip())
+        lines.append(report(a.bin, a.eval_dir, a.evalsets_root, adversarial).split("\n", 1)[1].strip())
+    else:
+        lines.append("(none in this matrix)")
     lines += ["", "## Every set together", ""]
     lines.append((a.eval_dir / "report.md").read_text().split("\n", 1)[1].strip())
     (a.out / "README.md").write_text("\n".join(lines) + "\n")

@@ -11,6 +11,8 @@
 #   i6 expected pass, computed error  -> error            cost 0.00 wall 50
 # Counts: items 6, expected fail 3, expected pass 3, detected 1, missed 1, false rejects 1,
 # unsure 1, errors 1. Rates: missed 1/3, detected 1/3, false rejects 1/3, unsure 1/6, error 1/6.
+# Wilson (z = 1.959963984540054): 1/3 -> [0.06149194472039621, 0.7923403991979522];
+# 1/6 -> [0.030053369748306635, 0.5635028221864702].
 # Cost total 1.50, median of [0.00, 0.10, 0.20, 0.30, 0.40, 0.50] = 0.25; wall total 1550,
 # median of [50, 100, 200, 300, 400, 500] = 250.
 # Repetition 2 covers i1 to i4: i1 fail (agrees), i2 fail (disagrees), i3 unsure (agrees),
@@ -128,9 +130,13 @@ false_rejects = 1
 unsure = 1
 errors = 1
 missed_rate = 0.3333333333333333
+missed_low = 0.06149194472039621
+missed_high = 0.7923403991979522
 detected_rate = 0.3333333333333333
 false_reject_rate = 0.3333333333333333
 unsure_rate = 0.16666666666666666
+unsure_low = 0.030053369748306635
+unsure_high = 0.5635028221864702
 error_rate = 0.16666666666666666
 cost_total_usd = 1.50
 cost_median_usd = 0.25

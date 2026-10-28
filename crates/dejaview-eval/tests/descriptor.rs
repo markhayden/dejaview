@@ -22,6 +22,12 @@ fn inputs(matrix_text: &str) -> Inputs {
             "{\"name\":\"fake_regions\"}".into(),
             Some("lock-1".into()),
         )],
+        selections: [(
+            "C@source-fidelity".to_string(),
+            vec!["view".to_string(), "align:visual_only".to_string()],
+        )]
+        .into_iter()
+        .collect(),
         harness_version: "0.1.0 (test)".into(),
     }
 }
@@ -120,4 +126,23 @@ fn copy_dir(from: &std::path::Path, to: &std::path::Path) {
             std::fs::copy(e.path(), target).unwrap();
         }
     }
+}
+
+#[test]
+fn a_changed_arm_selection_refuses_resume() {
+    let dir = tempdir("selections");
+    let text = std::fs::read_to_string(root().join("fixtures/matrix/baseline-a.toml")).unwrap();
+    let first = Descriptor::compute(&inputs(&text)).unwrap();
+    first.write(&dir).unwrap();
+    let mut changed = inputs(&text);
+    changed.selections.insert(
+        "D@source-fidelity".into(),
+        vec!["view".into(), "align:visual_only".into(), "classes".into()],
+    );
+    let now = Descriptor::compute(&changed).unwrap();
+    assert_ne!(now.sha256, first.sha256);
+    let err = Descriptor::check_resume(&dir, &now)
+        .unwrap_err()
+        .to_string();
+    assert!(err.contains("arm selections"), "{err}");
 }

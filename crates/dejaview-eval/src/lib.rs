@@ -56,3 +56,19 @@ pub enum Error {
 
 /// Result alias for this crate.
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// Writes a file through a temporary neighbour, synced and renamed into place, so a crash
+/// mid-write leaves the old file or none, never a truncated one.
+pub fn write_atomic(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let tmp = path.with_extension(format!(
+        "{}.tmp-{}",
+        path.extension().and_then(|e| e.to_str()).unwrap_or("file"),
+        std::process::id()
+    ));
+    let mut file = std::fs::File::create(&tmp)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    drop(file);
+    std::fs::rename(&tmp, path)
+}

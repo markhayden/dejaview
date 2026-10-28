@@ -47,7 +47,8 @@ fn every_cell_runs_with_the_cache_bypassed_and_repetition_one_flagged() {
     }
     assert_eq!(summary(&dir), s);
     assert!(dir.join("descriptor.json").exists() && dir.join("ledger.jsonl").exists());
-    assert!(!dir.join("LOCK").exists(), "the lock is released");
+    // The lock file stays (the OS lock on it is what is held) and is free again.
+    drop(dejaview_eval::descriptor::WriterLock::acquire(&dir).unwrap());
     // The run ends with the metrics and the Markdown report, which `eval report` reproduces
     // byte for byte from the saved results and the labels.
     let report_md = std::fs::read_to_string(dir.join("report.md")).unwrap();
@@ -89,7 +90,7 @@ fn every_cell_runs_with_the_cache_bypassed_and_repetition_one_flagged() {
 }
 
 #[test]
-fn the_cap_stops_the_matrix_with_a_budget_error_per_unstarted_decision() {
+fn the_cap_stops_the_matrix_before_a_decision_it_cannot_cover_and_records_nothing_for_it() {
     let dir = tempdir("cap");
     let mut p = plan(&dir, "fake-a.toml");
     p.matrix.matrix.spend_cap_usd = 0.2;
@@ -97,19 +98,71 @@ fn the_cap_stops_the_matrix_with_a_budget_error_per_unstarted_decision() {
         .matrix_text
         .replace("spend_cap_usd = 5.0", "spend_cap_usd = 0.2");
     let s = run(&p, &fake("held-costly.json"), None).unwrap();
-    let budget: Vec<&_> = s
-        .decisions
-        .iter()
-        .filter(|d| d.error_class.as_deref() == Some("budget"))
-        .collect();
-    assert!(!budget.is_empty() && budget.len() < 4, "{s:?}");
-    assert!(
+    // The first decision fits and settles to about $0.09; the second's envelope no longer does.
+    // The run stops there: no row, no directory, nothing sent, and the summary says why.
+    assert!(s.budget_exhausted, "{s:?}");
+    assert_eq!(
         s.decisions
             .iter()
-            .any(|d| d.verdict.as_deref() == Some("pass")),
-        "the first decision fits"
+            .map(|d| d.id.as_str())
+            .collect::<Vec<_>>(),
+        ["source-fidelity/pairs-v1/pair-01/fake:fake-model/A/rep-1"]
+    );
+    assert_eq!(s.decisions[0].verdict.as_deref(), Some("pass"));
+    assert!(s.decisions.iter().all(|d| d.error_class.is_none()));
+    assert!(
+        !dir.join("results/source-fidelity/pairs-v1/pair-01/fake_fake-model/A/rep-2")
+            .exists()
     );
     assert!(s.spent_usd <= 0.2 + 1e-9);
+    assert!(!dir.join("LOCK").exists() || std::fs::read_to_string(dir.join("LOCK")).is_ok());
+    // Resuming under the same cap stops at the same place; the complete decision is kept.
+    let again = run(&p, &fake("held-costly.json"), None).unwrap();
+    assert!(again.budget_exhausted);
+    assert_eq!((again.skipped, again.completed), (1, 0));
+}
+
+#[test]
+fn a_changed_admission_record_changes_arm_d_and_refuses_resume() {
+    use dejaview_eval::admissions::Admissions;
+    let dir = tempdir("arm-d");
+    let mut p = plan(&dir, "fake-a.toml");
+    p.matrix_text = p.matrix_text.replace("arms = [\"A\"]", "arms = [\"D\"]");
+    p.matrix = dejaview_eval::matrix::Matrix::parse(&p.matrix_text).unwrap();
+    p.admissions =
+        Some(Admissions::load(&root().join("fixtures/evalsets/admissions.toml")).unwrap());
+    let fake_d = || {
+        let f = Fake::new("held.json");
+        *f.tool_envelopes.lock().unwrap() =
+            Some(root().join("fixtures/tool-scripts/regions-25.json"));
+        f
+    };
+    let s = run(&p, &fake_d(), None).unwrap();
+    assert_eq!(s.completed, 4);
+    let d: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(dir.join("descriptor.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        d["selections"]["D@source-fidelity"],
+        serde_json::json!(["view", "align:visual_only", "classes"])
+    );
+    // The confirmed tool loses its admission: arm D is another arm now, and the directory refuses.
+    let mut p2 = plan(&dir, "fake-a.toml");
+    p2.matrix_text = p.matrix_text.clone();
+    p2.matrix = p.matrix.clone();
+    p2.admissions = Some(
+        Admissions::parse(
+            &std::fs::read_to_string(root().join("fixtures/evalsets/admissions.toml"))
+                .unwrap()
+                .replace("stage = \"confirmed\"", "stage = \"provisional\""),
+        )
+        .unwrap(),
+    );
+    let err = run(&p2, &fake_d(), None).unwrap_err().to_string();
+    assert!(
+        err.contains("different inputs") && err.contains("arm selections"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -205,5 +258,28 @@ fn a_model_account_in_the_matrix_binds_its_cells() {
     assert_eq!(
         report["config"]["privacy"]["account"],
         "fake:from-the-matrix"
+    );
+}
+
+#[test]
+fn a_completed_error_is_kept_on_resume() {
+    let dir = tempdir("errors-kept");
+    let errors = || {
+        let mut p = plan(&dir, "fake-a.toml");
+        p.config_text.push_str("\n[budget]\nretries = 2\n");
+        p
+    };
+    let s = run(&errors(), &fake("retries-exhausted.json"), None).unwrap();
+    assert_eq!(s.completed, 4);
+    assert!(s.decisions.iter().all(|d| d.error_class.is_some()), "{s:?}");
+    let class = s.decisions[0].error_class.clone();
+    // Resume with a script that would pass: nothing is redone and the errors stay, with their class.
+    let again = run(&errors(), &fake("held.json"), None).unwrap();
+    assert_eq!((again.completed, again.skipped), (0, 4));
+    assert!(
+        again
+            .decisions
+            .iter()
+            .all(|d| d.error_class == class && d.verdict.is_none())
     );
 }

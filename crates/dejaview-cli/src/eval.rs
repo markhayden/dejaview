@@ -69,6 +69,9 @@ pub struct CanaryArgs {
     /// `requalify` only: the owner's words of approval; without them nothing is recorded.
     #[arg(long)]
     approve: Option<String>,
+    /// The most the whole run may spend; it refuses before sending anything it cannot cover.
+    #[arg(long, default_value_t = 25.0)]
+    spend_cap_usd: f64,
     /// Print JSON instead of the text form.
     #[arg(long)]
     json: bool,
@@ -105,7 +108,9 @@ impl dejaview_eval::canary::Judge for CliJudge {
         let script = self.tool_script.as_deref();
         #[cfg(not(feature = "testkit"))]
         let script = None;
-        crate::tools_for_config(config, script).map_err(dejaview_eval::Error::Canary)
+        crate::tools_for_config(config, script)
+            .map(|(registry, _)| registry)
+            .map_err(dejaview_eval::Error::Canary)
     }
 }
 
@@ -133,7 +138,15 @@ fn eval_canary(args: &CanaryArgs) -> i32 {
             return EXIT_USAGE;
         }
     };
-    match dejaview_eval::canary::canary(&args.state, &config, &set, &args.out, &judge, VERSION) {
+    let setup = dejaview_eval::canary::Setup {
+        config: &config,
+        set: &set,
+        out_dir: &args.out,
+        judge: &judge,
+        harness_version: VERSION,
+        spend_cap_usd: args.spend_cap_usd,
+    };
+    match dejaview_eval::canary::canary(&args.state, &setup) {
         Ok(run) => {
             if args.json {
                 println!("{}", serde_json::to_string_pretty(&run).unwrap_or_default());
@@ -151,6 +164,9 @@ fn eval_canary(args: &CanaryArgs) -> i32 {
                         "  {}: baseline {}, observed {}",
                         d.item, d.baseline, d.observed
                     );
+                }
+                for item in &run.errors {
+                    println!("  {item}: operational error, compared with nothing");
                 }
                 if run.status == dejaview_eval::canary::Status::RecommendDisable {
                     println!(
@@ -175,15 +191,15 @@ fn eval_requalify(args: &CanaryArgs) -> i32 {
             return EXIT_USAGE;
         }
     };
-    match dejaview_eval::canary::requalify(
-        &args.state,
-        &config,
-        &set,
-        &args.out,
-        &judge,
-        VERSION,
-        args.approve.as_deref(),
-    ) {
+    let setup = dejaview_eval::canary::Setup {
+        config: &config,
+        set: &set,
+        out_dir: &args.out,
+        judge: &judge,
+        harness_version: VERSION,
+        spend_cap_usd: args.spend_cap_usd,
+    };
+    match dejaview_eval::canary::requalify(&args.state, &setup, args.approve.as_deref()) {
         Ok(q) => {
             if args.json {
                 println!("{}", serde_json::to_string_pretty(&q).unwrap_or_default());
@@ -368,6 +384,7 @@ fn eval_estimate(args: &EstimateArgs) -> i32 {
         provider_script: args.provider_script.clone(),
         #[cfg(feature = "testkit")]
         tool_script: args.tool_script.clone(),
+        lock_digests: Default::default(),
     };
     let e = match dejaview_eval::estimate::estimate(&plan, &factories) {
         Ok(e) => e,
@@ -409,12 +426,14 @@ fn eval_estimate(args: &EstimateArgs) -> i32 {
     0
 }
 
-/// The binary's providers and tools, per cell.
+/// The binary's providers and tools, per cell. The pack lock digests of the last registry built
+/// are kept for the descriptor, which asks for them right after the tools.
 struct CliFactories {
     #[cfg(feature = "testkit")]
     provider_script: Option<PathBuf>,
     #[cfg(feature = "testkit")]
     tool_script: Option<PathBuf>,
+    lock_digests: std::sync::Mutex<std::collections::BTreeMap<String, String>>,
 }
 
 impl Factories for CliFactories {
@@ -437,7 +456,19 @@ impl Factories for CliFactories {
         let script = self.tool_script.as_deref();
         #[cfg(not(feature = "testkit"))]
         let script = None;
-        crate::tools_for_config(config, script).map_err(dejaview_eval::Error::Runner)
+        let (registry, digests) =
+            crate::tools_for_config(config, script).map_err(dejaview_eval::Error::Runner)?;
+        if let Ok(mut held) = self.lock_digests.lock() {
+            *held = digests;
+        }
+        Ok(registry)
+    }
+
+    fn lock_digests(&self, _config: &Config) -> std::collections::BTreeMap<String, String> {
+        self.lock_digests
+            .lock()
+            .map(|d| d.clone())
+            .unwrap_or_default()
     }
 }
 
@@ -459,6 +490,7 @@ fn eval_run(args: &RunArgs) -> i32 {
         provider_script: args.provider_script.clone(),
         #[cfg(feature = "testkit")]
         tool_script: args.tool_script.clone(),
+        lock_digests: Default::default(),
     };
     // Signals cancel between decisions and inside one; the runtime that listens stays alive for
     // the whole run while every decision runs on its own.
@@ -503,6 +535,12 @@ fn eval_run(args: &RunArgs) -> i32 {
             );
             if s.cancelled {
                 eprintln!("dejaview: cancelled; run the same command again to resume");
+                dejaview_core::run::EXIT_ERROR
+            } else if s.budget_exhausted {
+                eprintln!(
+                    "dejaview: the ${:.2} cap no longer covers the next decision's envelope; the run stopped there and holds no result for it. Resuming tries again; a larger cap is a new matrix and a new evaluation directory",
+                    s.cap_usd
+                );
                 dejaview_core::run::EXIT_ERROR
             } else {
                 0

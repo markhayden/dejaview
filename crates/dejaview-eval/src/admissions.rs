@@ -74,7 +74,7 @@ impl Admissions {
 
     pub fn write(&self, path: &Path) -> Result<()> {
         let text = toml::to_string_pretty(self).map_err(|e| Error::Admissions(e.to_string()))?;
-        std::fs::write(path, text)
+        crate::write_atomic(path, text.as_bytes())
             .map_err(|e| Error::Admissions(format!("cannot write {}: {e}", path.display())))
     }
 

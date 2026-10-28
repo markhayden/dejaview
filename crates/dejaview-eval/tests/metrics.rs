@@ -79,11 +79,16 @@ fn the_fixture_metrics_match_the_hand_computed_numbers() {
     assert!(close(c.rates.false_rejects.value, num("false_reject_rate")));
     assert!(close(c.rates.unsure.value, num("unsure_rate")));
     assert!(close(c.rates.errors.value, num("error_rate")));
-    // Wilson intervals bracket the proportion.
+    // Wilson intervals to 1e-9 against the independently computed values.
     assert!(
-        c.rates.missed.low <= c.rates.missed.value && c.rates.missed.value <= c.rates.missed.high
+        close(c.rates.missed.low, num("missed_low"))
+            && close(c.rates.missed.high, num("missed_high"))
     );
-    assert!(c.rates.missed.low > 0.0 && c.rates.missed.high < 1.0);
+    assert!(
+        close(c.rates.unsure.low, num("unsure_low"))
+            && close(c.rates.unsure.high, num("unsure_high"))
+    );
+    assert!(close(c.rates.errors.low, num("unsure_low")), "1/6 as well");
     assert!(close(c.cost.total_usd, num("cost_total_usd")));
     assert!(close(c.cost.median_usd, num("cost_median_usd")));
     assert_eq!(c.wall.total_ms, int("wall_total_ms") as u64);
@@ -290,4 +295,94 @@ fn later_repetitions_never_move_the_headline() {
         close(a.repetitions.agreement.unwrap(), 0.0)
             && close(b.repetitions.agreement.unwrap(), 0.0)
     );
+}
+
+#[test]
+fn the_frozen_policy_decides_what_counts_as_missed() {
+    let text = std::fs::read_to_string(root().join("fixtures/stats/metrics-1.toml")).unwrap();
+    let f: Fixture = toml::from_str(&text).unwrap();
+    let rows = rows(&f);
+    // on_unsure = pass: i3 (expected fail, unsure) is let through, so missed is 2 of 3.
+    let lenient = Policy {
+        on_unsure: dejaview_core::config::PolicyOutcome::Pass,
+        on_error: dejaview_core::config::PolicyOutcome::Review,
+    };
+    let c = &compute(&rows, &lenient).cells[0];
+    assert_eq!(
+        (c.counts.missed, c.counts.detected, c.counts.unsure),
+        (2, 1, 1)
+    );
+    assert!(close(c.rates.missed.value, 2.0 / 3.0));
+    assert_eq!(
+        c.confusion.expected_fail,
+        [1, 1, 1, 0],
+        "the confusion does not move with the policy"
+    );
+    // on_error = fail: i6 (expected pass, error) is not a computed fail, so false rejects stay 1.
+    let strict = Policy {
+        on_unsure: dejaview_core::config::PolicyOutcome::Review,
+        on_error: dejaview_core::config::PolicyOutcome::Fail,
+    };
+    let c = &compute(&rows, &strict).cells[0];
+    assert_eq!(
+        (c.counts.missed, c.counts.false_rejects, c.counts.errors),
+        (1, 1, 1)
+    );
+    assert_eq!(c.confusion.expected_pass, [1, 1, 0, 1]);
+}
+
+#[test]
+fn an_iou_at_the_threshold_is_not_a_hit_and_an_empty_cell_does_not_panic() {
+    let policy = Policy {
+        on_unsure: dejaview_core::config::PolicyOutcome::Review,
+        on_error: dejaview_core::config::PolicyOutcome::Review,
+    };
+    // Label [0,0,1,1] and prediction [0,0,0.3,1]: IoU exactly 0.3.
+    let at = detected_row(
+        vec![region(
+            "candidate",
+            RegionKind::Bbox,
+            Some([0.0, 0.0, 1.0, 1.0]),
+            &["SF1"],
+        )],
+        vec![region(
+            "candidate",
+            RegionKind::Bbox,
+            Some([0.0, 0.0, 0.3, 1.0]),
+            &["SF1"],
+        )],
+    );
+    let r = compute(&[at], &policy).cells[0].localisation.clone();
+    assert_eq!((r.hits, r.spurious), (0, 1));
+    let above = detected_row(
+        vec![region(
+            "candidate",
+            RegionKind::Bbox,
+            Some([0.0, 0.0, 1.0, 1.0]),
+            &["SF1"],
+        )],
+        vec![region(
+            "candidate",
+            RegionKind::Bbox,
+            Some([0.0, 0.0, 0.31, 1.0]),
+            &["SF1"],
+        )],
+    );
+    assert_eq!(compute(&[above], &policy).cells[0].localisation.hits, 1);
+    // A cell with expected passes only: the fail-based rates are 0 of 0 with the whole interval.
+    let mut pass_only = detected_row(vec![], vec![]);
+    pass_only.expected = Expected::Pass;
+    pass_only.computed = Computed::Pass;
+    let c = &compute(&[pass_only], &policy).cells[0];
+    assert_eq!((c.counts.expected_fail, c.rates.missed.total), (0, 0));
+    assert_eq!(
+        (
+            c.rates.missed.value,
+            c.rates.missed.low,
+            c.rates.missed.high
+        ),
+        (0.0, 0.0, 1.0)
+    );
+    assert_eq!(c.localisation.labelled_regions, 0);
+    assert!(compute(&[], &policy).cells.is_empty());
 }

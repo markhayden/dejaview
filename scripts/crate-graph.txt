@@ -10,7 +10,6 @@ prod dejaview-providers -> dejaview-core
 prod dejaview-tools -> dejaview-core
 prod dejaview-eval -> dejaview-core
 prod dejaview-eval -> dejaview-providers
-prod dejaview-eval -> dejaview-tools
 prod dejaview-testkit -> dejaview-core
 dev dejaview-core -> dejaview-testkit
 dev dejaview-providers -> dejaview-testkit

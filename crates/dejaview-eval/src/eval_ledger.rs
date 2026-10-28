@@ -1,11 +1,13 @@
 //! The durable evaluation ledger (SPEC "Runner and arms"): one append-only `ledger.jsonl` under
-//! the evaluation directory. A decision's reservation is written and fsynced before anything is
-//! sent; its settlement is written once. On open, the file is replayed: settled decisions count
-//! their settled cost, and a decision reserved but never settled, which a crash may have sent,
-//! is charged at its reservation (its bound). Admission of the next decision is against the cap
-//! less everything spent and reserved so far, across every restart.
+//! the evaluation directory. Every attempt at a decision has its own hold: the reservation is
+//! written and fsynced before anything is sent, and its settlement is written once. On open, the
+//! file is replayed: settled attempts count their settled cost, and an attempt reserved but never
+//! settled, which a crash may have sent, is charged at its reservation (its bound). A decision run
+//! again after a crash is a new attempt, charged on top of the one the crash left. Admission of
+//! the next decision is against the cap less everything spent and reserved so far, across every
+//! restart.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -22,10 +24,14 @@ pub const LEDGER_FILE: &str = "ledger.jsonl";
 enum Line {
     Reserve {
         id: String,
+        #[serde(default)]
+        attempt: u32,
         usd: f64,
     },
     Settle {
         id: String,
+        #[serde(default)]
+        attempt: u32,
         reserved: f64,
         spent: f64,
     },
@@ -40,15 +46,21 @@ pub enum Fault {
     AfterSettlePersisted,
 }
 
+fn key(id: &str, attempt: u32) -> String {
+    format!("{id}#{attempt}")
+}
+
 #[derive(Debug, Default)]
 struct State {
-    /// Decisions reserved in this process and not yet settled: id -> reserved.
+    /// Attempts reserved in this process and not yet settled: key -> reserved.
     open: BTreeMap<String, f64>,
-    settled: BTreeSet<String>,
-    /// Decisions charged at their bound on recovery; closed, like settled ones.
-    charged: BTreeSet<String>,
+    /// Attempts settled, by key.
+    settled: BTreeMap<String, f64>,
+    /// How many attempts each decision has had a reservation line for.
+    attempts: BTreeMap<String, u32>,
     spent: f64,
-    current: Option<String>,
+    /// The decision the next reserve and settle belong to, and its attempt number.
+    current: Option<(String, u32)>,
     fault: Option<Fault>,
 }
 
@@ -65,7 +77,8 @@ impl EvalLedger {
     pub fn open(dir: &Path, cap: f64) -> Result<EvalLedger> {
         let path = dir.join(LEDGER_FILE);
         let mut reserved: BTreeMap<String, f64> = BTreeMap::new();
-        let mut settled = BTreeSet::new();
+        let mut settled: BTreeMap<String, f64> = BTreeMap::new();
+        let mut attempts: BTreeMap<String, u32> = BTreeMap::new();
         let mut spent = 0.0;
         if path.exists() {
             let text = std::fs::read_to_string(&path)
@@ -78,17 +91,23 @@ impl EvalLedger {
                     Error::Ledger(format!("{} line {}: {e}", path.display(), n + 1))
                 })?;
                 match line {
-                    Line::Reserve { id, usd } => {
-                        reserved.insert(id, usd);
+                    Line::Reserve { id, attempt, usd } => {
+                        let k = key(&id, attempt);
+                        let seen = attempts.entry(id).or_insert(0);
+                        *seen = (*seen).max(attempt);
+                        reserved.entry(k).or_insert(usd);
                     }
                     Line::Settle {
                         id,
+                        attempt,
                         reserved: _,
                         spent: s,
                     } => {
-                        if settled.insert(id.clone()) {
+                        let k = key(&id, attempt);
+                        if !settled.contains_key(&k) {
+                            settled.insert(k.clone(), s);
                             spent += s;
-                            reserved.remove(&id);
+                            reserved.remove(&k);
                         }
                     }
                 }
@@ -96,42 +115,59 @@ impl EvalLedger {
         }
         // Reserved and never settled: sent or possibly sent before a crash, charged at bound.
         let mut recovered = Vec::new();
-        let mut charged = BTreeSet::new();
-        for (id, usd) in reserved {
+        for (k, usd) in reserved {
             spent += usd;
-            charged.insert(id.clone());
-            recovered.push(id);
+            recovered.push(k.split_once('#').map(|(id, _)| id.to_string()).unwrap_or(k));
         }
+        recovered.dedup();
         Ok(EvalLedger {
             cap,
             path,
             recovered,
             state: Mutex::new(State {
                 settled,
-                charged,
+                attempts,
                 spent,
                 ..State::default()
             }),
         })
     }
 
-    /// Names the decision the next reserve and settle belong to.
+    /// Names the decision the next reserve and settle belong to: the attempt still open in this
+    /// process if there is one, otherwise a new attempt of it.
     pub fn begin(&self, decision_id: &str) {
         if let Ok(mut s) = self.state.lock() {
-            s.current = Some(decision_id.to_string());
+            let open = s
+                .open
+                .keys()
+                .filter_map(|k| k.split_once('#'))
+                .find(|(id, _)| *id == decision_id)
+                .and_then(|(_, n)| n.parse::<u32>().ok());
+            let attempt =
+                open.unwrap_or_else(|| s.attempts.get(decision_id).copied().unwrap_or(0) + 1);
+            s.current = Some((decision_id.to_string(), attempt));
         }
     }
 
-    /// Decisions charged at their bound on this open because a crash left them unsettled.
+    /// Decisions with an attempt charged at its bound on this open because a crash left it
+    /// unsettled.
     pub fn recovered(&self) -> &[String] {
         &self.recovered
     }
 
-    /// Every decision settled or charged, in id order.
+    /// Every decision with a settled attempt, in id order.
     pub fn settled(&self) -> Vec<String> {
         self.state
             .lock()
-            .map(|s| s.settled.iter().cloned().collect())
+            .map(|s| {
+                let mut ids: Vec<String> = s
+                    .settled
+                    .keys()
+                    .filter_map(|k| k.split_once('#').map(|(id, _)| id.to_string()))
+                    .collect();
+                ids.dedup();
+                ids
+            })
             .unwrap_or_default()
     }
 
@@ -169,7 +205,7 @@ impl Ledger for EvalLedger {
             .state
             .lock()
             .map_err(|_| budget("evaluation ledger poisoned".into()))?;
-        let id = s.current.clone().ok_or_else(|| {
+        let (id, attempt) = s.current.clone().ok_or_else(|| {
             budget("evaluation ledger: reserve without a decision; call begin first".into())
         })?;
         let held: f64 = s.open.values().sum();
@@ -188,6 +224,7 @@ impl Ledger for EvalLedger {
         }
         self.append(&Line::Reserve {
             id: id.clone(),
+            attempt,
             usd,
         })
         .map_err(|e| {
@@ -195,32 +232,38 @@ impl Ledger for EvalLedger {
                 "evaluation ledger: cannot persist the reservation: {e}"
             ))
         })?;
+        s.attempts.insert(id.clone(), attempt);
         if s.fault == Some(Fault::AfterReservePersisted) {
             s.fault = None;
             return Err(budget(format!(
                 "decision {id}: crashed after the reservation was persisted"
             )));
         }
-        s.open.insert(id, usd);
+        s.open.insert(key(&id, attempt), usd);
         Ok(())
     }
 
     fn settle(&self, reserved_usd: f64, spent_usd: f64) {
         let Ok(mut s) = self.state.lock() else { return };
-        let Some(id) = s.current.clone() else { return };
-        if s.settled.contains(&id) || s.charged.contains(&id) {
-            // At most once: a late settlement of a decision already settled or charged.
-            s.open.remove(&id);
+        let Some((id, attempt)) = s.current.clone() else {
+            return;
+        };
+        let k = key(&id, attempt);
+        if !s.open.contains_key(&k) {
+            // At most once: only an attempt reserved in this process and still open settles. A
+            // late settlement of one already settled, or charged at bound by a recovery, or never
+            // reserved here, changes nothing.
             return;
         }
         if s.fault == Some(Fault::BeforeSettlePersisted) {
             s.fault = None;
-            s.open.remove(&id);
+            s.open.remove(&k);
             return;
         }
         if self
             .append(&Line::Settle {
-                id: id.clone(),
+                id,
+                attempt,
                 reserved: reserved_usd,
                 spent: spent_usd,
             })
@@ -229,8 +272,8 @@ impl Ledger for EvalLedger {
             return;
         }
         s.fault = None;
-        s.open.remove(&id);
-        s.settled.insert(id);
+        s.open.remove(&k);
+        s.settled.insert(k, spent_usd);
         s.spent += spent_usd;
     }
 

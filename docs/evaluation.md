@@ -45,21 +45,26 @@ over every answer-affecting input: harness version; matrix identity and text; th
 text; prompt version and template bytes; catalog version and content (which carries the profiles);
 every set's seal components (items, families, jobs, images, rules, labels); every enabled tool's
 frozen manifest and pack lock digest. A resume recomputes it and refuses on any difference,
-naming what changed, so an evaluation directory only ever holds results of one configuration. A
-`LOCK` file naming the writer's pid admits one writer at a time; a lock whose process is gone is
-stale and taken over.
+naming what changed, so an evaluation directory only ever holds results of one configuration. The
+descriptor also records every arm's tool selection per use case, so a changed admission record
+cannot change arm D between runs of one evaluation. An OS advisory lock on the `LOCK` file admits
+one writer at a time; it is released however the holder ends, so a dead writer never leaves a
+stale lock and two writers never both succeed. `descriptor.json`, `result.json` and
+`summary.json` are written through a temporary file and a rename, so a crash mid-write leaves
+the previous file or none, never a truncated one.
 
 ## The durable ledger
 
-`ledger.jsonl` in the evaluation directory is append-only and fsynced per line. A decision's
-reservation (its envelope) is written before anything is sent; its settlement is written once.
-On open the file is replayed: settled decisions count their settled cost, and a decision
-reserved but never settled, which a crash may have sent, is charged at its reservation. Admission
-of the next decision is against the cap less everything spent or reserved so far, across every
-restart, so cumulative spend never exceeds the cap. A late settlement of a decision already
-settled or charged changes nothing. The recovery tests crash the ledger at each of the four
-points (before and after the reservation is persisted, before and after the settlement) and
-reopen it.
+`ledger.jsonl` in the evaluation directory is append-only and fsynced per line, and every
+attempt at a decision has its own hold. An attempt's reservation (its envelope) is written before
+anything is sent; its settlement is written once. On open the file is replayed: settled attempts
+count their settled cost, and an attempt reserved but never settled, which a crash may have sent,
+is charged at its reservation. A decision run again after a crash is a new attempt, charged on
+top of the one the crash left, never a free re-run. Admission of the next decision is against the
+cap less everything spent or reserved so far, across every restart, so cumulative spend never
+exceeds the cap. A late settlement of an attempt already settled or charged changes nothing. The
+recovery tests crash the ledger at each of the four points (before and after the reservation is
+persisted, before and after the settlement), reopen it, and re-run a crashed decision.
 
 ## `evalsets/admissions.toml`
 
@@ -91,14 +96,19 @@ decision in a fixed order: set, item, cell, repetition. Each decision gets its o
 and, once complete, `result.json`. On resume a decision with `result.json` is skipped, and one
 whose directory holds a started attempt but no result is listed as partial and run again in a
 fresh attempt directory; its earlier reservation was charged at its bound by the ledger. The cache
-is never read (`cache.status` is `bypass` in every report). When the ledger refuses a decision's
-envelope, that decision ends with `error: budget` and the runner carries on, so every decision has
-a row. SIGINT or SIGTERM cancels between decisions and inside one; the same command resumes.
+is never read (`cache.status` is `bypass` in every report). Before each decision the runner
+checks that the cap still covers its envelope; when it does not, the run stops there with
+`budget_exhausted` in the summary and no row for that decision or any after it, so an exhausted
+cap never turns into `error: budget` rows that would count against an arm. Resuming tries again
+from that decision; a larger cap is a new matrix, since the cap is part of the identity. A
+decision whose envelope exceeds the config's per-decision cap does end with `error: budget` (see
+"Estimating first"). SIGINT or SIGTERM cancels between decisions and inside one; the same command
+resumes.
 
 `summary.json` lists every decision of the matrix as it stands (set, item, cell, repetition,
 whether it is the decision repetition, verdict, exit code, error class, cost, wall time,
-directory) with what the run did (completed, skipped, partial, cancelled) and the ledger's
-cumulative spend against the cap. Repetition 1 is the decision repetition every gate and headline
+directory) with what the run did (completed, skipped, partial, cancelled, budget exhausted) and
+the ledger's cumulative spend against the cap. Repetition 1 is the decision repetition every gate and headline
 number uses; the others are reported descriptively. Projections (`align` under `visual_only` in
 arms C, D_X and D) are part of the selection the runner hands to the tool factory and are applied
 once the tools arrive in M4.
@@ -152,14 +162,15 @@ A gate scores one hypothesis, one tool under one model on one sealed set, from a
 evaluation directory, under the configuration the matrix froze (`[matrix.gate]`, the cells, the
 decision runs) and the policy the decision reports record. In order:
 
-1. The set's seal must hold (`sets verify-seal`), and the labels must hash to the seal's labels
+1. Across the evalsets root no family of the use case appears in two splits (from the manifests
+   alone, so unfetched images do not matter); the set's seal must hold (`sets verify-seal`), and the labels must hash to the seal's labels
    component: a heldout set's own `labels.toml`, or for a blind set the owner's label file given
    with `--labels`, which must label every item exactly once.
 2. The results must belong to the matrix: the descriptor's matrix identity equals the given
    matrix's, the descriptor's seal components for the set equal the seal's, `summary.json` was
    written under that descriptor, and the evaluation was not cancelled.
 3. The receipt id is sixteen hex digits over stage, tool, set, matrix identity, results hash
-   (`summary.json`) and seal hash. If `receipts/<id>.toml` already exists the scoring is resumed:
+   (the summary's decisions in id order, so a no-op resume does not change it) and seal hash. If `receipts/<id>.toml` already exists the scoring is resumed:
    nothing is rescored and the remaining writes are redone. Otherwise, if any receipt names the
    set, the set was scored before and scoring it again needs `--adr` with a reference no earlier
    receipt of the set carries.
@@ -205,12 +216,19 @@ configuration identity, every verdict, the cost) and every canary run against it
   baseline's (requalify instead: a canary compares like with like), when the set is not the
   baseline's, or when a sealed set's seal changed. Otherwise it judges every item and records the
   run: `clear` when every verdict matches; `suspect` on any deviation; `recommend_disable` when
-  the previous run against the same baseline already deviated. A clear run resets the count.
-  Nothing is ever disabled: the owner decides, and disabling means changing the configuration.
+  the previous run against the same baseline already deviated; `inconclusive` when an item ended
+  in an operational error and nothing else deviated (an error is never a verdict, so it neither
+  confirms nor contradicts the baseline; errored items are listed apart). A clear or inconclusive
+  run resets the count. Nothing is ever disabled: the owner decides, and disabling means changing
+  the configuration. A requalification with an errored item records nothing.
+- Both run under `--spend-cap-usd` (default $25, the standing cap per vendor): the total is
+  reserved and settled through a cap ledger, and an item whose envelope no longer fits refuses
+  before anything is sent.
 
 The configuration identity covers what decides an answer: provider profile, model and controls,
-rules base, profile and extra files, enabled tools, decision runs, policy and prompt version.
-Budgets, cache and output settings are left out.
+rules base, profile and extra files, the enabled tools and their frozen manifests, decision runs,
+policy, the prompt template, the catalog and the harness version. Budgets, cache and output
+settings are left out.
 
 ## Estimating first
 

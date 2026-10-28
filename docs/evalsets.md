@@ -51,7 +51,8 @@ tests mutate.
   canonical job, every image file, the pinned rules' name, version and content, the label file or
   its external hash) and one over all of them, with the time and the owner's attestation that no
   judge or tool has seen the items. For a blind set whose labels still sit beside the manifest,
-  `--labels-out` names the owner-storage directory the label file is moved to; the manifest's
+  `--labels-out` names the owner-storage directory the label file is moved to (refused when it
+  lies inside any git repository); the manifest's
   `labels = …` line becomes `labels_sha256 = …`. The timestamp and attestation are outside the
   hash, so re-sealing unchanged content reproduces it.
 - `dejaview sets verify-seal --set <id or path>` recomputes every component and names the ones

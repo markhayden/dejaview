@@ -176,6 +176,18 @@ impl Matrix {
         if m.spend_cap_usd.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
             return Err(Error::Matrix("spend_cap_usd must be positive".into()));
         }
+        for model in &m.models {
+            for (key, value) in &model.controls {
+                if let toml::Value::Float(f) = value
+                    && !f.is_finite()
+                {
+                    return Err(Error::Matrix(format!(
+                        "model {}:{}: control {key:?} must be a finite number",
+                        model.profile, model.model
+                    )));
+                }
+            }
+        }
         if let Some(g) = &m.gate {
             if g.resamples == 0 {
                 return Err(Error::Matrix("gate.resamples must be positive".into()));

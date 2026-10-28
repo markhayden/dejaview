@@ -83,3 +83,29 @@ fn a_model_may_carry_the_account_its_cells_consent_with() {
     );
     assert_ne!(m.identity(), Matrix::parse(&text).unwrap().identity());
 }
+
+#[test]
+fn the_shipped_baseline_matrix_parses_and_names_sets_that_exist() {
+    let m = Matrix::load(&root().join("evalsets/matrix/baseline.toml")).unwrap();
+    assert_eq!(m.matrix.arms, [Arm::A]);
+    assert_eq!((m.matrix.decision_runs, m.matrix.repetitions), (1, 2));
+    assert_eq!(m.matrix.sets.len(), 10);
+    for id in &m.matrix.sets {
+        assert!(
+            root().join("evalsets").join(id).join("set.toml").is_file(),
+            "{id}"
+        );
+    }
+    assert!(root().join(&m.matrix.config).is_file());
+    assert_eq!(m.matrix.models.len(), 6);
+    for model in &m.matrix.models {
+        if model.profile != "anthropic" {
+            let a = model.account.as_deref().unwrap_or("");
+            assert!(
+                a.contains("${DEJAVIEW_") && !a.contains('@'),
+                "{a}: a reference, never a value"
+            );
+        }
+    }
+    assert_eq!(m.decisions(110), 1320);
+}

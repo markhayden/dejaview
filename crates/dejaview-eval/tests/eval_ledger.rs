@@ -137,3 +137,48 @@ fn cumulative_spend_across_restarts_never_exceeds_the_cap() {
         "admitted {admitted}, refused {refused}"
     );
 }
+
+#[test]
+fn a_decision_run_again_after_a_crash_is_charged_for_both_attempts() {
+    let dir = tempdir("attempts");
+    let ledger = EvalLedger::open(&dir, 10.0).unwrap();
+    ledger.begin("item-1/cell-a/1");
+    ledger.reserve(2.0).unwrap();
+    // The process dies with the attempt in flight: on reopen it is charged at its bound.
+    drop(ledger);
+    let again = EvalLedger::open(&dir, 10.0).unwrap();
+    assert!((again.spent() - 2.0).abs() < 1e-9);
+    assert_eq!(again.recovered(), ["item-1/cell-a/1"]);
+    // The runner redoes the same decision: a second attempt, with its own hold and settlement,
+    // on top of the charged first one.
+    again.begin("item-1/cell-a/1");
+    again.reserve(2.0).unwrap();
+    assert!((again.reserved() - 2.0).abs() < 1e-9);
+    again.settle(2.0, 0.3);
+    assert!(
+        (again.spent() - 2.3).abs() < 1e-9,
+        "the crashed attempt at bound plus the re-run as settled"
+    );
+    assert_eq!(again.reserved(), 0.0);
+    // A late settlement of the same attempt changes nothing; and the file replays to the same.
+    again.settle(2.0, 0.3);
+    assert!((again.spent() - 2.3).abs() < 1e-9);
+    drop(again);
+    let third = EvalLedger::open(&dir, 10.0).unwrap();
+    assert!(
+        (third.spent() - 2.3).abs() < 1e-9,
+        "replay keeps both attempts"
+    );
+    assert_eq!(
+        third.recovered(),
+        ["item-1/cell-a/1"],
+        "the crashed attempt stays charged"
+    );
+    assert_eq!(third.settled(), ["item-1/cell-a/1"]);
+    // A crash between the settlement line and the result file is the same story: the next
+    // attempt is a fresh hold, never a free re-run.
+    third.begin("item-1/cell-a/1");
+    third.reserve(1.0).unwrap();
+    third.settle(1.0, 0.1);
+    assert!((third.spent() - 2.4).abs() < 1e-9);
+}

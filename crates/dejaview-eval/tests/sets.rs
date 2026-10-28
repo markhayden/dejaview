@@ -501,3 +501,93 @@ fn github_image_urls_name_the_pinned_revision() {
         "a directory is not a URL"
     );
 }
+
+#[test]
+fn the_published_sets_are_consistent_at_the_manifest_level() {
+    // Offline: the images live in the other repository, so only manifests, families and labels
+    // are read here. Every published set is labelled in full, sized as its split demands, and no
+    // family of a use case appears in two splits; the README lists each one.
+    use dejaview_eval::sets::{Families, Labels, Manifest, Split};
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../evalsets");
+    dejaview_eval::sets::check_families(&root).unwrap();
+    let readme = std::fs::read_to_string(root.join("README.md")).unwrap();
+    let dirs = dejaview_eval::sets::discover(&root).unwrap();
+    assert_eq!(dirs.len(), 10, "{dirs:?}");
+    for dir in dirs {
+        let manifest: Manifest =
+            toml::from_str(&std::fs::read_to_string(dir.join("set.toml")).unwrap()).unwrap();
+        let families: Families =
+            toml::from_str(&std::fs::read_to_string(dir.join(&manifest.set.families)).unwrap())
+                .unwrap();
+        let id = &manifest.set.id;
+        assert_eq!(root.join(id), dir, "{id} lives at its id");
+        let adversarial = id.ends_with("/adversarial-v1");
+        // The five adversarial sets share one README row.
+        let row = if adversarial {
+            "`*/adversarial-v1`".to_string()
+        } else {
+            format!("`{id}`")
+        };
+        assert!(readme.contains(&row), "README.md lists {id}");
+        assert_eq!(
+            manifest.item.len(),
+            if adversarial { 2 } else { 20 },
+            "{id}"
+        );
+        assert_eq!(
+            manifest.set.split,
+            Split::Dev,
+            "{id}: every published set is a dev set so far"
+        );
+        let labels: Labels = toml::from_str(
+            &std::fs::read_to_string(dir.join(manifest.set.labels.as_ref().unwrap())).unwrap(),
+        )
+        .unwrap();
+        let mut seen = std::collections::BTreeSet::new();
+        for l in &labels.label {
+            assert!(
+                manifest.item.iter().any(|i| i.id == l.item),
+                "{id}: label for unknown item {}",
+                l.item
+            );
+            assert!(
+                seen.insert(l.item.clone()),
+                "{id}: {} labelled twice",
+                l.item
+            );
+            assert!(
+                !l.words.is_empty() && !l.adjudicated_by.is_empty(),
+                "{id}: {} is unadjudicated",
+                l.item
+            );
+        }
+        assert_eq!(seen.len(), manifest.item.len(), "{id}: every item labelled");
+        for item in &manifest.item {
+            assert!(
+                families.family.iter().any(|f| f.id == item.family),
+                "{id}: {} names an undeclared family",
+                item.id
+            );
+        }
+        let failure_types: std::collections::BTreeSet<&str> = labels
+            .label
+            .iter()
+            .flat_map(|l| l.failure_types.iter().map(String::as_str))
+            .collect();
+        if !adversarial {
+            assert!(
+                failure_types.len() >= 2,
+                "{id}: failure types {failure_types:?}"
+            );
+            let fails = labels
+                .label
+                .iter()
+                .filter(|l| l.expected == dejaview_eval::sets::Expected::Fail)
+                .count();
+            assert!(
+                (5..=15).contains(&fails),
+                "{id}: {fails} expected fails of 20"
+            );
+        }
+    }
+}

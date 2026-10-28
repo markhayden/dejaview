@@ -65,6 +65,7 @@ fn the_report_renders_the_fixture_exactly_as_stored() {
         skipped: 0,
         partial: Vec::new(),
         cancelled: false,
+        budget_exhausted: false,
         spent_usd: 1.5,
         cap_usd: 5.0,
     };

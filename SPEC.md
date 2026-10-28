@@ -973,9 +973,10 @@ a miss.
 Model ids pinned; resolved model and API version on every report; `dejaview eval canary` reruns
 a fixed set uncached on a schedule or on a provider notice, comparing against the pinned baseline
 recorded when the configuration was qualified. One deviating canary marks the configuration
-`suspect`; two consecutive deviations against the same baseline recommend disabling it. Disabling
-requires the owner's explicit approval, and requalification is a full development-set run. No
-fallback to another model or provider.
+`suspect`; two consecutive deviations against the same baseline recommend disabling it; a canary
+in which an item ended in an operational error and nothing deviated is `inconclusive`, since an
+error is never a verdict. Disabling requires the owner's explicit approval, and requalification is
+a full development-set run under its own spend cap. No fallback to another model or provider.
 
 ### Data leaving the machine
 

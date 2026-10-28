@@ -11,9 +11,9 @@ if CRATE_GRAPH_FILE="$empty" scripts/check-crate-graph.sh >/dev/null 2>&1; then
 else pass=$((pass+1)); fi
 
 # crate graph: one removed edge must fail and name it.
-one="$(mktemp)"; grep -v 'dejaview-eval -> dejaview-tools' scripts/crate-graph.txt > "$one"
+one="$(mktemp)"; grep -v 'dejaview-eval -> dejaview-providers' scripts/crate-graph.txt > "$one"
 out="$(CRATE_GRAPH_FILE="$one" scripts/check-crate-graph.sh 2>&1 || true)"
-if grep -q 'unexpected prod edge: dejaview-eval -> dejaview-tools' <<< "$out"; then pass=$((pass+1));
+if grep -q 'unexpected prod edge: dejaview-eval -> dejaview-providers' <<< "$out"; then pass=$((pass+1));
 else echo "FAIL: crate-graph check did not name the missing edge" >&2; fail=$((fail+1)); fi
 rm -f "$empty" "$one"
 
@@ -56,7 +56,7 @@ rm -rf "$probe"
 
 # check-packaging: the shipped assets are listed as embedded by the crates that own them.
 out="$(scripts/check-packaging.sh 2>&1)"
-for want in "dejaview-core: embeds .*prompts/v1.md" "dejaview-core: embeds .*rules/source-fidelity.toml" "dejaview-providers: embeds catalog.toml"; do
+for want in "dejaview-core: embeds .*prompts/v1.md" "dejaview-core: embeds .*rules/source-fidelity.toml" "dejaview-providers: embeds catalog.toml" "dejaview-cli: embeds viewer/index.html, viewer/viewer.css, viewer/viewer.js"; do
   if grep -Eq "$want" <<< "$out"; then pass=$((pass+1));
   else echo "FAIL: check-packaging did not list '$want': $out" >&2; fail=$((fail+1)); fi
 done

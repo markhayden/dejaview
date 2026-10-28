@@ -264,6 +264,17 @@ fn the_initial_stage_refuses_a_non_blind_set_and_too_few_items() {
     let eval_dir = w.run(&text, "");
     let e = err(w.gate(&eval_dir, &text, dev, GateStage::Initial, None, None, None));
     assert!(e.contains("blind set") && e.contains("dev"), "{e}");
+    // An evaluation that stopped at its cap holds no result for every item: refused as such.
+    let summary_path = eval_dir.join("summary.json");
+    let summary = std::fs::read_to_string(&summary_path).unwrap();
+    std::fs::write(
+        &summary_path,
+        summary.replace("\"budget_exhausted\": false", "\"budget_exhausted\": true"),
+    )
+    .unwrap();
+    let e = err(w.gate(&eval_dir, &text, dev, GateStage::Initial, None, None, None));
+    assert!(e.contains("spend cap"), "{e}");
+    std::fs::write(&summary_path, summary).unwrap();
 
     let small = "source-fidelity/small-v1";
     let labels = w.blind(small, "small", 5);

@@ -108,8 +108,35 @@ fn report_view_serves_the_viewer_the_report_and_only_the_run_artifacts() {
     let (status, head, body) = get(&url, "/viewer.js");
     assert_eq!(status, 200);
     assert!(head.contains("text/javascript"), "{head}");
-    assert!(String::from_utf8_lossy(&body).contains("SUPPORTED_REPORT_VERSIONS = [1]"));
-    assert_eq!(get(&url, "/viewer.css").0, 200);
+    let js = String::from_utf8_lossy(&body).to_string();
+    assert!(js.contains("SUPPORTED_REPORT_VERSIONS = [1]"));
+    assert!(
+        js.contains("is not supported by this viewer"),
+        "the refusal branch for other versions"
+    );
+    let (status, _, css) = get(&url, "/viewer.css");
+    assert_eq!(status, 200);
+    // Nothing in the page reaches off the server that served it: no absolute URL anywhere but
+    // the SVG namespace, no stylesheet import, no preconnect.
+    let page = String::from_utf8_lossy(&get(&url, "/").2).to_string();
+    let css = String::from_utf8_lossy(&css).to_string();
+    for (name, text) in [
+        ("index.html", &page),
+        ("viewer.js", &js),
+        ("viewer.css", &css),
+    ] {
+        for (i, _) in text.match_indices("http") {
+            let hit = &text[i..(i + 30).min(text.len())];
+            assert!(
+                hit.starts_with("http://www.w3.org/2000/svg"),
+                "{name}: {hit}"
+            );
+        }
+        assert!(
+            !text.contains("@import") && !text.contains("preconnect"),
+            "{name}"
+        );
+    }
     let (status, head, body) = get(&url, "/report.json");
     assert_eq!(status, 200);
     assert!(head.contains("application/json"), "{head}");
@@ -158,6 +185,25 @@ fn report_view_serves_the_viewer_the_report_and_only_the_run_artifacts() {
         head.contains("Connection: close") && head.contains("nosniff"),
         "{head}"
     );
+    assert!(
+        head.contains("Content-Security-Policy: default-src 'self'"),
+        "{head}"
+    );
+    // A request for another host name (DNS rebinding) is refused before any route.
+    let mut s = TcpStream::connect(host).unwrap();
+    write!(
+        s,
+        "GET /report.json HTTP/1.1\r\nHost: evil.example\r\nConnection: close\r\n\r\n"
+    )
+    .unwrap();
+    let mut raw = String::new();
+    s.read_to_string(&mut raw).unwrap();
+    assert!(raw.starts_with("HTTP/1.1 421"), "{raw}");
+    let mut s = TcpStream::connect(host).unwrap();
+    write!(s, "GET /report.json HTTP/1.1\r\nConnection: close\r\n\r\n").unwrap();
+    let mut raw = String::new();
+    s.read_to_string(&mut raw).unwrap();
+    assert!(raw.starts_with("HTTP/1.1 421"), "no Host at all: {raw}");
 
     // A directory without a report is a usage error.
     let o = Command::new(env!("CARGO_BIN_EXE_dejaview"))

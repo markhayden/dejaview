@@ -42,12 +42,16 @@ pub fn tools_for(arm: &Arm, admissions: &Admissions, use_case: &str) -> Result<T
         }
         Arm::D => {
             sel.enabled = vec![VIEW.into(), ALIGN.into()];
-            for tool in admissions.admitted(use_case) {
-                if !sel.enabled.contains(&tool) {
-                    sel.enabled.push(tool);
+            let admitted = admissions.admitted(use_case);
+            for tool in &admitted {
+                if !sel.enabled.contains(tool) {
+                    sel.enabled.push(tool.clone());
                 }
             }
-            sel.projections.insert(ALIGN.into(), VISUAL_ONLY.into());
+            // `align` stays the projected control unless it was itself admitted in full.
+            if !admitted.iter().any(|t| t == ALIGN) {
+                sel.projections.insert(ALIGN.into(), VISUAL_ONLY.into());
+            }
         }
     }
     Ok(sel)

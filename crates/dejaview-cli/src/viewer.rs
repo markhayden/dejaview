@@ -2,7 +2,8 @@
 //! viewer assets are embedded, so the installed binary needs nothing else; the server answers
 //! only `GET` and `HEAD` for the page, its script and stylesheet, `report.json`, and the run
 //! artifacts, named strictly (`run-<n>/artifacts/<sha256>`), so nothing outside the directory can
-//! be read.
+//! be read; a request whose `Host` is not this server's loopback address is refused, and the
+//! page's policy keeps it from loading anything from elsewhere.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
@@ -75,8 +76,10 @@ fn handle(mut stream: TcpStream, dir: &Path) -> std::io::Result<()> {
         .by_ref()
         .take(MAX_HEAD_BYTES as u64)
         .read_line(&mut request_line)?;
-    // Drain the headers (bounded); nothing in them changes the answer.
+    // The headers (bounded): only `Host` matters, and it must name this loopback server, so a
+    // page from elsewhere cannot reach the report through a rebound name.
     let mut read = request_line.len();
+    let mut host = None;
     loop {
         let mut line = String::new();
         let n = reader
@@ -87,22 +90,36 @@ fn handle(mut stream: TcpStream, dir: &Path) -> std::io::Result<()> {
         if n == 0 || line == "\r\n" || line == "\n" || read >= MAX_HEAD_BYTES {
             break;
         }
+        if let Some((name, value)) = line.split_once(':')
+            && name.eq_ignore_ascii_case("host")
+        {
+            host = Some(value.trim().to_ascii_lowercase());
+        }
     }
     let mut parts = request_line.split_whitespace();
     let method = parts.next().unwrap_or("");
     let target = parts.next().unwrap_or("");
-    let response = match method {
-        "GET" | "HEAD" => route(dir, target.split('?').next().unwrap_or("")),
-        _ => Response::text(405, "text/plain; charset=utf-8", "method not allowed\n"),
+    let port = stream.local_addr().map(|a| a.port()).unwrap_or(0);
+    let host_ok = host
+        .as_deref()
+        .is_some_and(|h| h == format!("127.0.0.1:{port}") || h == format!("localhost:{port}"));
+    let response = if !host_ok {
+        Response::text(421, "text/plain; charset=utf-8", "wrong host\n")
+    } else {
+        match method {
+            "GET" | "HEAD" => route(dir, target.split('?').next().unwrap_or("")),
+            _ => Response::text(405, "text/plain; charset=utf-8", "method not allowed\n"),
+        }
     };
     let reason = match response.status {
         200 => "OK",
         404 => "Not Found",
         405 => "Method Not Allowed",
+        421 => "Misdirected Request",
         _ => "Error",
     };
     let head = format!(
-        "HTTP/1.1 {} {reason}\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {} {reason}\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nContent-Security-Policy: default-src 'self'; img-src 'self' data:\r\nConnection: close\r\n\r\n",
         response.status,
         response.content_type,
         response.body.len()

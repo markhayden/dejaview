@@ -262,7 +262,8 @@ pub fn gate(req: &Request) -> Result<GateReport> {
     };
     let model_name = format!("{}:{}", model.profile, model.model);
 
-    // The set, its seal and the labels.
+    // The set, its seal and the labels; and across the root, no family in two splits.
+    crate::sets::check_families(req.evalsets_root)?;
     let set_dir = req.evalsets_root.join(req.set);
     verify_seal(&set_dir)?;
     let set = Set::load(&set_dir)?;
@@ -413,7 +414,20 @@ pub fn gate(req: &Request) -> Result<GateReport> {
             "the evaluation was cancelled; resume it with `eval run` before scoring",
         ));
     }
-    let results_sha256 = sha256_hex(&summary_bytes);
+    if summary.budget_exhausted {
+        return Err(gate_err(
+            "the evaluation stopped at its spend cap; it holds no result for every item, so nothing can be scored",
+        ));
+    }
+    // Over the decisions alone, in id order: what the run did (completed, skipped, spend) may
+    // differ between a run and its no-op resume without a single result changing.
+    let mut decisions = summary.decisions.clone();
+    decisions.sort_by(|a, b| a.id.cmp(&b.id));
+    let results_sha256 = sha256_hex(
+        serde_json::to_string(&decisions)
+            .map_err(gate_err)?
+            .as_bytes(),
+    );
     let id = receipt_id(
         req.stage,
         req.tool,
@@ -562,7 +576,7 @@ pub fn gate(req: &Request) -> Result<GateReport> {
         let dir = req.evalsets_root.join(RECEIPTS_DIR);
         std::fs::create_dir_all(&dir).map_err(|e| io(&dir, e))?;
         let text = toml::to_string_pretty(&receipt).map_err(gate_err)?;
-        std::fs::write(&path, text).map_err(|e| io(&path, e))?;
+        crate::write_atomic(&path, text.as_bytes()).map_err(|e| io(&path, e))?;
         (receipt, false)
     };
     let mut written = vec![path];

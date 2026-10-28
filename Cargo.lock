@@ -337,7 +337,6 @@ dependencies = [
  "dejaview-core",
  "dejaview-providers",
  "dejaview-testkit",
- "dejaview-tools",
  "rand",
  "rand_chacha",
  "serde",

@@ -23,14 +23,19 @@ The server answers `GET` and `HEAD` only, for exactly these paths:
 | `/run-<n>/artifacts/<sha256>` | a run artifact: an image the model saw, a request or response body, a tool envelope; typed by its first bytes |
 
 Everything else is `404`, so nothing outside the decision directory (and nothing in it beyond the
-report and the artifacts) can be read through it. Responses carry `Cache-Control: no-store`,
-`X-Content-Type-Options: nosniff` and `Connection: close`. The page itself requests nothing but
-these paths from the server that served it: no fonts, scripts or images from anywhere else.
+report and the artifacts) can be read through it. A request whose `Host` header is not
+`127.0.0.1:<port>` or `localhost:<port>` is refused with `421` before any route, so a page from
+elsewhere cannot reach the report through a name rebound to loopback. Responses carry
+`Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy:
+default-src 'self'` and `Connection: close`. The page itself requests nothing but these paths
+from the server that served it: no fonts, scripts or images from anywhere else.
 
 ## What it shows
 
 The viewer declares the `report_version`s it reads (`SUPPORTED_REPORT_VERSIONS` in `viewer.js`,
-currently `[1]`) and refuses others with a message. For a supported report:
+currently `[1]`) and refuses others with a message. The version names the shape a reader must
+accept: fields added since (`frames`, `findings`) default when absent, so a current binary reads
+every version 1 report; an older binary refuses a newer report rather than misread it. For a supported report:
 
 - **Decision**: verdict, exit code, use case, provider, tools, decision runs and agreement, the
   policy, spent against envelope and cap, cache status, prompt and harness versions; a row per

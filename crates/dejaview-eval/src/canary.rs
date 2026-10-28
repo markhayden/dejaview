@@ -1,15 +1,18 @@
 //! Drift (SPEC "Drift"): `dejaview eval canary` reruns a pinned set, uncached, under the
 //! configuration as deployed and compares every verdict with the baseline recorded when the
 //! configuration was qualified. One deviating canary marks the configuration `suspect`; two
-//! consecutive deviations against the same baseline `recommend_disable`. Nothing is ever
-//! disabled here: that is the owner's call. `dejaview eval requalify` reruns the full set and
-//! records a new baseline on the owner's approval, which resets the canary history.
+//! consecutive deviations against the same baseline `recommend_disable`; a run in which an item
+//! ended in an operational error and nothing else deviated is `inconclusive` (an error is never
+//! a verdict). Nothing is ever disabled here: that is the owner's call. `dejaview eval requalify`
+//! reruns the full set and records a new baseline on the owner's approval, which resets the
+//! canary history. Both run under a spend cap of their own.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 
 use dejaview_core::config::Config;
 use dejaview_core::image::sha256_hex;
+use dejaview_core::ledger::{CapLedger, Ledger};
 use dejaview_core::provider::Provider;
 use dejaview_core::run::{self, Services};
 use dejaview_core::tool::ToolRegistry;
@@ -64,6 +67,9 @@ pub struct CanaryRun {
     pub baseline: String,
     pub status: Status,
     pub deviations: Vec<Deviation>,
+    /// Items that ended in an operational error: compared with nothing, never a deviation.
+    #[serde(default)]
+    pub errors: Vec<String>,
     pub verdicts: BTreeMap<String, String>,
     pub cost_usd: f64,
 }
@@ -82,6 +88,8 @@ pub enum Status {
     Clear,
     Suspect,
     RecommendDisable,
+    /// An item errored and nothing deviated: the baseline was neither confirmed nor contradicted.
+    Inconclusive,
 }
 
 impl std::fmt::Display for Status {
@@ -90,8 +98,21 @@ impl std::fmt::Display for Status {
             Status::Clear => "clear",
             Status::Suspect => "suspect",
             Status::RecommendDisable => "recommend_disable",
+            Status::Inconclusive => "inconclusive",
         })
     }
+}
+
+/// What a canary or requalification runs with: the configuration as deployed, the pinned set,
+/// where the decisions go, the judge the configuration resolves to, the harness version and the
+/// most the whole run may spend.
+pub struct Setup<'a> {
+    pub config: &'a Config,
+    pub set: &'a Set,
+    pub out_dir: &'a Path,
+    pub judge: &'a dyn Judge,
+    pub harness_version: &'a str,
+    pub spend_cap_usd: f64,
 }
 
 /// What `requalify` produced: the baseline, whether it was recorded, and how its verdicts differ
@@ -128,15 +149,26 @@ impl CanaryState {
                 .map_err(|e| canary_err(format!("cannot create {}: {e}", parent.display())))?;
         }
         let text = toml::to_string_pretty(self).map_err(canary_err)?;
-        std::fs::write(path, text)
+        crate::write_atomic(path, text.as_bytes())
             .map_err(|e| canary_err(format!("cannot write {}: {e}", path.display())))
     }
 }
 
-/// A digest of everything in the configuration that decides an answer: provider profile, model
-/// and controls, rules base, profile and extra files, decision runs, policy, prompt version.
-/// Budgets, cache and output settings are left out: they change cost and placement, not verdicts.
-pub fn configuration_identity(config: &Config) -> String {
+/// A digest of everything that decides an answer: provider profile, model and controls, rules
+/// base, profile and extra files, the enabled tools and their frozen manifests, decision runs,
+/// policy, the prompt template, the catalog and the harness version. Budgets, cache and output
+/// settings are left out: they change cost and placement, not verdicts.
+pub fn configuration_identity(
+    config: &Config,
+    judge: &dyn Judge,
+    harness_version: &str,
+) -> Result<String> {
+    let registry = judge.tools(config)?;
+    let mut manifests: Vec<String> = registry
+        .manifests()
+        .map(|m| serde_json::to_string(m).unwrap_or_default())
+        .collect();
+    manifests.sort();
     let rules = config.rules.as_ref().map(|r| {
         serde_json::json!({
             "base": r.base,
@@ -152,22 +184,35 @@ pub fn configuration_identity(config: &Config) -> String {
         },
         "rules": rules,
         "tools": config.tools.enabled,
+        "manifests": manifests,
         "decision_runs": config.budget.decision_runs,
         "policy": { "on_unsure": config.policy.on_unsure, "on_error": config.policy.on_error },
         "prompt_version": dejaview_core::render::PROMPT_VERSION,
+        "prompt_sha256": sha256_hex(dejaview_core::render::TEMPLATE.as_bytes()),
+        "catalog_sha256": sha256_hex(dejaview_providers::catalog::SHIPPED.as_bytes()),
+        "harness_version": harness_version,
     });
-    sha256_hex(serde_json::to_string(&v).unwrap_or_default().as_bytes())
+    Ok(sha256_hex(
+        serde_json::to_string(&v).map_err(canary_err)?.as_bytes(),
+    ))
 }
 
-/// Runs every item of the set under the configuration, never reading the cache, and returns
-/// each item's verdict (`pass`, `fail`, `unsure` or `error`) and the total charged cost.
-pub fn judge_set(
-    config: &Config,
-    set: &Set,
-    out_dir: &Path,
-    judge: &dyn Judge,
-    harness_version: &str,
-) -> Result<(BTreeMap<String, String>, f64)> {
+/// Runs every item of the set under the configuration, never reading the cache and never past
+/// `spend_cap_usd` in total, and returns each item's verdict (`pass`, `fail`, `unsure` or
+/// `error`) and the total charged cost.
+pub fn judge_set(setup: &Setup<'_>) -> Result<(BTreeMap<String, String>, f64)> {
+    let Setup {
+        config,
+        set,
+        out_dir,
+        judge,
+        harness_version,
+        spend_cap_usd,
+    } = *setup;
+    if spend_cap_usd.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
+        return Err(canary_err("the spend cap must be positive"));
+    }
+    let ledger = CapLedger::new(spend_cap_usd);
     let base = &set.manifest.set.rules.base;
     let mut config = config.clone();
     match &config.rules {
@@ -191,7 +236,19 @@ pub fn judge_set(
     for (item, job) in &set.jobs {
         let provider = judge.provider(&config)?;
         let tools = judge.tools(&config)?;
-        let mut services = Services::new(provider.as_ref(), &tools);
+        if let Some(pricing) = provider.pricing() {
+            let envelope = run::envelope(&config, job, &set.dir, &tools, pricing)
+                .map_err(|e| canary_err(format!("{item}: {e}")))?;
+            let remaining = Ledger::cap(&ledger) - Ledger::spent(&ledger);
+            if envelope.usd > remaining + 1e-9 {
+                return Err(canary_err(format!(
+                    "{item}: its envelope ${:.4} exceeds the ${remaining:.4} left of the ${spend_cap_usd:.2} spend cap; nothing more was sent",
+                    envelope.usd
+                )));
+            }
+        }
+        let mut services =
+            Services::new(provider.as_ref(), &tools).with_shared_ledger(Some(&ledger));
         services.evaluation = true;
         let outcome = crate::runner::block_on(run::check(
             &config,
@@ -218,12 +275,16 @@ pub fn judge_set(
     Ok((verdicts, cost))
 }
 
+/// Deviations between a baseline and an observation, leaving errored observations aside.
 fn deviations(
     baseline: &BTreeMap<String, String>,
     observed: &BTreeMap<String, String>,
 ) -> Vec<Deviation> {
     let mut out = Vec::new();
     for (item, want) in baseline {
+        if observed.get(item).is_some_and(|v| v == "error") {
+            continue;
+        }
         let got = observed
             .get(item)
             .cloned()
@@ -253,14 +314,9 @@ fn seal_of(set: &Set) -> Option<String> {
 }
 
 /// One canary run against the stored baseline; appends to the state file.
-pub fn canary(
-    state_path: &Path,
-    config: &Config,
-    set: &Set,
-    out_dir: &Path,
-    judge: &dyn Judge,
-    harness_version: &str,
-) -> Result<CanaryRun> {
+pub fn canary(state_path: &Path, setup: &Setup<'_>) -> Result<CanaryRun> {
+    let (config, set, judge, harness_version) =
+        (setup.config, setup.set, setup.judge, setup.harness_version);
     let mut state = CanaryState::load(state_path)
         .map_err(|e| canary_err(format!("{e}; run `eval requalify` to record a baseline")))?;
     let baseline = state.baseline.as_ref().ok_or_else(|| {
@@ -269,7 +325,7 @@ pub fn canary(
             state_path.display()
         ))
     })?;
-    let identity = configuration_identity(config);
+    let identity = configuration_identity(config, judge, harness_version)?;
     if baseline.configuration != identity {
         return Err(canary_err(
             "the configuration differs from the one the baseline was recorded under; a canary compares like with like, so requalify first",
@@ -287,24 +343,31 @@ pub fn canary(
             set.manifest.set.id
         )));
     }
-    let (verdicts, cost_usd) = judge_set(config, set, out_dir, judge, harness_version)?;
+    let (verdicts, cost_usd) = judge_set(setup)?;
+    let errors: Vec<String> = verdicts
+        .iter()
+        .filter(|(_, v)| *v == "error")
+        .map(|(item, _)| item.clone())
+        .collect();
     let deviations = deviations(&baseline.verdicts, &verdicts);
-    let previous_deviated = state
-        .runs
-        .last()
-        .is_some_and(|r| r.baseline == baseline.id && r.status != Status::Clear);
-    let status = if deviations.is_empty() {
-        Status::Clear
-    } else if previous_deviated {
+    let previous_deviated = state.runs.last().is_some_and(|r| {
+        r.baseline == baseline.id && matches!(r.status, Status::Suspect | Status::RecommendDisable)
+    });
+    let status = if !deviations.is_empty() && previous_deviated {
         Status::RecommendDisable
-    } else {
+    } else if !deviations.is_empty() {
         Status::Suspect
+    } else if !errors.is_empty() {
+        Status::Inconclusive
+    } else {
+        Status::Clear
     };
     let run = CanaryRun {
         at: crate::sets::utc_now(),
         baseline: baseline.id.clone(),
         status,
         deviations,
+        errors,
         verdicts,
         cost_usd,
     };
@@ -318,15 +381,18 @@ pub fn canary(
 /// how it differs from the current one are returned for the owner to look at.
 pub fn requalify(
     state_path: &Path,
-    config: &Config,
-    set: &Set,
-    out_dir: &Path,
-    judge: &dyn Judge,
-    harness_version: &str,
+    setup: &Setup<'_>,
     approval: Option<&str>,
 ) -> Result<Requalification> {
-    let (verdicts, cost_usd) = judge_set(config, set, out_dir, judge, harness_version)?;
-    let configuration = configuration_identity(config);
+    let (config, set, judge, harness_version) =
+        (setup.config, setup.set, setup.judge, setup.harness_version);
+    let (verdicts, cost_usd) = judge_set(setup)?;
+    if verdicts.values().any(|v| v == "error") {
+        return Err(canary_err(
+            "an item ended in an operational error; a baseline records verdicts only, so run again when the provider is well",
+        ));
+    }
+    let configuration = configuration_identity(config, judge, harness_version)?;
     let seal_sha256 = seal_of(set);
     let mut text = format!(
         "{configuration}\n{}\n{}\n",

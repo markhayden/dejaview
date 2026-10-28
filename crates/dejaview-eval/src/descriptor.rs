@@ -27,6 +27,10 @@ pub struct Inputs {
     pub evalsets_root: PathBuf,
     /// (tool name, frozen manifest as JSON, pack lock digest if any).
     pub tools: Vec<(String, String, Option<String>)>,
+    /// Every arm's tool selection per use case (`<arm>@<use case>` -> tools in prompt order,
+    /// `tool:projection` where projected), so a changed admission record cannot change arm D
+    /// between runs of one evaluation.
+    pub selections: BTreeMap<String, Vec<String>>,
     pub harness_version: String,
 }
 
@@ -46,6 +50,9 @@ pub struct Descriptor {
     pub profiles: Vec<String>,
     pub sets: BTreeMap<String, Components>,
     pub tools: BTreeMap<String, ToolDigest>,
+    /// Every arm's tool selection per use case (see [`Inputs::selections`]).
+    #[serde(default)]
+    pub selections: BTreeMap<String, Vec<String>>,
     /// Over every field above.
     pub sha256: String,
 }
@@ -97,6 +104,7 @@ impl Descriptor {
             profiles,
             sets,
             tools,
+            selections: inputs.selections.clone(),
             sha256: String::new(),
         };
         d.sha256 = d.overall();
@@ -113,10 +121,7 @@ impl Descriptor {
         let path = dir.join(DESCRIPTOR_FILE);
         let text =
             serde_json::to_string_pretty(self).map_err(|e| Error::Descriptor(e.to_string()))?;
-        let mut file = std::fs::File::create(&path)
-            .map_err(|e| Error::Descriptor(format!("cannot write {}: {e}", path.display())))?;
-        file.write_all(text.as_bytes())
-            .and_then(|_| file.sync_data())
+        crate::write_atomic(&path, text.as_bytes())
             .map_err(|e| Error::Descriptor(format!("cannot write {}: {e}", path.display())))
     }
 
@@ -172,6 +177,9 @@ impl Descriptor {
         if stored.profiles != now.profiles {
             changed.push("profiles".to_string());
         }
+        if stored.selections != now.selections {
+            changed.push("arm selections (tools per arm and use case)".to_string());
+        }
         for (id, a) in &stored.sets {
             match now.sets.get(id) {
                 None => changed.push(format!("set {id} (gone)")),
@@ -224,7 +232,9 @@ impl Descriptor {
 /// is stale and taken over.
 #[derive(Debug)]
 pub struct WriterLock {
-    path: PathBuf,
+    /// Held open: the OS advisory lock on it is the lock, released when the process ends however
+    /// it ends, so a dead writer never leaves a stale one and two writers never both succeed.
+    _file: std::fs::File,
 }
 
 impl WriterLock {
@@ -232,66 +242,33 @@ impl WriterLock {
         std::fs::create_dir_all(dir)
             .map_err(|e| Error::Descriptor(format!("cannot create {}: {e}", dir.display())))?;
         let path = dir.join(LOCK_FILE);
-        for _ in 0..2 {
-            match std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&path)
-            {
-                Ok(mut file) => {
-                    let _ = writeln!(file, "pid = {}", std::process::id());
-                    let _ = file.sync_data();
-                    return Ok(WriterLock { path });
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
-                    let holder = std::fs::read_to_string(&path).unwrap_or_default();
-                    let pid: Option<u32> = holder
-                        .trim()
-                        .strip_prefix("pid = ")
-                        .and_then(|p| p.trim().parse().ok());
-                    match pid {
-                        Some(pid) if process_alive(pid) => {
-                            return Err(Error::Descriptor(format!(
-                                "{} is held by another writer (pid {pid}); one evaluation directory accepts one writer at a time",
-                                dir.display()
-                            )));
-                        }
-                        _ => {
-                            // Stale: the holder is gone. Remove it and try once more.
-                            let _ = std::fs::remove_file(&path);
-                        }
-                    }
-                }
-                Err(e) => {
-                    return Err(Error::Descriptor(format!(
-                        "cannot create {}: {e}",
-                        path.display()
-                    )));
-                }
+        let mut file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&path)
+            .map_err(|e| Error::Descriptor(format!("cannot open {}: {e}", path.display())))?;
+        match file.try_lock() {
+            Ok(()) => {}
+            Err(std::fs::TryLockError::WouldBlock) => {
+                let holder = std::fs::read_to_string(&path).unwrap_or_default();
+                return Err(Error::Descriptor(format!(
+                    "{} is held by another writer ({}); one evaluation directory accepts one writer at a time",
+                    dir.display(),
+                    holder.trim()
+                )));
+            }
+            Err(std::fs::TryLockError::Error(e)) => {
+                return Err(Error::Descriptor(format!(
+                    "cannot lock {}: {e}",
+                    path.display()
+                )));
             }
         }
-        Err(Error::Descriptor(format!(
-            "{} is held by another writer",
-            dir.display()
-        )))
+        let _ = file.set_len(0);
+        let _ = writeln!(file, "pid = {}", std::process::id());
+        let _ = file.sync_data();
+        Ok(WriterLock { _file: file })
     }
-}
-
-impl Drop for WriterLock {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
-    }
-}
-
-fn process_alive(pid: u32) -> bool {
-    if pid == std::process::id() {
-        return true;
-    }
-    std::process::Command::new("kill")
-        .args(["-0", &pid.to_string()])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
 }

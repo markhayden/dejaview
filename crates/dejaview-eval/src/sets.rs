@@ -466,6 +466,34 @@ pub fn discover(root: &Path) -> Result<Vec<PathBuf>> {
     Ok(found)
 }
 
+/// The cross-set rule alone, from the manifests: a family of one use case appears in a single
+/// split. Needs no images, so a gate can apply it over a root whose images are not all fetched.
+pub fn check_families(root: &Path) -> Result<()> {
+    let mut families: BTreeMap<(String, String), (Split, String)> = BTreeMap::new();
+    for dir in discover(root)? {
+        let manifest: Manifest = read_toml(&dir.join(MANIFEST_FILE))?;
+        let meta = &manifest.set;
+        for item in &manifest.item {
+            let key = (meta.use_case.clone(), item.family.clone());
+            match families.get(&key) {
+                Some((split, other)) if *split != meta.split => {
+                    return Err(sets_err(
+                        &meta.id,
+                        format!(
+                            "family {:?} is in the {} split here and in the {split} split of {other}; a family never appears in more than one split",
+                            item.family, meta.split
+                        ),
+                    ));
+                }
+                _ => {
+                    families.insert(key, (meta.split, meta.id.clone()));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// `dejaview sets check`: every set under the root passes its own checks, and across sets a
 /// family of one use case appears in a single split.
 pub fn check(root: &Path) -> Result<CheckReport> {
@@ -661,6 +689,15 @@ pub fn seal(dir: &Path, attestation: &str, labels_out: Option<&Path>) -> Result<
                 "a blind set's labels must leave the set directory before sealing; name the owner storage directory to move them to",
             )
         })?;
+        if inside_repository(out) {
+            return Err(sets_err(
+                &id,
+                format!(
+                    "{} is inside a repository; blind labels are owner storage and must leave every repository",
+                    out.display()
+                ),
+            ));
+        }
         let from = dir.join(&rel);
         let bytes = std::fs::read(&from)
             .map_err(|e| sets_err(&id, format!("cannot read {}: {e}", from.display())))?;
@@ -702,6 +739,23 @@ pub fn seal(dir: &Path, attestation: &str, labels_out: Option<&Path>) -> Result<
     Ok(seal)
 }
 
+/// Whether `out` (or, before it exists, its parent) lies inside a git repository: some ancestor
+/// holds a `.git`.
+fn inside_repository(out: &Path) -> bool {
+    let start = std::fs::canonicalize(out)
+        .ok()
+        .or_else(|| out.parent().and_then(|p| std::fs::canonicalize(p).ok()));
+    let Some(mut p) = start else { return false };
+    loop {
+        if p.join(".git").exists() {
+            return true;
+        }
+        if !p.pop() {
+            return false;
+        }
+    }
+}
+
 /// Replaces the manifest's `labels = "…"` line with `labels_sha256 = "…"`, keeping the rest of
 /// the hand-written file as it is.
 fn pin_labels_hash(manifest: &Path, hash: &str) -> Result<()> {
@@ -711,8 +765,9 @@ fn pin_labels_hash(manifest: &Path, hash: &str) -> Result<()> {
     let out: Vec<String> = text
         .lines()
         .map(|line| {
-            if !replaced && line.trim_start().starts_with("labels ")
-                || line.trim_start().starts_with("labels=")
+            if !replaced
+                && (line.trim_start().starts_with("labels ")
+                    || line.trim_start().starts_with("labels="))
             {
                 replaced = true;
                 format!("labels_sha256 = \"{hash}\"")

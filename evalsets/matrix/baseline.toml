@@ -20,7 +20,7 @@ sets = [
 arms = ["A"]
 decision_runs = 1
 repetitions = 2
-spend_cap_usd = 60.0
+spend_cap_usd = 75.0
 
 [[matrix.models]]
 profile = "anthropic"

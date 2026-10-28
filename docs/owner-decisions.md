@@ -10,7 +10,7 @@ A blank entry blocks the task named in its row. Dates are when the owner decided
 | 3 | Spend cap: fixture recordings (all three vendors) | 2.5b | 2026-10-26: $25 for the Anthropic recordings (spent about $1.15 across Opus 5.5, Sonnet 5.5 and Haiku 5.5). 2026-10-27: $25 each for the Gemini and OpenAI recordings |
 | 4 | Spend cap: release and gateway smoke tests | 2.8, 2.10b | 2026-10-27: the standing $25 per vendor applies; each vendor's account also carries its own credit limit. Estimated for the 2.10b live smoke: under $1 in total across the three direct profiles |
 | 5 | Spend cap: image generation for public sets | 3.2a | 2026-10-27: the standing $25 per vendor applies (fal, OpenAI, Google); generation costs about one to five cents an image |
-| 6 | Spend cap: arm A baseline | 3.8 | decide before 3.8, against `eval estimate` |
+| 6 | Spend cap: arm A baseline | 3.8 | 2026-10-28: $75 for the whole matrix (`evalsets/matrix/baseline.toml`: all six models of decision 1, 1,320 decisions), chosen against `eval estimate` (envelope sum $4,585, floor $235, expected about $33 from recorded live usage: Anthropic ~$16, Google ~$8, OpenAI ~$8, each under the standing $25 per vendor) |
 | 7 | Spend cap: arm C | 4.5 | decide before 4.5, against `eval estimate` |
 | 8 | Spend cap: initial gate | 5.6 | decide before 5.6, against `eval estimate` |
 | 9 | Spend cap: confirmation gate | 6.2 | decide before 6.2, against `eval estimate` |

@@ -68,10 +68,17 @@ be proven by code, and gate scoring treats journal searches as supporting eviden
 `fake`), a source prompt and seed, the protected subjects, a brief, and its items, each made from
 the source by one construction op. `fixtures/sets/houses-v1.plan.toml` is the dry-run plan.
 
-Ops and what they mean: `grade` (a mild colour grade: a pass), `mirror`, `rotate`, `crop` (the
-structural rule, a fail over the whole image) and `edit` (the generator changes one named thing,
-the identity rule, a fail whose region is the bounding box of the pixel difference). The draft
-label comes from the op alone; nobody looks at the picture to write it, and no judge or tool runs.
+Two family kinds. A **scene** family (source fidelity) has one source and items made from it by
+an op: `grade` (a mild colour grade: a pass), `mirror`, `rotate`, `crop` (the structural rule, a
+fail over the whole image) and `edit` (the generator changes one named thing, the identity rule,
+a fail whose region is the densest patch of pixel difference; any other dense patch the generator
+changed unasked is reported as a secondary change for the reviewer). A **subject** family
+(reference consistency) has one to four generated references of one subject and three item
+forms: a `scene` composed from the references (a pass whose identity the owner confirms), an
+item built `from` an earlier candidate by an `edit` that changes a marking (RC2), and a `scene`
+with a `lookalike` description generated without the references (RC3). The draft label comes
+from the construction alone; nobody looks at the picture to write it, and no judge or tool runs.
+`fixtures/sets/pets-v1.plan.toml` is the first dev set's plan.
 
 ```
 cd scripts/sets

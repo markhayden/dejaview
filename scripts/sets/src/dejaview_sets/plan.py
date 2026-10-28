@@ -35,7 +35,13 @@ class Source:
 @dataclass(frozen=True)
 class Item:
     id: str
-    op: dict[str, Any]
+    # Scene families: the op applied to the family source. Subject families: `scene` generates
+    # the candidate from the references; `from_item` plus `op` edits an earlier candidate;
+    # `lookalike` generates the scene from a changed description without the references.
+    op: dict[str, Any] | None = None
+    scene: Source | None = None
+    from_item: str | None = None
+    lookalike: str | None = None
 
 
 @dataclass(frozen=True)
@@ -43,10 +49,15 @@ class Family:
     id: str
     generator: str
     description: str
-    brief: str
-    source: Source
     items: list[Item] = field(default_factory=list)
-    # Protected subjects, one job requirement each (SF1 protects what the requirements name).
+    # "scene" (source fidelity: one source, items by op) or "subject" (reference consistency:
+    # references of one subject, items generated into new scenes from them).
+    kind: str = "scene"
+    brief: str = ""
+    source: Source | None = None
+    subject: str = ""
+    references: list[Source] = field(default_factory=list)
+    # Protected subjects, one job requirement each (SF1/RC rules protect what they name).
     protected: list[str] = field(default_factory=list)
 
 
@@ -92,35 +103,113 @@ def parse(text: str) -> Plan:
     seen_items: set[str] = set()
     for f in doc["family"]:
         where = f"family {f.get('id', '?')}"
-        _only(f, {"id", "generator", "description", "brief", "source", "item", "protected"}, where)
-        _require(f, ("id", "generator", "description", "brief", "source"), where)
-        if f["generator"] not in GENERATORS:
+        kind = f.get("kind", "scene")
+        if kind not in ("scene", "subject"):
+            raise ValueError(f"{where}: kind must be scene or subject")
+        if f.get("generator") not in GENERATORS:
             raise ValueError(f"{where}: generator must be one of {GENERATORS}")
-        src = f["source"]
-        _only(src, {"prompt", "seed", "size"}, f"{where} source")
-        _require(src, ("prompt", "seed"), f"{where} source")
+        if kind == "scene":
+            _only(
+                f,
+                {"id", "kind", "generator", "description", "brief", "source", "item", "protected"},
+                where,
+            )
+            _require(f, ("id", "generator", "description", "brief", "source"), where)
+            src = f["source"]
+            _only(src, {"prompt", "seed", "size"}, f"{where} source")
+            _require(src, ("prompt", "seed"), f"{where} source")
+            source = Source(
+                prompt=src["prompt"], seed=int(src["seed"]), size=int(src.get("size", 1024))
+            )
+            references: list[Source] = []
+        else:
+            _only(
+                f,
+                {
+                    "id",
+                    "kind",
+                    "generator",
+                    "description",
+                    "subject",
+                    "references",
+                    "item",
+                    "protected",
+                    "size",
+                },
+                where,
+            )
+            _require(f, ("id", "generator", "description", "subject", "references"), where)
+            source = None
+            references = []
+            for n, r in enumerate(f["references"], start=1):
+                _only(r, {"prompt", "seed", "size"}, f"{where} reference {n}")
+                _require(r, ("prompt", "seed"), f"{where} reference {n}")
+                references.append(
+                    Source(
+                        prompt=r["prompt"],
+                        seed=int(r["seed"]),
+                        size=int(r.get("size", f.get("size", 1024))),
+                    )
+                )
+            if not 1 <= len(references) <= 4:
+                raise ValueError(f"{where}: one to four references")
         items: list[Item] = []
+        family_item_ids: set[str] = set()
         for it in f.get("item", []):
             iw = f"{where} item {it.get('id', '?')}"
-            _only(it, {"id", "op"}, iw)
-            _require(it, ("id", "op"), iw)
-            if "kind" not in it["op"]:
-                raise ValueError(f"{iw}: op needs a kind")
+            _require(it, ("id",), iw)
             if it["id"] in seen_items:
                 raise ValueError(f"{iw}: duplicate item id")
             seen_items.add(it["id"])
-            items.append(Item(id=it["id"], op=dict(it["op"])))
+            if kind == "scene":
+                _only(it, {"id", "op"}, iw)
+                _require(it, ("id", "op"), iw)
+                if "kind" not in it["op"]:
+                    raise ValueError(f"{iw}: op needs a kind")
+                items.append(Item(id=it["id"], op=dict(it["op"])))
+            else:
+                _only(it, {"id", "scene", "from", "op", "lookalike"}, iw)
+                scene = None
+                if "scene" in it:
+                    _only(it["scene"], {"prompt", "seed", "size"}, f"{iw} scene")
+                    _require(it["scene"], ("prompt", "seed"), f"{iw} scene")
+                    scene = Source(
+                        prompt=it["scene"]["prompt"],
+                        seed=int(it["scene"]["seed"]),
+                        size=int(it["scene"].get("size", f.get("size", 1024))),
+                    )
+                from_item = it.get("from")
+                op = dict(it["op"]) if "op" in it else None
+                lookalike = it.get("lookalike")
+                if from_item is not None:
+                    if from_item not in family_item_ids:
+                        raise ValueError(
+                            f"{iw}: from {from_item!r} is not an earlier item of this family"
+                        )
+                    if op is None or op.get("kind") != "edit":
+                        raise ValueError(f"{iw}: an item built from another needs an edit op")
+                    if scene is not None or lookalike is not None:
+                        raise ValueError(f"{iw}: from takes an op only")
+                elif scene is None:
+                    raise ValueError(f"{iw}: a subject item needs a scene or a from")
+                elif op is not None:
+                    raise ValueError(f"{iw}: an op applies to a from item")
+                items.append(
+                    Item(id=it["id"], op=op, scene=scene, from_item=from_item, lookalike=lookalike)
+                )
+            family_item_ids.add(it["id"])
         if not items:
             raise ValueError(f"{where}: no items")
         families.append(
             Family(
                 id=f["id"],
+                kind=kind,
                 generator=f["generator"],
                 description=f["description"],
-                brief=f["brief"],
-                source=Source(
-                    prompt=src["prompt"], seed=int(src["seed"]), size=int(src.get("size", 1024))
-                ),
+                brief=f.get("brief", ""),
+                source=source,
+                subject=f.get("subject", ""),
+                references=references,
                 items=items,
                 protected=[str(x) for x in f.get("protected", [])],
             )

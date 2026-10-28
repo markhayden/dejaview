@@ -1,6 +1,8 @@
-"""Image generators behind one small interface: `generate(prompt, seed, size)` and
-`edit(image, prompt, seed)`, both returning PNG or JPEG bytes. Credentials come from the
-environment only (FAL_KEY, OPENAI_API_KEY, GEMINI_API_KEY) and are never written anywhere.
+"""Image generators behind one small interface: `generate(prompt, seed, size)` for a new image,
+`edit(image, prompt, seed)` for one instruction-edit of one image, and `compose(images, prompt,
+seed)` for a new scene carrying the subject of one or more references. All return PNG or JPEG
+bytes. Credentials come from the environment only (FAL_KEY, OPENAI_API_KEY, GEMINI_API_KEY) and
+are never written anywhere.
 """
 
 from __future__ import annotations
@@ -43,13 +45,17 @@ def _env(name: str) -> str:
     return value
 
 
+def _mime(image: bytes) -> str:
+    return "image/png" if image[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg"
+
+
 def _data_uri(image: bytes) -> str:
-    kind = "image/png" if image[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg"
-    return f"data:{kind};base64," + base64.b64encode(image).decode()
+    return f"data:{_mime(image)};base64," + base64.b64encode(image).decode()
 
 
 class FalKlein:
-    """FLUX.2 [klein] 4B on fal: text to image and instruction edits, seeded."""
+    """FLUX.2 [klein] 4B on fal: text to image, instruction edits and multi-reference scenes,
+    all seeded."""
 
     name = "fal"
     model = "fal-ai/flux-2-klein/4b"
@@ -77,11 +83,14 @@ class FalKlein:
         )
 
     def edit(self, image: bytes, prompt: str, seed: int) -> bytes:
+        return self.compose([image], prompt, seed)
+
+    def compose(self, images: list[bytes], prompt: str, seed: int) -> bytes:
         return self._call(
             self.edit_model,
             {
                 "prompt": prompt,
-                "image_urls": [_data_uri(image)],
+                "image_urls": [_data_uri(i) for i in images],
                 "seed": seed,
                 "num_images": 1,
                 "output_format": "png",
@@ -111,22 +120,27 @@ class OpenAiImage:
         return base64.b64decode(d["data"][0]["b64_json"])
 
     def edit(self, image: bytes, prompt: str, seed: int) -> bytes:
+        return self.compose([image], prompt, seed)
+
+    def compose(self, images: list[bytes], prompt: str, seed: int) -> bytes:
         boundary = "----dejaview" + uuid.uuid4().hex
         parts = []
-        for name, value in (
+        fields = (
             ("model", self.model),
             ("prompt", prompt),
             ("quality", "medium"),
             ("output_format", "png"),
-        ):
+        )
+        for name, value in fields:
             parts.append(
                 f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode()
             )
-        parts.append(
-            f'--{boundary}\r\nContent-Disposition: form-data; name="image[]"; filename="source.png"\r\nContent-Type: image/png\r\n\r\n'.encode()
-            + image
-            + b"\r\n"
-        )
+        for n, image in enumerate(images, start=1):
+            head = (
+                f'--{boundary}\r\nContent-Disposition: form-data; name="image[]"; '
+                f'filename="input-{n}.png"\r\nContent-Type: {_mime(image)}\r\n\r\n'
+            )
+            parts.append(head.encode() + image + b"\r\n")
         parts.append(f"--{boundary}--\r\n".encode())
         req = urllib.request.Request(
             "https://api.openai.com/v1/images/edits",
@@ -140,9 +154,8 @@ class OpenAiImage:
             with urllib.request.urlopen(req, timeout=300) as r:
                 d = json.load(r)
         except urllib.error.HTTPError as e:
-            raise GeneratorError(
-                f"images/edits: HTTP {e.code}: {e.read()[:400].decode('utf-8', 'replace')}"
-            ) from None
+            detail = e.read()[:400].decode("utf-8", "replace")
+            raise GeneratorError(f"images/edits: HTTP {e.code}: {detail}") from None
         return base64.b64decode(d["data"][0]["b64_json"])
 
 
@@ -173,18 +186,21 @@ class GeminiImage:
         return self._call([{"text": prompt}])
 
     def edit(self, image: bytes, prompt: str, seed: int) -> bytes:
-        mime = "image/png" if image[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg"
-        return self._call(
-            [
-                {"inlineData": {"mimeType": mime, "data": base64.b64encode(image).decode()}},
-                {"text": prompt},
-            ]
-        )
+        return self.compose([image], prompt, seed)
+
+    def compose(self, images: list[bytes], prompt: str, seed: int) -> bytes:
+        parts: list[dict] = [
+            {"inlineData": {"mimeType": _mime(i), "data": base64.b64encode(i).decode()}}
+            for i in images
+        ]
+        parts.append({"text": prompt})
+        return self._call(parts)
 
 
 class FakeGenerator:
     """Deterministic pictures for tests and dry runs without a network: a coloured scene with a
-    few shapes; `edit` paints over a patch so the difference region is well defined."""
+    few shapes; `edit` paints over a patch so the difference region is well defined; `compose`
+    carries the first reference's subject patch into a new background."""
 
     name = "fake"
     model = "fake-model"
@@ -204,6 +220,18 @@ class FakeGenerator:
         im = Image.open(io.BytesIO(image)).convert("RGB")
         w, h = im.size
         ImageDraw.Draw(im).rectangle((w * 0.7, h * 0.78, w * 0.92, h * 0.92), fill=(120, 140, 160))
+        buf = io.BytesIO()
+        im.save(buf, format="PNG")
+        return buf.getvalue()
+
+    def compose(self, images: list[bytes], prompt: str, seed: int) -> bytes:
+        first = Image.open(io.BytesIO(images[0])).convert("RGB")
+        w, h = first.size
+        im = Image.new("RGB", (w, h), (90 + seed % 80, 70, 110))
+        im.paste(
+            first.crop((int(w * 0.3), int(h * 0.4), int(w * 0.7), int(h * 0.9))),
+            (int(w * 0.2), int(h * 0.3)),
+        )
         buf = io.BytesIO()
         im.save(buf, format="PNG")
         return buf.getvalue()

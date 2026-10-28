@@ -1,7 +1,12 @@
-"""Build a set from a plan: generate each family's source once, derive every item by its op,
-write the public set directory (manifest, families, jobs, images) and the owner worksheet
-(construction record, draft labels, contact sheets) to owner storage. Then `promote` publishes
-the labels the owner confirmed and drops the items the owner struck.
+"""Build a set from a plan and write two things: the public set directory (manifest, families,
+one pinned job per item, the images) and the owner worksheet (construction record, draft labels,
+a contact sheet per family) in owner storage. `promote` then publishes the labels the owner
+confirmed and drops the items the owner struck.
+
+Scene families (source fidelity) generate one source and derive every item from it by an op.
+Subject families (reference consistency) generate the references of one subject, then each item
+is a new scene composed from those references (a pass, to be confirmed), an edit of an earlier
+candidate that changes a marking (RC2), or a lookalike generated without the references (RC3).
 """
 
 from __future__ import annotations
@@ -11,13 +16,14 @@ import hashlib
 import io
 import shutil
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from PIL import Image, ImageDraw
 
-from . import ops, toml_out
+from . import ops, regions, toml_out
+from .ops import DraftLabel
 from .plan import Family, Plan
 
 SOURCE_FILE = "source.png"
@@ -36,6 +42,20 @@ class PromoteReport:
     struck: int = 0
 
 
+@dataclass
+class _Built:
+    """One item as built: its candidate, its job's images beyond the candidate, its draft."""
+
+    id: str
+    candidate: bytes
+    label: DraftLabel
+    brief: str
+    record: dict[str, Any]
+    #: (image id, role, label, path relative to the set, sha256)
+    others: list[tuple[str, str, str | None, str, str]] = field(default_factory=list)
+    requirements: list[dict[str, Any]] = field(default_factory=list)
+
+
 def _sha256(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
 
@@ -44,64 +64,29 @@ def _today() -> str:
     return dt.date.today().isoformat()
 
 
-def _requirements(family: Family) -> list[dict[str, Any]]:
-    return [
-        {
-            "id": f"RQ{n}",
-            "kind": "must_hold",
-            "scope": ["candidate"],
-            "evidence": ["source"],
-            "text": f"{subject[0].upper() + subject[1:]} keeps its identity, shape, position and extent relative to the source.",
-        }
-        for n, subject in enumerate(family.protected, start=1)
-    ]
+def _cap(text: str) -> str:
+    return text[0].upper() + text[1:] if text else text
 
 
 def _job_text(
-    plan: Plan,
-    family: Family,
-    candidate_rel: str,
-    candidate_sha: str,
-    source_rel: str,
-    source_sha: str,
+    set_id: str,
+    use_case: str,
+    brief: str,
+    requirements: list[dict[str, Any]],
+    images: list[dict[str, Any]],
 ) -> str:
     tables: list[tuple[str, dict[str, Any], bool]] = [
-        ("job", {"use_case": plan.set.use_case, "brief": family.brief}, False)
+        ("job", {"use_case": use_case, "brief": brief}, False)
     ]
-    for rq in _requirements(family):
-        tables.append(("job.requirements", rq, True))
-    tables.append(
-        (
-            "job.images",
-            {
-                "id": "candidate",
-                "role": "candidate",
-                "source": {"path": candidate_rel, "sha256": candidate_sha},
-            },
-            True,
-        )
-    )
-    tables.append(
-        (
-            "job.images",
-            {
-                "id": "source",
-                "role": "source",
-                "source": {"path": source_rel, "sha256": source_sha},
-            },
-            True,
-        )
-    )
+    tables += [("job.requirements", rq, True) for rq in requirements]
+    tables += [("job.images", im, True) for im in images]
     return toml_out.document(
-        f"Item of {plan.set.id}; built by construction, see the owner's record.", tables
+        f"Item of {set_id}; built by construction, see the owner's record.", tables
     )
 
 
-def _contact_sheet(
-    family: Family, source: bytes, candidates: list[tuple[str, bytes, ops.DraftLabel]], path: Path
-) -> None:
+def _contact_sheet(cells: list[tuple[str, bytes, DraftLabel | None]], path: Path) -> None:
     thumb = 256
-    cells = [("source", source, None)] + [(i, b, lab) for i, b, lab in candidates]
     sheet = Image.new(
         "RGB", (thumb * len(cells) + 8 * (len(cells) + 1), thumb + 70), (245, 245, 245)
     )
@@ -114,6 +99,206 @@ def _contact_sheet(
         caption = name if lab is None else f"{name}\n{lab.expected}: {lab.words[:48]}"
         d.multiline_text((x, thumb + 14), caption, fill=(20, 20, 20))
     sheet.save(path, format="PNG")
+
+
+def _match_requirements(
+    label: DraftLabel, target: str | None, requirements: list[dict[str, Any]]
+) -> None:
+    if not target:
+        return
+    for rq in requirements:
+        if target.lower() in rq["text"].lower():
+            label.obligation_ids.append(rq["id"])
+
+
+def _build_scene_family(
+    family: Family, gen: Any, out: Path
+) -> tuple[list[_Built], dict[str, Any], list[tuple[str, bytes, DraftLabel | None]]]:
+    assert family.source is not None
+    source = gen.generate(family.source.prompt, family.source.seed, family.source.size)
+    source_rel = f"families/{family.id}/{SOURCE_FILE}"
+    (out / source_rel).parent.mkdir(parents=True, exist_ok=True)
+    (out / source_rel).write_bytes(source)
+    source_sha = _sha256(source)
+    requirements = [
+        {
+            "id": f"RQ{n}",
+            "kind": "must_hold",
+            "scope": ["candidate"],
+            "evidence": ["source"],
+            "text": f"{_cap(subject)} keeps its identity, shape, position and extent relative to the source.",
+        }
+        for n, subject in enumerate(family.protected, start=1)
+    ]
+    record = {
+        "id": family.id,
+        "kind": "scene",
+        "generator": family.generator,
+        "model": getattr(gen, "model", family.generator),
+        "prompt": family.source.prompt,
+        "seed": family.source.seed,
+        "size": family.source.size,
+        "source_sha256": source_sha,
+        "generated_on": _today(),
+        "protected": list(family.protected),
+    }
+    built: list[_Built] = []
+    cells: list[tuple[str, bytes, DraftLabel | None]] = [("source", source, None)]
+    for n, item in enumerate(family.items):
+        assert item.op is not None
+        candidate, label = ops.apply(item.op, source, gen, family.source.seed + n + 1)
+        if label.expected == "fail" and label.obligation_ids == ["SF1"]:
+            _match_requirements(
+                label, item.op.get("removes") or item.op.get("alters"), requirements
+            )
+        rec = {"id": item.id, "family": family.id, "op": dict(item.op), "generated_on": _today()}
+        if label.notes:
+            rec["edit_notes"] = label.notes
+        built.append(
+            _Built(
+                id=item.id,
+                candidate=candidate,
+                label=label,
+                brief=family.brief,
+                record=rec,
+                others=[("source", "source", None, source_rel, source_sha)],
+                requirements=requirements,
+            )
+        )
+        cells.append((item.id, candidate, label))
+    return built, record, cells
+
+
+def _build_subject_family(
+    family: Family, gen: Any, out: Path
+) -> tuple[list[_Built], dict[str, Any], list[tuple[str, bytes, DraftLabel | None]]]:
+    refs: list[tuple[str, bytes, str, str]] = []  # (image id, bytes, rel path, sha)
+    ref_records = []
+    for n, ref in enumerate(family.references, start=1):
+        image = gen.generate(ref.prompt, ref.seed, ref.size)
+        rel = f"families/{family.id}/ref-{n}.png"
+        (out / rel).parent.mkdir(parents=True, exist_ok=True)
+        (out / rel).write_bytes(image)
+        sha = _sha256(image)
+        refs.append((f"ref:{family.id}-{n}", image, rel, sha))
+        ref_records.append(
+            {"prompt": ref.prompt, "seed": ref.seed, "size": ref.size, "sha256": sha}
+        )
+    ref_ids = [r[0] for r in refs]
+    requirements = [
+        {
+            "id": f"RQ{n}",
+            "kind": "must_hold",
+            "scope": ["candidate"],
+            "evidence": list(ref_ids),
+            "text": f"{_cap(subject)} is present and unchanged in the candidate, as in the references.",
+        }
+        for n, subject in enumerate(family.protected, start=1)
+    ]
+    record = {
+        "id": family.id,
+        "kind": "subject",
+        "generator": family.generator,
+        "model": getattr(gen, "model", family.generator),
+        "subject": family.subject,
+        "references": ref_records,
+        "generated_on": _today(),
+        "protected": list(family.protected),
+    }
+    others = [(rid, "reference", family.description, rel, sha) for rid, _, rel, sha in refs]
+    ref_bytes = [r[1] for r in refs]
+    built: list[_Built] = []
+    by_id: dict[str, _Built] = {}
+    cells: list[tuple[str, bytes, DraftLabel | None]] = [(rid, b, None) for rid, b, _, _ in refs]
+    for item in family.items:
+        if item.from_item is not None:
+            assert item.op is not None
+            base = by_id[item.from_item]
+            candidate = gen.edit(
+                base.candidate,
+                item.op["prompt"],
+                item.scene.seed if item.scene else base.record.get("seed", 0) + 1,
+            )
+            alters = item.op.get("alters") or item.op.get("removes")
+            changes = regions.difference_regions(base.candidate, candidate)
+            label = DraftLabel(
+                expected="fail",
+                failure_type=f"{alters}-changed" if alters else "edited",
+                obligation_ids=["RC2"],
+                words=f"the {alters} is changed in the candidate, unlike the references"
+                if alters
+                else f"edited: {item.op['prompt']}",
+                notes={"prompt": item.op["prompt"], "from": item.from_item},
+            )
+            _match_requirements(label, alters, requirements)
+            if changes.primary is None:
+                label.region_kind = "whole_image"
+            else:
+                label.region_kind = "bbox"
+                label.bbox = list(changes.primary)
+            if changes.secondary:
+                label.notes["secondary_changes"] = changes.secondary
+                label.words += f"; the generator also changed {len(changes.secondary)} other area(s), check them"
+            brief = base.brief
+            rec = {
+                "id": item.id,
+                "family": family.id,
+                "from": item.from_item,
+                "op": dict(item.op),
+                "generated_on": _today(),
+                "edit_notes": label.notes,
+            }
+        elif item.lookalike is not None:
+            assert item.scene is not None
+            prompt = f"{item.scene.prompt} The subject is {item.lookalike}."
+            candidate = gen.generate(prompt, item.scene.seed, item.scene.size)
+            label = DraftLabel(
+                expected="fail",
+                failure_type="lookalike",
+                obligation_ids=["RC3", "RC1"],
+                words=f"a lookalike, not the reference subject: {item.lookalike}",
+                region_kind="whole_image",
+                notes={"prompt": prompt},
+            )
+            brief = item.scene.prompt
+            rec = {
+                "id": item.id,
+                "family": family.id,
+                "scene": {"prompt": item.scene.prompt, "seed": item.scene.seed},
+                "lookalike": item.lookalike,
+                "generated_on": _today(),
+            }
+        else:
+            assert item.scene is not None
+            prompt = f"{item.scene.prompt} The subject is exactly the one in the reference image(s): {family.subject}; keep every marking, colour and feature."
+            candidate = gen.compose(ref_bytes, prompt, item.scene.seed)
+            label = DraftLabel(
+                expected="pass",
+                failure_type=None,
+                obligation_ids=[],
+                words="the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting",
+                notes={"prompt": prompt},
+            )
+            brief = item.scene.prompt
+            rec = {
+                "id": item.id,
+                "family": family.id,
+                "scene": {"prompt": item.scene.prompt, "seed": item.scene.seed},
+                "generated_on": _today(),
+            }
+        b = _Built(
+            id=item.id,
+            candidate=candidate,
+            label=label,
+            brief=brief,
+            record=rec,
+            others=list(others),
+            requirements=requirements,
+        )
+        built.append(b)
+        by_id[item.id] = b
+        cells.append((item.id, candidate, label))
+    return built, record, cells
 
 
 def build(plan: Plan, out: Path, owner: Path, generators: dict[str, Any]) -> BuildReport:
@@ -131,80 +316,64 @@ def build(plan: Plan, out: Path, owner: Path, generators: dict[str, Any]) -> Bui
         gen = generators.get(family.generator)
         if gen is None:
             raise ValueError(f"family {family.id}: no generator {family.generator!r} available")
-        source = gen.generate(family.source.prompt, family.source.seed, family.source.size)
-        source_rel = f"families/{family.id}/{SOURCE_FILE}"
-        (out / source_rel).parent.mkdir(parents=True, exist_ok=True)
-        (out / source_rel).write_bytes(source)
-        source_sha = _sha256(source)
-        report.images += 1
+        if family.kind == "subject":
+            built, record, cells = _build_subject_family(family, gen, out)
+            report.images += len(family.references)
+        else:
+            built, record, cells = _build_scene_family(family, gen, out)
+            report.images += 1
         families_out.append({"id": family.id, "description": family.description})
-        record_families.append(
-            {
-                "id": family.id,
-                "generator": family.generator,
-                "model": getattr(gen, "model", family.generator),
-                "prompt": family.source.prompt,
-                "seed": family.source.seed,
-                "size": family.source.size,
-                "source_sha256": source_sha,
-                "generated_on": _today(),
-                "protected": list(family.protected),
-            }
-        )
-        candidates: list[tuple[str, bytes, ops.DraftLabel]] = []
-        for n, item in enumerate(family.items):
-            candidate, label = ops.apply(item.op, source, gen, family.source.seed + n + 1)
-            if label.expected == "fail" and label.obligation_ids == ["SF1"]:
-                target = item.op.get("removes") or item.op.get("alters") or ""
-                for rq in _requirements(family):
-                    if target and target.lower() in rq["text"].lower():
-                        label.obligation_ids.append(rq["id"])
-            item_dir = out / "items" / item.id
+        record_families.append(record)
+        for b in built:
+            item_dir = out / "items" / b.id
             item_dir.mkdir(parents=True, exist_ok=True)
-            candidate_rel = f"items/{item.id}/{CANDIDATE_FILE}"
-            (out / candidate_rel).write_bytes(candidate)
-            candidate_sha = _sha256(candidate)
+            candidate_rel = f"items/{b.id}/{CANDIDATE_FILE}"
+            (out / candidate_rel).write_bytes(b.candidate)
+            candidate_sha = _sha256(b.candidate)
+            images = [
+                {
+                    "id": "candidate",
+                    "role": "candidate",
+                    "source": {"path": candidate_rel, "sha256": candidate_sha},
+                }
+            ]
+            for image_id, role, label, rel, sha in b.others:
+                entry: dict[str, Any] = {"id": image_id, "role": role}
+                if label:
+                    entry["label"] = label
+                entry["source"] = {"path": rel, "sha256": sha}
+                images.append(entry)
             (item_dir / "job.toml").write_text(
-                _job_text(plan, family, candidate_rel, candidate_sha, source_rel, source_sha)
+                _job_text(plan.set.id, plan.set.use_case, b.brief, b.requirements, images)
             )
             manifest_items.append(
-                {"id": item.id, "family": family.id, "job": f"items/{item.id}/job.toml"}
+                {"id": b.id, "family": family.id, "job": f"items/{b.id}/job.toml"}
             )
-            record_items.append(
-                {
-                    "id": item.id,
-                    "family": family.id,
-                    "op": dict(item.op),
-                    "candidate_sha256": candidate_sha,
-                    "generated_on": _today(),
-                    **({"edit_notes": label.notes} if label.notes else {}),
-                }
-            )
+            record_items.append({**b.record, "candidate_sha256": candidate_sha})
             fields: dict[str, Any] = {
-                "item": item.id,
-                "expected": label.expected,
-                "failure_types": [label.failure_type] if label.failure_type else [],
-                "words": label.words,
-                "obligation_ids": list(label.obligation_ids),
+                "item": b.id,
+                "expected": b.label.expected,
+                "failure_types": [b.label.failure_type] if b.label.failure_type else [],
+                "words": b.label.words,
+                "obligation_ids": list(b.label.obligation_ids),
                 "adjudicated_by": "owner",
                 "adjudicated_on": "",
                 "status": "draft",
             }
             draft_labels.append(("label", fields, True))
-            if label.region_kind:
+            if b.label.region_kind:
                 region: dict[str, Any] = {
                     "frame": "raw:candidate",
-                    "kind": label.region_kind,
-                    "defect": label.failure_type or "changed",
-                    "obligation_ids": list(label.obligation_ids),
+                    "kind": b.label.region_kind,
+                    "defect": b.label.failure_type or "changed",
+                    "obligation_ids": list(b.label.obligation_ids),
                 }
-                if label.bbox:
-                    region["bbox"] = label.bbox
+                if b.label.bbox:
+                    region["bbox"] = b.label.bbox
                 draft_labels.append(("label.regions", region, True))
-            candidates.append((item.id, candidate, label))
             report.items += 1
             report.images += 1
-        _contact_sheet(family, source, candidates, owner_dir / f"contact-{family.id}.png")
+        _contact_sheet(cells, owner_dir / f"contact-{family.id}.png")
     set_fields: dict[str, Any] = {
         "id": plan.set.id,
         "use_case": plan.set.use_case,
@@ -281,9 +450,9 @@ def promote(draft_path: Path, set_dir: Path) -> PromoteReport:
     )
     label_tables: list[tuple[str, dict[str, Any], bool]] = []
     for label in confirmed:
-        regions = label.pop("regions", [])
+        regs = label.pop("regions", [])
         label_tables.append(("label", label, True))
-        for r in regions:
+        for r in regs:
             label_tables.append(("label.regions", r, True))
     (set_dir / "labels.toml").write_text(
         toml_out.document(

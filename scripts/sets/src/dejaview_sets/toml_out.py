@@ -22,7 +22,7 @@ def value(v: Any) -> str:
     if isinstance(v, (list, tuple)):
         return "[" + ", ".join(value(x) for x in v) + "]"
     if isinstance(v, dict):
-        return "{ " + ", ".join(f"{k} = {value(x)}" for k, x in v.items()) + " }"
+        return "{ " + ", ".join(f"{k} = {value(x)}" for k, x in v.items() if x is not None) + " }"
     raise TypeError(f"cannot write {type(v).__name__} to TOML")
 
 

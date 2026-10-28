@@ -1,0 +1,36 @@
+# Item of product-fidelity/packshots-v1; built by construction, see the owner's record.
+[job]
+use_case = "product-fidelity"
+brief = "Photograph of the toothpaste tube on a bathroom shelf beside a toothbrush in a glass, soft light."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:toothpaste-1"]
+text = "The name MINT LINE on the tube matches the reference exactly."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:toothpaste-1"]
+text = "The single green stripe matches the reference exactly."
+
+[[job.requirements]]
+id = "RQ3"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:toothpaste-1"]
+text = "The flat white flip cap matches the reference exactly."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/toothpaste-bathroom-blue/candidate.png", sha256 = "d1c2f4d7e76b5d104ff71b324acc4e655154b4e451984581ed8e630485c4e8e8" }
+
+[[job.images]]
+id = "ref:toothpaste-1"
+role = "reference"
+label = "a white toothpaste tube with a green stripe and the name MINT LINE"
+source = { path = "families/toothpaste/ref-1.png", sha256 = "98018912c3f25a700ea5c29b1390afdf56ef38df22c738cdefd9a8ca1e69439b" }

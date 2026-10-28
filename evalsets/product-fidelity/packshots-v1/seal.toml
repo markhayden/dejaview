@@ -1,0 +1,12 @@
+[seal]
+sha256 = "09ea7c30735ade549f98d4fec57cfce6d6ba8ed7eaa3eeb3a6723b479b4e5f77"
+created = "2026-10-28T02:50:37Z"
+attestation = "Reviewed every item of product-fidelity/packshots-v1 from the contact sheets on 2026-10-27 and confirmed all twenty labels; no judge or tool ran on these items before they were labelled."
+
+[seal.components]
+items = "69377a0c056bdb8d351efc8e39601eced0914aa59f09123d6b6ad5a38e69c978"
+families = "37cc2f5a10eb7b6076fb3fd67aa627119a87614fd9bd8ee5461bde3371bcbb65"
+jobs = "1d64acdac5459bad105c636e3afa2df100c21d1bf9a64e0846fa801b12612fc7"
+images = "d5f36ef727221e9c5d139a6bbee8f82cdcc615bbf9b3c72c1af9aba75778dd78"
+rules = "5b27049f09ab135ef60c3d60243fe35745ae5e93a39786e057ced5b52abea9fa"
+labels = "64c249014e6021f469962f7d6b63e13b4413df76b7e53145d5e46c3e4770d3e7"

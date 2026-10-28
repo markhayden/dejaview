@@ -68,3 +68,35 @@ def test_rebuild_one_item_keeps_the_rest(tmp_path: Path):
         assert "nope" in str(e)
     else:
         raise AssertionError("rebuilt an unknown item")
+
+
+def test_rebuild_adds_an_item_the_plan_gained_and_drops_one_it_lost(tmp_path: Path):
+    """Renaming an item in the plan: rebuild the new id, and the manifest, record and draft
+    follow the plan for that family."""
+    out = tmp_path / "evalsets/reference-consistency/pets-v1"
+    owner = tmp_path / "owner"
+    gens = {"fake": FakeGenerator()}
+    build.build(plan_mod.parse(PLAN), out, owner, generators=gens)
+    renamed = PLAN.replace('id = "pip-bridge-lookalike"', 'id = "pip-park-lookalike"')
+    build.rebuild(
+        plan_mod.parse(renamed), out, owner, generators=gens, item_id="pip-park-lookalike"
+    )
+    manifest = tomllib.loads((out / "set.toml").read_text())
+    assert [i["id"] for i in manifest["item"]] == [
+        "pip-bridge",
+        "pip-bridge-no-patch",
+        "pip-park-lookalike",
+    ]
+    assert not (out / "items/pip-bridge-lookalike").exists()
+    record = tomllib.loads((owner / "reference-consistency/pets-v1/construction.toml").read_text())
+    assert [i["id"] for i in record["item"]] == [
+        "pip-bridge",
+        "pip-bridge-no-patch",
+        "pip-park-lookalike",
+    ]
+    draft = tomllib.loads((owner / "reference-consistency/pets-v1/labels-draft.toml").read_text())
+    assert [label["item"] for label in draft["label"]] == [
+        "pip-bridge",
+        "pip-bridge-no-patch",
+        "pip-park-lookalike",
+    ]

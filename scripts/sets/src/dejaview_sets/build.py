@@ -590,8 +590,35 @@ def rebuild(
         )
         cells = [("source", source, None)]
     _, entry, drafts = _write_item(plan.set.id, plan.set.use_case, out, b)
+    # The family's entries in the record, the draft and the manifest follow the plan's item list:
+    # the rebuilt item replaced, a new id inserted at its place, an id the plan lost dropped;
+    # other families untouched.
     record = tomllib.loads((owner_dir / "construction.toml").read_text())
-    items = [entry if i["id"] == item_id else i for i in record.get("item", [])]
+    plan_ids = [i.id for i in family.items]
+    family_ids = {i["id"] for i in record.get("item", []) if i.get("family") == family.id} | set(
+        plan_ids
+    )
+
+    def resync(
+        entries: list[dict[str, Any]], key: str, fresh: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        own = {e[key]: e for e in entries if e[key] in family_ids}
+        own[item_id] = fresh
+        block = [own[i] for i in plan_ids if i in own]
+        merged: list[dict[str, Any]] = []
+        placed = False
+        for e in entries:
+            if e[key] in family_ids:
+                if not placed:
+                    merged.extend(block)
+                    placed = True
+            else:
+                merged.append(e)
+        if not placed:
+            merged.extend(block)
+        return merged
+
+    items = resync(record.get("item", []), "id", entry)
     (owner_dir / "construction.toml").write_text(
         toml_out.document(
             f"Construction record of {plan.set.id}: owner material, never published.",
@@ -604,9 +631,24 @@ def rebuild(
     new_label = dict(drafts[0][1])
     if len(drafts) > 1:
         new_label["regions"] = [d[1] for d in drafts[1:]]
-    labels = [new_label if label["item"] == item_id else label for label in draft.get("label", [])]
+    labels = resync(draft.get("label", []), "item", new_label)
     (owner_dir / "labels-draft.toml").write_text(
         toml_out.document(DRAFT_COMMENT, _label_tables(labels))
+    )
+    manifest = tomllib.loads((out / "set.toml").read_text())
+    for i in manifest.get("item", []):
+        if i["id"] in family_ids and i["id"] not in plan_ids:
+            shutil.rmtree(out / "items" / i["id"], ignore_errors=True)
+    manifest_items = resync(
+        manifest.get("item", []),
+        "id",
+        {"id": item_id, "family": family.id, "job": f"items/{item_id}/job.toml"},
+    )
+    (out / "set.toml").write_text(
+        toml_out.document(
+            "Built by dejaview-sets; labels arrive with `promote` after the owner's review.",
+            [("set", manifest["set"], False)] + [("item", i, True) for i in manifest_items],
+        )
     )
     draft_by_item = {label["item"]: label for label in labels}
     for i in family.items:

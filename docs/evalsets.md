@@ -78,8 +78,12 @@ Three family kinds cover the five use cases.
   protected subject, the identity rule, a fail whose region is the densest patch of pixel
   difference; any other dense patch the generator changed unasked is reported as a secondary
   change for the reviewer). Under reality checks the job is the candidate alone: `as_is` (the
-  clean image, a pass), `restyle` (a clean variant, a pass) and `edit` with a `defect` of
-  `anatomy`, `shadow`, `text` or `merge`, which plants that defect and labels RE1 to RE4.
+  clean image, a pass), `restyle` (a clean variant, a pass), `edit` with a `defect` of
+  `anatomy`, `shadow`, `text` or `merge`, which plants that defect by editing the clean image and
+  labels RE1 to RE4, and `generate` with a `defect`, which draws the candidate from its own
+  prompt with the defect asked for. The generators follow a text prompt asking for six fingers
+  or a shadow the wrong way but quietly ignore an edit instruction to add one, so anatomy,
+  merge and shadow defects are generated; garbled text works either way.
 - A **subject** family has one to four generated references of one subject and three item
   forms: a `scene` composed from the references (a pass whose identity the owner confirms), an
   item built `from` an earlier candidate by an `edit` that changes a marking, and a `scene` with

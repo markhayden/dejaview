@@ -1,0 +1,39 @@
+# Item of brief-compliance/stills-v1; built by construction, see the owner's record.
+[job]
+use_case = "brief-compliance"
+brief = "A photograph of a wooden desk from above: exactly three yellow pencils lying side by side, a white mug printed with the word MONDAY, and a closed green notebook. No laptop, no phone."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+text = "The candidate shows exactly three yellow pencils lying side by side."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+text = "The candidate shows a white mug printed with the word MONDAY."
+
+[[job.requirements]]
+id = "RQ3"
+kind = "must_hold"
+scope = ["candidate"]
+text = "The candidate shows a closed green notebook."
+
+[[job.requirements]]
+id = "RQ4"
+kind = "must_not"
+scope = ["candidate"]
+text = "The candidate shows a laptop; none was asked for."
+
+[[job.requirements]]
+id = "RQ5"
+kind = "must_not"
+scope = ["candidate"]
+text = "The candidate shows a phone; none was asked for."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/desk-five-pencils/candidate.png", sha256 = "08f4b4316aa547a8788bb2b1376729aa72c5ca5791748d24a77f68adf7dba22d" }

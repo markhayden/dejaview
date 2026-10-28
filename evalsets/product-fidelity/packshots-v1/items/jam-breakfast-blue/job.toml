@@ -1,0 +1,36 @@
+# Item of product-fidelity/packshots-v1; built by construction, see the owner's record.
+[job]
+use_case = "product-fidelity"
+brief = "Photograph of the jam jar on a breakfast table beside toast and a knife, morning light."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:jam-1"]
+text = "The label reading PEAR & GINGER matches the reference exactly."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:jam-1"]
+text = "The red gingham lid cover matches the reference exactly."
+
+[[job.requirements]]
+id = "RQ3"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:jam-1"]
+text = "The amber jam colour matches the reference exactly."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/jam-breakfast-blue/candidate.png", sha256 = "b86b1a94ae37a0bae326c7958a3bc6eb424fa482b2bca100686657db6d19690d" }
+
+[[job.images]]
+id = "ref:jam-1"
+role = "reference"
+label = "a glass jar of amber jam with a gingham lid cover and a label reading PEAR & GINGER"
+source = { path = "families/jam/ref-1.png", sha256 = "74f2a671804d8c86e503eb816fdf996e4cdfca4d43759ad00b1757f989ef98f7" }

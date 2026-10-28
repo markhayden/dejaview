@@ -1,0 +1,20 @@
+# Subject or scene families; a family never appears in more than one split.
+[[family]]
+id = "tonic"
+description = "a tall green glass bottle of tonic water with a white oval label reading HARBOUR TONIC"
+
+[[family]]
+id = "coffee-tin"
+description = "a cylindrical matte black coffee tin with a copper lid and a white label reading NORTH ROAST"
+
+[[family]]
+id = "toothpaste"
+description = "a white toothpaste tube with a green stripe and the name MINT LINE"
+
+[[family]]
+id = "matches"
+description = "a small navy matchbox printed OAK & ASH with a gold tree emblem"
+
+[[family]]
+id = "jam"
+description = "a glass jar of amber jam with a gingham lid cover and a label reading PEAR & GINGER"

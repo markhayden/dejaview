@@ -1,0 +1,36 @@
+# Item of product-fidelity/packshots-v1; built by construction, see the owner's record.
+[job]
+use_case = "product-fidelity"
+brief = "Photograph of a bottle standing on a picnic blanket in a park, afternoon light."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:tonic-1"]
+text = "The white oval label reading HARBOUR TONIC matches the reference exactly."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:tonic-1"]
+text = "The silver screw cap matches the reference exactly."
+
+[[job.requirements]]
+id = "RQ3"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:tonic-1"]
+text = "The green glass colour matches the reference exactly."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/tonic-picnic-lookalike/candidate.png", sha256 = "849df61b651bfbfeed2bfd967a6f65ac31d80aea2b10d1e951dd826dd10fbd89" }
+
+[[job.images]]
+id = "ref:tonic-1"
+role = "reference"
+label = "a tall green glass bottle of tonic water with a white oval label reading HARBOUR TONIC"
+source = { path = "families/tonic/ref-1.png", sha256 = "92ef2fcce823d03519b443caffd13f7806eaa0d2d61e68dd29de04bf971802ff" }

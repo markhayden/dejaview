@@ -64,9 +64,9 @@ tag.
 - [x] 3.2a Set-building toolkit and ADR 0013 (toolkit, dry run and ADR done 2026-10-27; the public `dejaview-evalsets` repository is the owner's to create, with README and licence, before 3.2b publishes images)
 - [x] 3.2b First dev set adjudicated and published (reference-consistency/pets-v1, 2026-10-27; images in markhayden/dejaview-evalsets, pushed by the owner)
 - [x] 3.3a Source fidelity dev set (source-fidelity/scenes-v1, 2026-10-27)
-- [ ] 3.3b Reality checks dev set
-- [ ] 3.3c Brief compliance dev set
-- [ ] 3.3d Product fidelity dev set
+- [x] 3.3b Reality checks dev set (reality-checks/people-v1, 2026-10-27)
+- [x] 3.3c Brief compliance dev set (brief-compliance/stills-v1, 2026-10-27)
+- [x] 3.3d Product fidelity dev set (product-fidelity/packshots-v1, 2026-10-27)
 - [ ] 3.3e Adversarial sets (five, one per use case) → tag `m3.1`
 - [ ] 3.4a Execution descriptor and durable evaluation ledger
 - [ ] 3.4b Matrix runner, arms and resume

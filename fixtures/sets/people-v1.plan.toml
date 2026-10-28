@@ -23,7 +23,7 @@ id = "market-evening"
 op = { kind = "restyle", prompt = "Change the light to warm evening sun. Keep every person, hand, object and the sign exactly as they are; change nothing else." }
 [[family.item]]
 id = "market-six-fingers"
-op = { kind = "edit", prompt = "Give the vendor's hand that holds the bag six clearly visible fingers. Change nothing else.", defect = "anatomy", words = "the vendor's hand holding the bag has six fingers" }
+op = { kind = "generate", seed = 6003, prompt = "A photograph of a fruit market stall: a vendor in an apron hands a brown paper bag to a customer; the vendor's open hand is raised flat towards the camera and has six fingers spread wide, the extra finger clearly visible; a chalkboard sign reads FRESH PEARS; morning light, 35mm lens.", defect = "anatomy", words = "the vendor's hand on the bag has six fingers" }
 [[family.item]]
 id = "market-garbled-sign"
 op = { kind = "edit", prompt = "Replace the writing on the chalkboard with letter-like scribbles that spell no word. Change nothing else.", defect = "text", words = "the chalkboard sign is garbled letter-like scribbles instead of FRESH PEARS" }
@@ -42,10 +42,10 @@ id = "barista-mono"
 op = { kind = "restyle", prompt = "Make the photograph black and white. Keep every person, hand, object and the board exactly as they are; change nothing else." }
 [[family.item]]
 id = "barista-merged-hand"
-op = { kind = "edit", prompt = "Make the barista's hand holding the cup merge into the cup so fingers and ceramic blend into one surface. Change nothing else.", defect = "merge", words = "the barista's hand merges into the cup" }
+op = { kind = "generate", seed = 6103, prompt = "A photograph of a barista at a cafe counter pouring milk into a cup; the hand holding the cup is fused with the cup, fingers and ceramic melting into one continuous surface; a menu board behind reads FLAT WHITE 4; soft window light.", defect = "merge", words = "the barista's hand is fused with the cup" }
 [[family.item]]
-id = "barista-wrong-shadow"
-op = { kind = "edit", prompt = "Make the shadow of the milk jug fall towards the window, opposite to every other shadow in the scene. Change nothing else.", defect = "shadow", words = "the jug's shadow falls opposite to every other shadow" }
+id = "barista-garbled-board"
+op = { kind = "edit", prompt = "Replace every word on the menu board behind the barista with letter-like scribbles that spell no word; keep the prices. Change nothing else.", defect = "text", words = "the menu board's words are garbled letter-like scribbles" }
 
 [[family]]
 id = "cyclist"
@@ -60,8 +60,8 @@ op = { kind = "as_is" }
 id = "cyclist-rain"
 op = { kind = "restyle", prompt = "Make it just after rain: wet road reflecting the sky, grey light. Keep the cyclist, the bicycle, the sign and the framing exactly as they are; change nothing else." }
 [[family.item]]
-id = "cyclist-third-arm"
-op = { kind = "edit", prompt = "Give the cyclist a third arm reaching from the shoulder to the handlebar. Change nothing else.", defect = "anatomy", words = "the cyclist has three arms" }
+id = "cyclist-two-heads"
+op = { kind = "generate", seed = 6203, prompt = "A photograph of a cyclist in a yellow jacket stopped at a street corner, one foot on the ground; the cyclist has two heads side by side on one body, both wearing helmets, clearly visible; a street name sign on the wall reads NORTH STREET; overcast daylight.", defect = "anatomy", words = "the cyclist has two heads" }
 [[family.item]]
 id = "cyclist-garbled-sign"
 op = { kind = "edit", prompt = "Replace the street sign's letters with letter-like shapes that spell no word. Change nothing else.", defect = "text", words = "the street sign is garbled instead of NORTH STREET" }
@@ -80,10 +80,10 @@ id = "bus-stop-dusk"
 op = { kind = "restyle", prompt = "Change the time to dusk with the bus stop's light on. Keep the woman, the phone, the board and the framing exactly as they are; change nothing else." }
 [[family.item]]
 id = "bus-stop-phone-merge"
-op = { kind = "edit", prompt = "Make the phone pass through the woman's fingers so the fingers and the phone overlap as one. Change nothing else.", defect = "merge", words = "the phone passes through the woman's fingers" }
+op = { kind = "generate", seed = 6303, prompt = "A photograph of a woman at a bus stop holding a phone; her fingers sink into the phone's screen and come out through its back as if it were not solid, phone and fingers merged into one object, close-up; a timetable board beside her reads ROUTE 12; afternoon light.", defect = "merge", words = "the woman's fingers pass through the phone" }
 [[family.item]]
 id = "bus-stop-fused-fingers"
-op = { kind = "edit", prompt = "Fuse the fingers of the hand holding the phone into a single smooth mitten-like shape. Change nothing else.", defect = "anatomy", words = "the fingers of the hand holding the phone are fused" }
+op = { kind = "generate", seed = 6304, prompt = "A photograph of a woman at a bus stop holding a phone in a hand with seven fingers, all fingers clearly visible; a timetable board beside her reads ROUTE 12; afternoon light.", defect = "anatomy", words = "the hand holding the phone has seven fingers" }
 
 [[family]]
 id = "skatepark"

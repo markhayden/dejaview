@@ -51,7 +51,7 @@ id = "desk-laptop"
 op = { kind = "generate", seed = 7103, prompt = "A photograph of a wooden desk from above: exactly three yellow pencils lying side by side, a white mug printed with the word MONDAY, a closed green notebook, and an open silver laptop.", violates = "BC2", about = "a laptop" }
 [[family.item]]
 id = "desk-misspelt"
-op = { kind = "generate", seed = 7104, prompt = "A photograph of a wooden desk from above: exactly three yellow pencils lying side by side, a white mug printed with the word MONDAI, and a closed green notebook. No laptop, no phone.", violates = "BC3", about = "MONDAY" }
+op = { kind = "generate", seed = 7104, prompt = "A photograph of a wooden desk from above: exactly three yellow pencils lying side by side, a white mug printed with the word MONDAI in large clear letters facing the camera, and a closed green notebook. No laptop, no phone.", violates = "BC3", about = "MONDAY" }
 
 [[family]]
 id = "shelf"
@@ -73,7 +73,7 @@ id = "shelf-price-tags"
 op = { kind = "generate", seed = 7203, prompt = "A photograph of a wooden shop shelf: four glass jars of dark jam in a row, each with a cream label that reads FIG JAM, a small potted herb at the right end, and a white price tag in front of each jar.", violates = "BC2", about = "price tags" }
 [[family.item]]
 id = "shelf-misspelt"
-op = { kind = "generate", seed = 7204, prompt = "A photograph of a wooden shop shelf: four glass jars of dark jam in a row, each with a cream label that reads FIG JAN, and a small potted herb at the right end. No price tags, no hands.", violates = "BC3", about = "FIG JAM" }
+op = { kind = "generate", seed = 7204, prompt = "A photograph of a wooden shop shelf: four glass jars of dark jam in a row, each with a cream label that reads FOG JAM, and a small potted herb at the right end. No price tags, no hands.", violates = "BC3", about = "FIG JAM" }
 
 [[family]]
 id = "kids-room"

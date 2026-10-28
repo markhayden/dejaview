@@ -7,13 +7,19 @@ checkable by code, and each set's `seal.toml` binds its content to the owner's a
 
 | Set | Split | Items | Families | Generators | Failure types | Reviewed |
 |---|---|---|---|---|---|---|
+| `reality-checks/people-v1` | dev | 20 (10 pass, 10 fail) | 5 scenes of people, hands and signs: a market stall, a barista, a cyclist, a bus stop, a skate park | FLUX.2 klein ×2, gpt-image-2 ×2, Gemini 3.1 Flash Image ×1 | impossible anatomy (RE1, 4 items); garbled text (RE3, 4 items); a merged hand or object (RE4, 1 item); a contradictory shadow (RE2, 1 item); pass items are the clean image and a clean restyle per family | 2026-10-27 by the owner from the contact sheets; all twenty confirmed; eight defects redrawn before review because an edit instruction left the image unchanged |
+| `brief-compliance/stills-v1` | dev | 20 (5 pass, 15 fail) | 5 briefs: a cafe window, a desk, a shop shelf, a child's room, a bakery counter | FLUX.2 klein ×2, gpt-image-2 ×2, Gemini 3.1 Flash Image ×1 | something asked for missing (BC1, 5 items); something forbidden present (BC2, 5 items); the specified text misspelt (BC3, 5 items) | 2026-10-27 by the owner from the contact sheets; all twenty confirmed; two items redrawn before review |
+| `product-fidelity/packshots-v1` | dev | 20 (5 pass, 15 fail) | 5 products: a tonic bottle, a coffee tin, a toothpaste tube, a matchbox, a jam jar | FLUX.2 klein ×2, gpt-image-2 ×2, Gemini 3.1 Flash Image ×1 | label text changed (PF2, 5 items); colour changed (PF3, 5 items); a lookalike product (PF1 and PF2, 5 items) | 2026-10-27 by the owner from the contact sheets; all twenty confirmed |
 | `source-fidelity/scenes-v1` | dev | 20 (10 pass, 10 fail) | 5 scenes: a brick house, a hotel pool, a village street, a red barn, a river bridge | FLUX.2 klein ×2, gpt-image-2 ×2, Gemini 3.1 Flash Image ×1 | a structural transform: mirror, rotate or crop (SF2, 5 items); a protected structure removed or changed by an edit (SF1, 5 items); pass items include a permitted restyle or dressing change per family | 2026-10-27 by the owner from the contact sheets; all twenty confirmed |
 | `reference-consistency/pets-v1` | dev | 20 (10 pass, 10 fail) | 5 subjects: Pip (golden retriever), Marlow (tabby cat), Ada (grey parrot), Bramble (bay horse), Hobbes (corgi) | FLUX.2 klein ×2, gpt-image-2 ×2, Gemini 3.1 Flash Image ×1 | a marking changed by an edit (RC2, 5 items); a lookalike generated without the references (RC3, 5 items) | 2026-10-27 by the owner from the contact sheets; all twenty confirmed; two edits rebuilt before review because their first draws left the marking in place or painted it on |
 
 **Review log.** Every generated image, kept or replaced, is in the owner's construction record
 for the set (owner storage, never published), with generator, model, prompt, seed where the API
 has one, every edit instruction, and the hash of each file. For pets-v1: 30 images kept (10
-references, 20 candidates), 2 candidates replaced by `rebuild` before the review, 0 struck. No
+references, 20 candidates), 2 candidates replaced by `rebuild` before the review, 0 struck. For
+scenes-v1: 25 kept, 0 replaced, 0 struck. For people-v1: 25 kept, 8 candidates replaced (planted
+defects an edit left out, redrawn by generation; two defect kinds swapped), 0 struck. For
+stills-v1: 20 kept, 2 replaced, 0 struck. For packshots-v1: 25 kept, 0 replaced, 0 struck. No
 judge model or tool of the harness ran on any item before labelling. The assistant that built the
 set viewed the contact sheets of this dev set to report on edit quality; it never views a blind
 set's items.

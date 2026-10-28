@@ -1,0 +1,36 @@
+# Item of product-fidelity/packshots-v1; built by construction, see the owner's record.
+[job]
+use_case = "product-fidelity"
+brief = "Photograph of the matchbox on a stone mantelpiece beside a candle, warm light."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:matches-1"]
+text = "The gold OAK & ASH lettering matches the reference exactly."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:matches-1"]
+text = "The gold tree emblem matches the reference exactly."
+
+[[job.requirements]]
+id = "RQ3"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:matches-1"]
+text = "The navy blue box matches the reference exactly."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/matches-mantel-red/candidate.png", sha256 = "5707f6d3dbca11b75a6f5ad9bdf4499b556d28955b98d92db81f61b100dfe235" }
+
+[[job.images]]
+id = "ref:matches-1"
+role = "reference"
+label = "a small navy matchbox printed OAK & ASH with a gold tree emblem"
+source = { path = "families/matches/ref-1.png", sha256 = "7c9d26d4da675c6087a51cc4fe4218a8120e7ef40cb7ef7e0febaad4ae54a970" }

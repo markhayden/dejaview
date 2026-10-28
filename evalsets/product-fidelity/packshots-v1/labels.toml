@@ -1,0 +1,280 @@
+# Answer labels adjudicated by the owner from the construction record.
+[[label]]
+item = "tonic-bar"
+expected = "pass"
+failure_types = []
+words = "the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "tonic-bar-label"
+expected = "fail"
+failure_types = ["white oval label reading HARBOUR TONIC-changed"]
+words = "the white oval label reading HARBOUR TONIC is changed in the candidate, unlike the references"
+obligation_ids = ["PF2", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "white oval label reading HARBOUR TONIC-changed"
+obligation_ids = ["PF2", "RQ1"]
+bbox = [0.4297, 0.6387, 0.5859, 0.6758]
+
+[[label]]
+item = "tonic-bar-amber"
+expected = "fail"
+failure_types = ["green glass colour-changed"]
+words = "the green glass colour is changed in the candidate, unlike the references; the generator also changed 7 other area(s), check them"
+obligation_ids = ["PF3", "RQ3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "green glass colour-changed"
+obligation_ids = ["PF3", "RQ3"]
+bbox = [0.4902, 0.4229, 0.6172, 0.5]
+
+[[label]]
+item = "tonic-picnic-lookalike"
+expected = "fail"
+failure_types = ["lookalike"]
+words = "a lookalike, not the reference subject: a short brown glass bottle with a round red label and a black cap"
+obligation_ids = ["PF1", "PF2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "lookalike"
+obligation_ids = ["PF1", "PF2"]
+
+[[label]]
+item = "coffee-tin-kitchen"
+expected = "pass"
+failure_types = []
+words = "the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "coffee-tin-kitchen-label"
+expected = "fail"
+failure_types = ["white label reading NORTH ROAST-changed"]
+words = "the white label reading NORTH ROAST is changed in the candidate, unlike the references"
+obligation_ids = ["PF2", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "white label reading NORTH ROAST-changed"
+obligation_ids = ["PF2", "RQ1"]
+bbox = [0.332, 0.4697, 0.4902, 0.6318]
+
+[[label]]
+item = "coffee-tin-kitchen-silver"
+expected = "fail"
+failure_types = ["copper-coloured lid-changed"]
+words = "the copper-coloured lid is changed in the candidate, unlike the references"
+obligation_ids = ["PF3", "RQ2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "copper-coloured lid-changed"
+obligation_ids = ["PF3", "RQ2"]
+bbox = [0.2839, 0.2061, 0.5449, 0.2773]
+
+[[label]]
+item = "coffee-tin-shelf-lookalike"
+expected = "fail"
+failure_types = ["lookalike"]
+words = "a lookalike, not the reference subject: a tall white coffee tin with a black lid and a brown label"
+obligation_ids = ["PF1", "PF2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "lookalike"
+obligation_ids = ["PF1", "PF2"]
+
+[[label]]
+item = "toothpaste-bathroom"
+expected = "pass"
+failure_types = []
+words = "the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "toothpaste-bathroom-label"
+expected = "fail"
+failure_types = ["name MINT LINE-changed"]
+words = "the name MINT LINE is changed in the candidate, unlike the references"
+obligation_ids = ["PF2", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "name MINT LINE-changed"
+obligation_ids = ["PF2", "RQ1"]
+bbox = [0.4082, 0.3682, 0.5938, 0.4717]
+
+[[label]]
+item = "toothpaste-bathroom-blue"
+expected = "fail"
+failure_types = ["single green stripe-changed"]
+words = "the single green stripe is changed in the candidate, unlike the references; the generator also changed 3 other area(s), check them"
+obligation_ids = ["PF3", "RQ2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "single green stripe-changed"
+obligation_ids = ["PF3", "RQ2"]
+bbox = [0.4883, 0.377, 0.5645, 0.4707]
+
+[[label]]
+item = "toothpaste-sink-lookalike"
+expected = "fail"
+failure_types = ["lookalike"]
+words = "a lookalike, not the reference subject: a blue toothpaste tube with two white stripes and a round cap"
+obligation_ids = ["PF1", "PF2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "lookalike"
+obligation_ids = ["PF1", "PF2"]
+
+[[label]]
+item = "matches-mantel"
+expected = "pass"
+failure_types = []
+words = "the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "matches-mantel-label"
+expected = "fail"
+failure_types = ["gold OAK & ASH lettering-changed"]
+words = "the gold OAK & ASH lettering is changed in the candidate, unlike the references; the generator also changed 1 other area(s), check them"
+obligation_ids = ["PF2", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "gold OAK & ASH lettering-changed"
+obligation_ids = ["PF2", "RQ1"]
+bbox = [0.3818, 0.5195, 0.5918, 0.5654]
+
+[[label]]
+item = "matches-mantel-red"
+expected = "fail"
+failure_types = ["navy blue box-changed"]
+words = "the navy blue box is changed in the candidate, unlike the references; the generator also changed 4 other area(s), check them"
+obligation_ids = ["PF3", "RQ3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "navy blue box-changed"
+obligation_ids = ["PF3", "RQ3"]
+bbox = [0.4766, 0.5332, 0.5, 0.5527]
+
+[[label]]
+item = "matches-table-lookalike"
+expected = "fail"
+failure_types = ["lookalike"]
+words = "a lookalike, not the reference subject: a long white matchbox with a red stripe and no emblem"
+obligation_ids = ["PF1", "PF2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "lookalike"
+obligation_ids = ["PF1", "PF2"]
+
+[[label]]
+item = "jam-breakfast"
+expected = "pass"
+failure_types = []
+words = "the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "jam-breakfast-label"
+expected = "fail"
+failure_types = ["label reading PEAR & GINGER-changed"]
+words = "the label reading PEAR & GINGER is changed in the candidate, unlike the references; the generator also changed 1 other area(s), check them"
+obligation_ids = ["PF2", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "label reading PEAR & GINGER-changed"
+obligation_ids = ["PF2", "RQ1"]
+bbox = [0.4427, 0.498, 0.5951, 0.6953]
+
+[[label]]
+item = "jam-breakfast-blue"
+expected = "fail"
+failure_types = ["red gingham lid cover-changed"]
+words = "the red gingham lid cover is changed in the candidate, unlike the references"
+obligation_ids = ["PF3", "RQ2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "red gingham lid cover-changed"
+obligation_ids = ["PF3", "RQ2"]
+bbox = [0.3125, 0.1562, 0.7272, 0.4297]
+
+[[label]]
+item = "jam-shelf-lookalike"
+expected = "fail"
+failure_types = ["lookalike"]
+words = "a lookalike, not the reference subject: a square jar of dark purple jam with a plain gold metal lid and a white label"
+obligation_ids = ["PF1", "PF2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "lookalike"
+obligation_ids = ["PF1", "PF2"]

@@ -1,0 +1,111 @@
+# Built by dejaview-sets; labels confirmed by the owner.
+[set]
+id = "brief-compliance/stills-v1"
+use_case = "brief-compliance"
+split = "dev"
+licence = "CC-BY-4.0"
+images_repo = "github.com/markhayden/dejaview-evalsets"
+images_rev = "b0c1a7541cfccbeaf86e92a5281bda21af2defeb"
+labels = "labels.toml"
+families = "families.toml"
+rules = { base = "brief-compliance", version = 1 }
+
+[[item]]
+id = "cafe-window-asked"
+family = "cafe-window"
+job = "items/cafe-window-asked/job.toml"
+
+[[item]]
+id = "cafe-window-no-cups"
+family = "cafe-window"
+job = "items/cafe-window-no-cups/job.toml"
+
+[[item]]
+id = "cafe-window-person"
+family = "cafe-window"
+job = "items/cafe-window-person/job.toml"
+
+[[item]]
+id = "cafe-window-misspelt"
+family = "cafe-window"
+job = "items/cafe-window-misspelt/job.toml"
+
+[[item]]
+id = "desk-asked"
+family = "desk"
+job = "items/desk-asked/job.toml"
+
+[[item]]
+id = "desk-five-pencils"
+family = "desk"
+job = "items/desk-five-pencils/job.toml"
+
+[[item]]
+id = "desk-laptop"
+family = "desk"
+job = "items/desk-laptop/job.toml"
+
+[[item]]
+id = "desk-misspelt"
+family = "desk"
+job = "items/desk-misspelt/job.toml"
+
+[[item]]
+id = "shelf-asked"
+family = "shelf"
+job = "items/shelf-asked/job.toml"
+
+[[item]]
+id = "shelf-no-herb"
+family = "shelf"
+job = "items/shelf-no-herb/job.toml"
+
+[[item]]
+id = "shelf-price-tags"
+family = "shelf"
+job = "items/shelf-price-tags/job.toml"
+
+[[item]]
+id = "shelf-misspelt"
+family = "shelf"
+job = "items/shelf-misspelt/job.toml"
+
+[[item]]
+id = "kids-room-asked"
+family = "kids-room"
+job = "items/kids-room-asked/job.toml"
+
+[[item]]
+id = "kids-room-red-kite"
+family = "kids-room"
+job = "items/kids-room-red-kite/job.toml"
+
+[[item]]
+id = "kids-room-toys"
+family = "kids-room"
+job = "items/kids-room-toys/job.toml"
+
+[[item]]
+id = "kids-room-misspelt"
+family = "kids-room"
+job = "items/kids-room-misspelt/job.toml"
+
+[[item]]
+id = "bakery-asked"
+family = "bakery"
+job = "items/bakery-asked/job.toml"
+
+[[item]]
+id = "bakery-no-water"
+family = "bakery"
+job = "items/bakery-no-water/job.toml"
+
+[[item]]
+id = "bakery-person"
+family = "bakery"
+job = "items/bakery-person/job.toml"
+
+[[item]]
+id = "bakery-misspelt"
+family = "bakery"
+job = "items/bakery-misspelt/job.toml"

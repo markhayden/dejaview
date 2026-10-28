@@ -47,6 +47,35 @@ def apply(op: dict[str, Any], source: bytes, generator, seed: int) -> tuple[byte
             obligation_ids=[],
             words="the generated image as it is; confirm nothing in it breaks the rules",
         )
+    if kind == "generate":
+        # The candidate from its own prompt (reality checks: a defect the generators will draw when
+        # asked for it directly but ignore when asked to edit it in). No region: whole image.
+        if generator is None:
+            raise ValueError("generate: the family's generator is needed")
+        prompt = op["prompt"]
+        defect = op.get("defect")
+        out = generator.generate(prompt, seed, int(op.get("size", 1024)))
+        if defect:
+            rule = REALITY_DEFECTS.get(defect)
+            if rule is None:
+                raise ValueError(
+                    f"generate: defect must be one of {sorted(REALITY_DEFECTS)}, got {defect!r}"
+                )
+            return out, DraftLabel(
+                expected="fail",
+                failure_type=defect,
+                obligation_ids=[rule],
+                words=op.get("words") or f"a generated {defect} defect: {prompt}",
+                region_kind="whole_image",
+                notes={"prompt": prompt},
+            )
+        return out, DraftLabel(
+            expected="pass",
+            failure_type=None,
+            obligation_ids=[],
+            words="generated clean from its own prompt; confirm nothing in it breaks the rules",
+            notes={"prompt": prompt},
+        )
     if kind == "grade":
         warmth = float(op.get("warmth", 0.1))
         im = _load(source)

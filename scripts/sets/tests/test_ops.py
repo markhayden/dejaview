@@ -112,3 +112,40 @@ def test_restyle_is_a_permitted_edit_that_keeps_structure():
     assert "restyle" in label.words.lower()
     assert label.notes["prompt"].startswith("Make it dusk")
     assert "changed_area" in label.notes, "the reviewer is told where the edit landed"
+
+
+class FakeTextGen:
+    name = "fake"
+    model = "fake-model"
+
+    def generate(self, prompt, seed, size):
+        im = Image.new("RGB", (size, size), (10, 10, 10))
+        buf = io.BytesIO()
+        im.save(buf, format="PNG")
+        return buf.getvalue()
+
+
+def test_generate_makes_the_candidate_from_its_own_prompt_with_the_defect_named():
+    out, label = ops.apply(
+        {
+            "kind": "generate",
+            "prompt": "A vendor whose hand has six fingers.",
+            "defect": "anatomy",
+            "words": "six fingers",
+            "size": 32,
+        },
+        png(),
+        generator=FakeTextGen(),
+        seed=9,
+    )
+    assert load(out).size == (32, 32)
+    assert label.expected == "fail" and label.obligation_ids == ["RE1"]
+    assert label.region_kind == "whole_image"
+    assert label.words == "six fingers"
+    out, label = ops.apply(
+        {"kind": "generate", "prompt": "A clean scene.", "size": 32},
+        png(),
+        generator=FakeTextGen(),
+        seed=9,
+    )
+    assert label.expected == "pass" and label.obligation_ids == []

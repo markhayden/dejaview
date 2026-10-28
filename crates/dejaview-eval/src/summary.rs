@@ -185,20 +185,46 @@ pub fn write(eval_dir: &Path, sets: &[Set], summary: &Summary) -> Result<MatrixM
     Ok(m)
 }
 
-/// Load `summary.json` and the sets it names from `evalsets_root`, then [`write`].
-pub fn regenerate(eval_dir: &Path, evalsets_root: &Path) -> Result<MatrixMetrics> {
+fn load_summary(eval_dir: &Path) -> Result<Summary> {
     let path = eval_dir.join(SUMMARY_FILE);
     let text = std::fs::read_to_string(&path).map_err(|e| io(&path, e))?;
-    let summary: Summary = serde_json::from_str(&text)
-        .map_err(|e| Error::Runner(format!("{}: {e}", path.display())))?;
+    serde_json::from_str(&text).map_err(|e| Error::Runner(format!("{}: {e}", path.display())))
+}
+
+fn load_sets(evalsets_root: &Path, summary: &Summary) -> Result<Vec<Set>> {
     let mut ids: Vec<&str> = summary.decisions.iter().map(|d| d.set.as_str()).collect();
     ids.sort_unstable();
     ids.dedup();
-    let sets = ids
-        .iter()
+    ids.iter()
         .map(|id| Set::load(&evalsets_root.join(id)))
-        .collect::<Result<Vec<_>>>()?;
+        .collect()
+}
+
+/// Load `summary.json` and the sets it names from `evalsets_root`, then [`write`].
+pub fn regenerate(eval_dir: &Path, evalsets_root: &Path) -> Result<MatrixMetrics> {
+    let summary = load_summary(eval_dir)?;
+    let sets = load_sets(evalsets_root, &summary)?;
     write(eval_dir, &sets, &summary)
+}
+
+/// The Markdown report over the named sets only (every set when `only` is empty), without
+/// touching the directory: how the results document reports development and adversarial sets
+/// separately.
+pub fn render_subset(eval_dir: &Path, evalsets_root: &Path, only: &[String]) -> Result<String> {
+    let mut summary = load_summary(eval_dir)?;
+    if !only.is_empty() {
+        for id in only {
+            if !summary.decisions.iter().any(|d| d.set == *id) {
+                return Err(Error::Runner(format!(
+                    "the summary has no decisions of set {id}"
+                )));
+            }
+        }
+        summary.decisions.retain(|d| only.contains(&d.set));
+    }
+    let sets = load_sets(evalsets_root, &summary)?;
+    let (rows, policy) = rows(eval_dir, &labels_of(&sets), &summary)?;
+    Ok(render(&summary, &metrics::compute(&rows, &policy)))
 }
 
 fn pct(p: &metrics::Proportion) -> String {

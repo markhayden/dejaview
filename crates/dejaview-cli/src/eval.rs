@@ -221,9 +221,28 @@ pub struct ReportArgs {
     /// The evalsets root the summary's set ids resolve under.
     #[arg(long, default_value = "evalsets")]
     evalsets_root: PathBuf,
+    /// Print the Markdown for these sets only (comma separated) to stdout and write nothing.
+    #[arg(long, value_delimiter = ',')]
+    sets: Vec<String>,
 }
 
 fn eval_report(args: &ReportArgs) -> i32 {
+    if !args.sets.is_empty() {
+        return match dejaview_eval::summary::render_subset(
+            &args.out,
+            &args.evalsets_root,
+            &args.sets,
+        ) {
+            Ok(text) => {
+                print!("{text}");
+                0
+            }
+            Err(e) => {
+                eprintln!("dejaview: {e}");
+                EXIT_USAGE
+            }
+        };
+    }
     match dejaview_eval::summary::regenerate(&args.out, &args.evalsets_root) {
         Ok(m) => {
             println!(

@@ -84,6 +84,52 @@ fn eval_run_completes_a_fake_matrix_and_resumes_without_redoing_it() {
         String::from_utf8_lossy(&o.stderr)
     );
     assert_eq!(std::fs::read(out.join("report.md")).unwrap(), stored);
+    // A subset of sets prints to stdout and writes nothing; an unknown set is refused.
+    let before = std::fs::metadata(out.join("report.md"))
+        .unwrap()
+        .modified()
+        .unwrap();
+    let o = dejaview(
+        &repo_root(),
+        &[
+            "eval",
+            "report",
+            "--out",
+            out.to_str().unwrap(),
+            "--evalsets-root",
+            "fixtures/evalsets",
+            "--sets",
+            "source-fidelity/pairs-v1",
+        ],
+    );
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    assert_eq!(o.stdout, stored, "one set is the whole matrix here");
+    assert_eq!(
+        std::fs::metadata(out.join("report.md"))
+            .unwrap()
+            .modified()
+            .unwrap(),
+        before
+    );
+    let o = dejaview(
+        &repo_root(),
+        &[
+            "eval",
+            "report",
+            "--out",
+            out.to_str().unwrap(),
+            "--evalsets-root",
+            "fixtures/evalsets",
+            "--sets",
+            "no/such",
+        ],
+    );
+    assert_eq!(o.status.code(), Some(64));
     // A matrix whose config is missing is a usage error.
     let o = Command::new(env!("CARGO_BIN_EXE_dejaview"))
         .current_dir(repo_root())

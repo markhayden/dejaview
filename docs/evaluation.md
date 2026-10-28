@@ -111,7 +111,9 @@ Every run ends by writing `metrics.json` and `report.md` next to `summary.json`,
 dejaview eval report --out eval-out/<name> [--evalsets-root evalsets]
 ```
 
-regenerates both from the saved results alone: `summary.json` for the decisions, each decision's
+regenerates both from the saved results alone (`--sets a,b` instead prints the Markdown over those
+sets only and writes nothing, which is how a results document reports development and
+adversarial sets separately): `summary.json` for the decisions, each decision's
 `report.json` for its findings and the policy, and the sets' `labels.toml` for the answers. The
 rendering is a pure function of those inputs, so regenerating reproduces the stored Markdown byte
 for byte. Only labelled items are scored; an unlabelled item contributes nothing.

@@ -94,5 +94,9 @@ if grep -q 'printed no URL' <<< "$out"; then pass=$((pass+1));
 else echo "FAIL: offline-smoke accepted a report view that serves nothing: $out" >&2; fail=$((fail+1)); fi
 rm -rf "$probe"
 
+# results-doc: the generator at least compiles.
+if python3 -I -m py_compile scripts/results-doc.py 2>/dev/null; then pass=$((pass+1));
+else echo "FAIL: scripts/results-doc.py does not compile" >&2; fail=$((fail+1)); fi
+
 echo "check tests: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

@@ -370,6 +370,7 @@ name = "dejaview-testkit"
 version = "0.1.0"
 dependencies = [
  "dejaview-core",
+ "image",
  "serde",
  "serde_json",
  "thiserror",
@@ -382,6 +383,7 @@ version = "0.1.0"
 dependencies = [
  "dejaview-core",
  "dejaview-testkit",
+ "image",
  "serde",
  "serde_json",
  "sha2",

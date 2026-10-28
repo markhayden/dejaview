@@ -81,7 +81,7 @@ tag.
   - follow-ups recorded at the M3 review (2026-10-28), not blocking: a real SIGINT test of `eval run` through the binary; prompt equivalence across arms checked on the journaled system prompt; an automated devtools check of the viewer; a test that an environment-expanded matrix account is `[redacted]` in the report; the seal's image and rules components isolated in the mutation tests; one fixture per `sets check` failure mode; `JsonSchema` on `DecisionResult`, `Summary`, `Estimate` and `Matrix`; a concurrency cap on the viewer server; a harness-level test that instruction-like text in a label or brief never alters the prompt
 
 ## M4 Built-in tools and MCP client
-- [ ] 4.0 Alignment feasibility spike and ADR 0014
+- [x] 4.0 Alignment feasibility spike and ADR 0014 (2026-10-28: direct registration on normalised pyramids, within 0.05 px and 0.01° at 2048 px, sphere within 0.03°; `dejaview_tools::align`, failure fixtures under fixtures/images/align)
 - [ ] 4.1 Registry in production
 - [ ] 4.2a `view`, `resize`, equirectangular geometry
 - [ ] 4.2b Viewer equirectangular overlay

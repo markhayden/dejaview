@@ -30,7 +30,15 @@ touches the filesystem.
 
 ## Transports
 
-**Built-in (in-process Rust).** A `Tool` implementation; arrives with M4.
+**Built-in (in-process Rust).** A `Tool` implementation; arrives with M4. The alignment
+estimators behind `align` are in place (`dejaview_tools::align`, ADR 0014): `align_flat` returns
+the homography from source to candidate pixel coordinates and `align_sphere` the rotation between
+two equirectangular panoramas, each with `overlap`, `ncc`, `inlier_fraction` and `texture` and
+an outcome of `registered`, `low_texture` or `not_registered`. Direct registration on locally
+contrast-normalised pyramids: an exhaustive coarse search, then robust Gauss-Newton per level;
+measured within 0.05 px and 0.01° at 2048 px on synthetic scenes with exact ground truth, and
+refusing unrelated, textureless, mirrored, quarter-turned and barely overlapping pairs
+(`fixtures/images/align/`).
 
 **MCP over stdio, revision 2025-11-25** (`crates/dejaview-tools/src/mcp/`). The client is
 synchronous like the `Tool` trait. On connect it spawns the server with the environment allowlist

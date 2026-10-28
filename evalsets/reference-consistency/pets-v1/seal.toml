@@ -1,0 +1,12 @@
+[seal]
+sha256 = "571ca0537157fee5db42a5bda444f7b3bd0b6d9fa3cb5bd9da567ca4fc3af7bd"
+created = "2026-10-28T02:03:44Z"
+attestation = "Reviewed every item of reference-consistency/pets-v1 from the contact sheets on 2026-10-27 and confirmed all twenty labels; no judge or tool ran on these items before they were labelled."
+
+[seal.components]
+items = "c86e2f691ef6bc9b49279a4cc3d5150e92d00e1d08b8ed35c62e109261c4d8f8"
+families = "7f14b2278d5fcc0eb5540d8f5eaaaac5165301f42c84a7071a7bcedd20cd68e9"
+jobs = "e4254ff4fcf18a583330c4927e1797be4bd73acb79d39dc2d629e18a07245ee2"
+images = "4ecf8bd27eb3d86920b945806f90dd79bf687b1d76ccf3ec6bf9c384cc590239"
+rules = "2747c0834f6630a67ff1b5453e285fbfde24369b7d4b85be25e80029559fb051"
+labels = "b0e1f317578f425126702d208c2fb5663fc5c0787ba61e15026d42d7d7cd4818"

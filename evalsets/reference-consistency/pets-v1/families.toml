@@ -1,0 +1,20 @@
+# Subject or scene families; a family never appears in more than one split.
+[[family]]
+id = "pip"
+description = "Pip, a golden retriever with a white chest patch and a red collar"
+
+[[family]]
+id = "marlow"
+description = "Marlow, a grey tabby cat with one white front paw and a torn left ear"
+
+[[family]]
+id = "ada"
+description = "Ada, an African grey parrot with a bright red tail and a pale band on her right leg"
+
+[[family]]
+id = "bramble"
+description = "Bramble, a bay horse with a white blaze down the face and one white sock on the left hind leg"
+
+[[family]]
+id = "hobbes"
+description = "Hobbes, a tricolour corgi with a white stripe up the forehead and a black saddle"

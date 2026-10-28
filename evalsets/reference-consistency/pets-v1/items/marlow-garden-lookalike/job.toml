@@ -1,0 +1,35 @@
+# Item of reference-consistency/pets-v1; built by construction, see the owner's record.
+[job]
+use_case = "reference-consistency"
+brief = "Photograph of a cat sitting on a garden wall among ivy, morning light."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:marlow-1", "ref:marlow-2"]
+text = "Marlow's single white front paw is present and unchanged in the candidate, as in the references."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:marlow-1", "ref:marlow-2"]
+text = "The notch in Marlow's left ear is present and unchanged in the candidate, as in the references."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/marlow-garden-lookalike/candidate.png", sha256 = "0878299c400cbac29622e8672cb66c3f4e922b1af917ac823bdda15fc77ecbef" }
+
+[[job.images]]
+id = "ref:marlow-1"
+role = "reference"
+label = "Marlow, a grey tabby cat with one white front paw and a torn left ear"
+source = { path = "families/marlow/ref-1.png", sha256 = "38f9968f4fea1aee064b78d1bf356a1ee911330db49e0b27de8ba55b682ff031" }
+
+[[job.images]]
+id = "ref:marlow-2"
+role = "reference"
+label = "Marlow, a grey tabby cat with one white front paw and a torn left ear"
+source = { path = "families/marlow/ref-2.png", sha256 = "bcc621f371cfa0dcaaed134cbff0b6ff713d7cd12dd42fa934d6a4ae9e208226" }

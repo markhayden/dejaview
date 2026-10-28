@@ -1,0 +1,35 @@
+# Item of reference-consistency/pets-v1; built by construction, see the owner's record.
+[job]
+use_case = "reference-consistency"
+brief = "Photograph of a corgi running through a wheat field, late afternoon."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:hobbes-1", "ref:hobbes-2"]
+text = "The white stripe up Hobbes's forehead is present and unchanged in the candidate, as in the references."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:hobbes-1", "ref:hobbes-2"]
+text = "Hobbes's black saddle is present and unchanged in the candidate, as in the references."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/hobbes-field-lookalike/candidate.png", sha256 = "3c58641dd98062b724c776413f6c1712222c64186d1ac06cec6cf37a6c542128" }
+
+[[job.images]]
+id = "ref:hobbes-1"
+role = "reference"
+label = "Hobbes, a tricolour corgi with a white stripe up the forehead and a black saddle"
+source = { path = "families/hobbes/ref-1.png", sha256 = "cc1b1d72c4f4ddec9b4fdca94ef16298c94a982eddbdae353fe4a29539755b1e" }
+
+[[job.images]]
+id = "ref:hobbes-2"
+role = "reference"
+label = "Hobbes, a tricolour corgi with a white stripe up the forehead and a black saddle"
+source = { path = "families/hobbes/ref-2.png", sha256 = "769a012788d773d351e300dd6f98ccad35c5df0d346934de9276a7e26f49a66a" }

@@ -78,7 +78,8 @@ forms: a `scene` composed from the references (a pass whose identity the owner c
 item built `from` an earlier candidate by an `edit` that changes a marking (RC2), and a `scene`
 with a `lookalike` description generated without the references (RC3). The draft label comes
 from the construction alone; nobody looks at the picture to write it, and no judge or tool runs.
-`fixtures/sets/pets-v1.plan.toml` is the first dev set's plan.
+`fixtures/sets/pets-v1.plan.toml` is the first dev set's plan; the set itself is
+`evalsets/reference-consistency/pets-v1` and `evalsets/README.md` tabulates every published set.
 
 ```
 cd scripts/sets

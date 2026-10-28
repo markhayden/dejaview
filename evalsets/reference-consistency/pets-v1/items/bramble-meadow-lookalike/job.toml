@@ -1,0 +1,35 @@
+# Item of reference-consistency/pets-v1; built by construction, see the owner's record.
+[job]
+use_case = "reference-consistency"
+brief = "Photograph of a horse grazing in a summer meadow, hills behind."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:bramble-1", "ref:bramble-2"]
+text = "Bramble's white blaze is present and unchanged in the candidate, as in the references."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:bramble-1", "ref:bramble-2"]
+text = "The single white sock on Bramble's left hind leg is present and unchanged in the candidate, as in the references."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/bramble-meadow-lookalike/candidate.png", sha256 = "7b853b7c877eb8fbf30da088f1ca3d5d28064e30cfed1c411d872af84f17be97" }
+
+[[job.images]]
+id = "ref:bramble-1"
+role = "reference"
+label = "Bramble, a bay horse with a white blaze down the face and one white sock on the left hind leg"
+source = { path = "families/bramble/ref-1.png", sha256 = "93d02f98f87369eeb05413fead974c76cea17de28b1837d9cd27d7ac442a0444" }
+
+[[job.images]]
+id = "ref:bramble-2"
+role = "reference"
+label = "Bramble, a bay horse with a white blaze down the face and one white sock on the left hind leg"
+source = { path = "families/bramble/ref-2.png", sha256 = "e62237fe01fca83bd03f6d5b944813e89c90f91d7c19c146093fc3086c75adc5" }

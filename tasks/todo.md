@@ -60,7 +60,7 @@ tag.
 - [ ] Recorded from the M2 review, not fixed: transport-error excerpts (up to 2 KB of a provider's error body) reach the journal and stderr without the redaction pass (the credential is never in a response body, so nothing has leaked; route them through the redaction list when the journal gains a redaction step); the `dist` installer in the `package` workflow is fetched by `curl | sh` without a checksum, as the generated release workflow does
 
 ## M3 Evaluation sets and baseline
-- [ ] 3.1 Set manifests, check, fetch, seal
+- [x] 3.1 Set manifests, check, fetch, seal
 - [ ] 3.2a Set-building toolkit and ADR 0013
 - [ ] 3.2b First dev set adjudicated and published
 - [ ] 3.3a Source fidelity dev set

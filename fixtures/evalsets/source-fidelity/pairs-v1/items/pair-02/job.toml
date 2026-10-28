@@ -1,0 +1,13 @@
+[job]
+use_case = "source-fidelity"
+brief = "Restyle the scene; keep the structure."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/pair-02/candidate.png", sha256 = "c3b1d5b3dfd99667cb440ae76d7b613c710f620f1cc3457ada3c971ed58b5010" }
+
+[[job.images]]
+id = "source"
+role = "source"
+source = { path = "items/pair-02/source.png", sha256 = "8c12b7425ca2c5cbc9cfa733fbab6f2bd267a379baaec01e0fecb2d2ab6b154f" }

@@ -18,6 +18,7 @@ fn job(use_case: &str, roles: &[(&str, Role)]) -> Job {
                 label: None,
                 source: ImageSource::Path {
                     path: "x.png".into(),
+                    sha256: None,
                 },
                 projection: None,
             })

@@ -1,0 +1,21 @@
+# A two-item development set for the harness's own tests: the fixture image pairs as
+# source-fidelity items, labelled from construction. Not a published set.
+[set]
+id = "source-fidelity/pairs-v1"
+use_case = "source-fidelity"
+split = "dev"
+licence = "Apache-2.0"
+images_repo = "."
+labels = "labels.toml"
+families = "families.toml"
+rules = { base = "source-fidelity", version = 1 }
+
+[[item]]
+id = "pair-01"
+family = "gradient"
+job = "items/pair-01/job.toml"
+
+[[item]]
+id = "pair-02"
+family = "rotated"
+job = "items/pair-02/job.toml"

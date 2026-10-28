@@ -1409,7 +1409,8 @@ dejaview report prune --older-than 30d
 dejaview tools list --config dejaview.toml      # manifests as the model will see them
 dejaview sets check evalsets/
 dejaview sets fetch --set reference-consistency/pets-v1
-dejaview sets seal --set <blind set>            # writes labels_sha256, moves labels out
+dejaview sets seal --set <set> --attest "…"    # writes seal.toml; a blind set's labels move out (--labels-out)
+dejaview sets verify-seal --set <set>
 dejaview eval run --matrix matrix.toml --out eval-out/<name>
 dejaview eval report eval-out/<name>
 dejaview eval gate --matrix matrix.toml --tool regions --set <sealed set>
@@ -1447,7 +1448,7 @@ fixtures/
   adapters/<adapter>/           recorded conversations per capability combination
   profiles/<profile>/           recorded conversations per shipped profile, including routing
   images/                       golden images for built-in tools, flat and equirectangular
-evalsets/<use-case>/<set>/      set.toml, labels.toml or labels_sha256, families.toml, items/*/job.toml
+evalsets/<use-case>/<set>/      set.toml, labels.toml or labels_sha256, families.toml, seal.toml, items/*/job.toml
 viewer/                         static report viewer
 docs/
   brief.md                      untracked, the starting brief

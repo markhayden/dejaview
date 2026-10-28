@@ -32,7 +32,10 @@ fn spec(id: &str, path: &str) -> ImageSpec {
         role: Role::Candidate,
         label: None,
         projection: None,
-        source: ImageSource::Path { path: path.into() },
+        source: ImageSource::Path {
+            path: path.into(),
+            sha256: None,
+        },
     }
 }
 

@@ -4,6 +4,7 @@
 mod catalog;
 mod eval;
 mod report;
+mod sets;
 
 use std::path::{Path, PathBuf};
 
@@ -47,6 +48,8 @@ enum Command {
     Eval(eval::EvalArgs),
     /// The model catalog: limits, prices, capabilities and sources per model.
     Catalog(catalog::CatalogArgs),
+    /// Evaluation sets: check, fetch images, seal and verify a seal.
+    Sets(sets::SetsArgs),
 }
 
 #[derive(clap::Args)]
@@ -178,6 +181,7 @@ fn main() {
         Some(Command::Report(args)) => report::run(&args),
         Some(Command::Eval(args)) => eval::run(&args),
         Some(Command::Catalog(args)) => catalog::run(&args),
+        Some(Command::Sets(args)) => sets::run(&args),
     };
     std::process::exit(code);
 }

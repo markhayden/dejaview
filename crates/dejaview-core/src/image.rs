@@ -222,15 +222,26 @@ pub fn load(spec: &ImageSpec, base: &Path, bounds: &DecodeBounds) -> Result<Cano
 
 fn read_bytes(spec: &ImageSpec, base: &Path) -> Result<Vec<u8>> {
     match &spec.source {
-        ImageSource::Path { path } => {
+        ImageSource::Path { path, sha256 } => {
             let full = if path.is_absolute() {
                 path.clone()
             } else {
                 base.join(path)
             };
-            std::fs::read(&full).map_err(|e| {
+            let bytes = std::fs::read(&full).map_err(|e| {
                 Error::Image(format!("{}: cannot read {}: {e}", spec.id, full.display()))
-            })
+            })?;
+            if let Some(pinned) = sha256 {
+                let actual = sha256_hex(&bytes);
+                if !actual.eq_ignore_ascii_case(pinned) {
+                    return Err(Error::Image(format!(
+                        "{}: {} has sha256 {actual}, the job pins {pinned}",
+                        spec.id,
+                        full.display()
+                    )));
+                }
+            }
+            Ok(bytes)
         }
         ImageSource::Base64 { base64, .. } => base64_decode(base64)
             .map_err(|e| Error::Image(format!("{}: invalid base64: {e}", spec.id))),
@@ -323,6 +334,15 @@ pub fn base64_decode(text: &str) -> std::result::Result<Vec<u8>, String> {
         }
     }
     Ok(out)
+}
+
+/// Lowercase hex SHA-256 of bytes.
+pub fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::Digest;
+    sha2::Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 #[cfg(test)]

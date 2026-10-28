@@ -1,0 +1,24 @@
+# Answer labels for the dev split, adjudicated from construction.
+[[label]]
+item = "pair-01"
+expected = "pass"
+failure_types = []
+words = "the candidate keeps the source's structure"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "pair-02"
+expected = "fail"
+failure_types = ["rotated"]
+words = "the candidate is rotated relative to the source"
+obligation_ids = ["SF2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+  [[label.regions]]
+  frame = "raw:candidate"
+  kind = "whole_image"
+  defect = "rotated"
+  obligation_ids = ["SF2"]

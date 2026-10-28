@@ -340,7 +340,10 @@ dependencies = [
  "rand",
  "rand_chacha",
  "serde",
+ "serde_json",
+ "sha2",
  "thiserror",
+ "tokio",
  "toml",
 ]
 

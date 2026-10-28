@@ -124,6 +124,41 @@ fn every_cell_runs_with_the_cache_bypassed_and_repetition_one_flagged() {
     assert_eq!(summary(&dir), s);
     assert!(dir.join("descriptor.json").exists() && dir.join("ledger.jsonl").exists());
     assert!(!dir.join("LOCK").exists(), "the lock is released");
+    // The run ends with the metrics and the Markdown report, which `eval report` reproduces
+    // byte for byte from the saved results and the labels.
+    let report_md = std::fs::read_to_string(dir.join("report.md")).unwrap();
+    let metrics_json = std::fs::read_to_string(dir.join("metrics.json")).unwrap();
+    let m: dejaview_eval::metrics::MatrixMetrics = serde_json::from_str(&metrics_json).unwrap();
+    assert_eq!(m.cells.len(), 1);
+    let c = &m.cells[0];
+    assert_eq!(
+        (
+            c.counts.items,
+            c.counts.expected_fail,
+            c.counts.expected_pass
+        ),
+        (2, 1, 1)
+    );
+    assert_eq!(
+        c.counts.missed, 1,
+        "pair-02 is a rotation the scripted pass misses"
+    );
+    assert_eq!(c.repetitions.count, 2);
+    assert_eq!(c.repetitions.agreement, Some(1.0));
+    assert!(
+        report_md.starts_with("# Evaluation report: fake-a\n"),
+        "{report_md}"
+    );
+    std::fs::remove_file(dir.join("report.md")).unwrap();
+    dejaview_eval::summary::regenerate(&dir, &root().join("fixtures/evalsets")).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(dir.join("report.md")).unwrap(),
+        report_md
+    );
+    assert_eq!(
+        std::fs::read_to_string(dir.join("metrics.json")).unwrap(),
+        metrics_json
+    );
     // The same matrix again: everything is complete, nothing is redone.
     let again = run(&plan(&dir, "fake-a.toml"), &fake("held.json"), None).unwrap();
     assert_eq!((again.completed, again.skipped), (0, 4));

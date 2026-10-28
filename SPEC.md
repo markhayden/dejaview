@@ -1413,6 +1413,7 @@ dejaview sets seal --set <set> --attest "…"    # writes seal.toml; a blind set
 dejaview sets verify-seal --set <set>
 dejaview eval estimate --matrix matrix.toml      # every envelope, the sum, a cost range; warns over the cap
 dejaview eval run --matrix matrix.toml --out eval-out/<name>
+dejaview eval report --out eval-out/<name>       # regenerate metrics.json and report.md from saved results
 dejaview eval report eval-out/<name>
 dejaview eval gate --matrix matrix.toml --tool regions --set <sealed set>
 dejaview eval canary --config dejaview.toml

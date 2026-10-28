@@ -362,5 +362,6 @@ pub fn run(plan: &Plan, factories: &dyn Factories, cancel: Option<&Cancel>) -> R
     summary.spent_usd = dejaview_core::ledger::Ledger::spent(&ledger);
     let text = serde_json::to_string_pretty(&summary).map_err(|e| Error::Runner(e.to_string()))?;
     std::fs::write(plan.eval_dir.join(SUMMARY_FILE), text).map_err(|e| io(&plan.eval_dir, e))?;
+    crate::summary::write(&plan.eval_dir, &sets, &summary)?;
     Ok(summary)
 }

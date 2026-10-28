@@ -92,6 +92,41 @@ number uses; the others are reported descriptively. Projections (`align` under `
 arms C, D_X and D) are part of the selection the runner hands to the tool factory and are applied
 once the tools arrive in M4.
 
+## The report
+
+Every run ends by writing `metrics.json` and `report.md` next to `summary.json`, and
+
+```
+dejaview eval report --out eval-out/<name> [--evalsets-root evalsets]
+```
+
+regenerates both from the saved results alone: `summary.json` for the decisions, each decision's
+`report.json` for its findings and the policy, and the sets' `labels.toml` for the answers. The
+rendering is a pure function of those inputs, so regenerating reproduces the stored Markdown byte
+for byte. Only labelled items are scored; an unlabelled item contributes nothing.
+
+Per cell, over repetition 1 (SPEC "Metrics"):
+
+- the confusion of expected `pass | fail` against computed `pass | fail | unsure | error`;
+- detected failures (expected fail, computed fail) and missed failures (expected fail, let through
+  as a pass by the frozen policy, which is the config's `[policy]` as every report records it),
+  both over expected fails; false rejects over expected passes; unsure and error rates over all
+  items; each with its 95% Wilson interval;
+- localisation over detected failures that have labelled regions: a prediction (a finding with
+  disposition `violation`, mapped to the root image's raw frame) and a label are eligible only when
+  they name the same root image and their `obligation_ids` intersect; a hit is an eligible pair
+  with IoU above 0.3 (polygons by their bounding box), or `whole_image` against `whole_image`, or
+  `absent` against `absent`; pairs are matched one to one greedily by descending IoU; unmatched
+  predictions are spurious; reported as hits over labelled regions and spurious over predictions.
+  A finding whose location did not resolve to a root image matches nothing and counts as spurious;
+  a `view` location has no root geometry and likewise matches nothing;
+- cost total and median per item (errors included) and wall time total and median.
+
+Later repetitions never move a headline number; they are reported as the share of (item,
+repetition) pairs whose computed verdict agrees with repetition 1. `fixtures/stats/metrics-1.toml`
+is the hand-computed fixture the tests hold the numbers to, and `fixtures/stats/metrics-1.md` its
+stored rendering.
+
 ## Estimating first
 
 ```

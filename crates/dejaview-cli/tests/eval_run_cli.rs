@@ -60,6 +60,29 @@ fn eval_run_completes_a_fake_matrix_and_resumes_without_redoing_it() {
         text.contains("(0 completed now, 4 already complete"),
         "{text}"
     );
+    // The run wrote the Markdown report; `eval report` reproduces it byte for byte.
+    let stored = std::fs::read(out.join("report.md")).unwrap();
+    assert!(!stored.is_empty());
+    std::fs::remove_file(out.join("report.md")).unwrap();
+    let o = Command::new(env!("CARGO_BIN_EXE_dejaview"))
+        .current_dir(repo_root())
+        .args([
+            "eval",
+            "report",
+            "--out",
+            out.to_str().unwrap(),
+            "--evalsets-root",
+            "fixtures/evalsets",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    assert_eq!(std::fs::read(out.join("report.md")).unwrap(), stored);
     // A matrix whose config is missing is a usage error.
     let o = Command::new(env!("CARGO_BIN_EXE_dejaview"))
         .current_dir(repo_root())

@@ -11,8 +11,10 @@ pub mod eval_ledger;
 pub mod fixture;
 pub mod gate_rules;
 pub mod matrix;
+pub mod metrics;
 pub mod runner;
 pub mod sets;
+pub mod summary;
 pub mod wilson;
 
 /// Errors this crate produces. Every public fallible function returns this type.

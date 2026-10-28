@@ -1,5 +1,5 @@
-//! `dejaview eval`: the matrix runner (3.4b) and the gate on a statistics fixture (1.15); the
-//! estimate, the report and the gate lifecycle arrive with the rest of M3.
+//! `dejaview eval`: the matrix runner (3.4b), the estimate (3.4c), the report (3.5a) and the
+//! gate on a statistics fixture (1.15); the gate lifecycle arrives with 3.5b.
 
 use std::path::{Path, PathBuf};
 
@@ -30,8 +30,40 @@ pub enum EvalCommand {
     /// Print every decision's envelope, their sum and a cost range for a matrix, and warn when
     /// the sum exceeds the cap; nothing is sent and nothing is refused.
     Estimate(EstimateArgs),
+    /// Regenerate `metrics.json` and `report.md` in an evaluation directory from its saved
+    /// results and the sets' labels; nothing is sent.
+    Report(ReportArgs),
     /// Apply the admission gate to a synthetic result table and print the interval and outcome.
     Gate(GateArgs),
+}
+
+#[derive(clap::Args)]
+pub struct ReportArgs {
+    /// The evaluation directory an `eval run` wrote.
+    #[arg(long)]
+    out: PathBuf,
+    /// The evalsets root the summary's set ids resolve under.
+    #[arg(long, default_value = "evalsets")]
+    evalsets_root: PathBuf,
+}
+
+fn eval_report(args: &ReportArgs) -> i32 {
+    match dejaview_eval::summary::regenerate(&args.out, &args.evalsets_root) {
+        Ok(m) => {
+            println!(
+                "eval report: {} cells over labelled items, written to {} and {} in {}",
+                m.cells.len(),
+                dejaview_eval::summary::METRICS_FILE,
+                dejaview_eval::summary::REPORT_FILE,
+                args.out.display()
+            );
+            0
+        }
+        Err(e) => {
+            eprintln!("dejaview: {e}");
+            EXIT_USAGE
+        }
+    }
 }
 
 #[derive(clap::Args)]
@@ -294,6 +326,7 @@ pub fn run(args: &EvalArgs) -> i32 {
     match &args.command {
         EvalCommand::Run(a) => eval_run(a),
         EvalCommand::Estimate(a) => eval_estimate(a),
+        EvalCommand::Report(a) => eval_report(a),
         EvalCommand::Gate(a) => gate(a),
     }
 }

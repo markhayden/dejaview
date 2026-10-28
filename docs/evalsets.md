@@ -89,6 +89,9 @@ uv run dejaview-sets promote --draft <owner storage>/<set id>/labels-draft.toml 
 dejaview sets check evalsets/
 ```
 
+`rebuild --item <id> [--seed-offset N]` regenerates one item from the family's images already on
+disk, with the plan as it now reads (a reworded edit, a new seed offset), and puts only that
+item's label back to draft; this is the review loop for an item the owner struck.
 `build` writes the public set directory (manifest, families, one job per item with pinned
 images, the family's source stored once under `families/`) and, to owner storage, the
 construction record (generator, model, prompt, seed, every edit instruction, hashes, dates), the

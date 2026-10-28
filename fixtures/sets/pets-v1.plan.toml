@@ -29,7 +29,7 @@ scene = { prompt = "Photograph of the dog standing on a windy beach at low tide,
 [[family.item]]
 id = "pip-bridge-no-patch"
 from = "pip-bridge"
-op = { kind = "edit", prompt = "Replace the white patch of fur on the dog's chest with fur that matches the surrounding golden coat, so the chest is uniformly golden and blends naturally. Change nothing else.", alters = "white chest patch" }
+op = { kind = "edit", prompt = "Cover the white patch of fur on the dog's chest with light tan fur exactly like the fur around it, so no white patch remains and the chest looks like the rest of the coat. Change nothing else.", alters = "white chest patch" }
 [[family.item]]
 id = "pip-park-lookalike"
 scene = { prompt = "Photograph of a dog sitting in a city park, autumn leaves, afternoon light.", seed = 114 }
@@ -133,7 +133,7 @@ scene = { prompt = "Photograph of the corgi sitting at the bow of a small wooden
 [[family.item]]
 id = "hobbes-cafe-no-stripe"
 from = "hobbes-cafe"
-op = { kind = "edit", prompt = "Replace the white stripe on the corgi's forehead with tan fur matching the cheeks, so the forehead is plain tan and blends naturally. Change nothing else.", alters = "white stripe up Hobbes's forehead" }
+op = { kind = "edit", prompt = "Cover the white stripe on the corgi's forehead with tan fur exactly like the cheeks, so the whole forehead between the ears is plain tan with no white. Change nothing else.", alters = "white stripe up Hobbes's forehead" }
 [[family.item]]
 id = "hobbes-field-lookalike"
 scene = { prompt = "Photograph of a corgi running through a wheat field, late afternoon.", seed = 514 }

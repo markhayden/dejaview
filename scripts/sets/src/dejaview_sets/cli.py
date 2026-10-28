@@ -27,6 +27,21 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument(
         "--fake", action="store_true", help="use the fake generator for every family (no network)"
     )
+    r = sub.add_parser(
+        "rebuild",
+        help="regenerate one item from the family's existing images, with the plan as it now reads",
+    )
+    r.add_argument("--plan", required=True, type=Path)
+    r.add_argument("--out", required=True, type=Path)
+    r.add_argument("--owner", required=True, type=Path)
+    r.add_argument("--item", required=True)
+    r.add_argument(
+        "--seed-offset",
+        type=int,
+        default=0,
+        help="added to the item's seed, to get a different draw",
+    )
+    r.add_argument("--fake", action="store_true")
     p = sub.add_parser("promote", help="publish confirmed labels and drop struck items")
     p.add_argument("--draft", required=True, type=Path, help="the reviewed labels-draft.toml")
     p.add_argument("--set", required=True, type=Path, help="the set directory")
@@ -40,6 +55,15 @@ def main(argv: list[str] | None = None) -> int:
             r = build_mod.build(plan, args.out, args.owner, gens)
             print(
                 f"built {plan.set.id}: {r.items} items, {r.images} images in {args.out}; worksheet in {args.owner / plan.set.id}"
+            )
+        elif args.command == "rebuild":
+            plan = plan_mod.load(args.plan)
+            gens = live()
+            if args.fake:
+                gens = {name: FakeGenerator() for name in gens}
+            build_mod.rebuild(plan, args.out, args.owner, gens, args.item, args.seed_offset)
+            print(
+                f"rebuilt {args.item} in {args.out}; its label is back to draft in {args.owner / plan.set.id}"
             )
         else:
             r = build_mod.promote(args.draft, args.set)

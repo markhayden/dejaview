@@ -1,0 +1,51 @@
+# The arm A baseline (PLAN.md task 3.8, owner decision 6): every published development and
+# adversarial set through the initial model subset (owner decision 1), no tools, one decision run,
+# two repetitions. The base config's rules base is overridden per set by the runner; each model
+# names the account its vendor's consent binds to, as an environment reference.
+[matrix]
+name = "baseline-a-2026-10"
+config = "evalsets/matrix/baseline-config.toml"
+sets = [
+  "source-fidelity/scenes-v1",
+  "reference-consistency/pets-v1",
+  "reality-checks/people-v1",
+  "brief-compliance/stills-v1",
+  "product-fidelity/packshots-v1",
+  "source-fidelity/adversarial-v1",
+  "reference-consistency/adversarial-v1",
+  "reality-checks/adversarial-v1",
+  "brief-compliance/adversarial-v1",
+  "product-fidelity/adversarial-v1",
+]
+arms = ["A"]
+decision_runs = 1
+repetitions = 2
+spend_cap_usd = 75.0
+
+[[matrix.models]]
+profile = "anthropic"
+model = "claude-sonnet-5-5"
+
+[[matrix.models]]
+profile = "anthropic"
+model = "claude-opus-5-5"
+
+[[matrix.models]]
+profile = "google-ai-studio"
+model = "gemini-3.8-flash"
+account = "google:${DEJAVIEW_GOOGLE_ACCOUNT}"
+
+[[matrix.models]]
+profile = "google-ai-studio"
+model = "gemini-4-argon"
+account = "google:${DEJAVIEW_GOOGLE_ACCOUNT}"
+
+[[matrix.models]]
+profile = "openai"
+model = "gpt-6.1-terra"
+account = "openai:${DEJAVIEW_OPENAI_ACCOUNT}"
+
+[[matrix.models]]
+profile = "openai"
+model = "gpt-6.1-sol"
+account = "openai:${DEJAVIEW_OPENAI_ACCOUNT}"

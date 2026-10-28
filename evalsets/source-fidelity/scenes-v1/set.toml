@@ -1,0 +1,111 @@
+# Built by dejaview-sets; labels confirmed by the owner.
+[set]
+id = "source-fidelity/scenes-v1"
+use_case = "source-fidelity"
+split = "dev"
+licence = "CC-BY-4.0"
+images_repo = "github.com/markhayden/dejaview-evalsets"
+images_rev = "eefad1b9964920fa865656792d30cf2548663193"
+labels = "labels.toml"
+families = "families.toml"
+rules = { base = "source-fidelity", version = 1 }
+
+[[item]]
+id = "brick-house-grade"
+family = "brick-house"
+job = "items/brick-house-grade/job.toml"
+
+[[item]]
+id = "brick-house-golden-hour"
+family = "brick-house"
+job = "items/brick-house-golden-hour/job.toml"
+
+[[item]]
+id = "brick-house-mirror"
+family = "brick-house"
+job = "items/brick-house-mirror/job.toml"
+
+[[item]]
+id = "brick-house-no-bicycle"
+family = "brick-house"
+job = "items/brick-house-no-bicycle/job.toml"
+
+[[item]]
+id = "hotel-pool-grade"
+family = "hotel-pool"
+job = "items/hotel-pool-grade/job.toml"
+
+[[item]]
+id = "hotel-pool-chairs"
+family = "hotel-pool"
+job = "items/hotel-pool-chairs/job.toml"
+
+[[item]]
+id = "hotel-pool-crop"
+family = "hotel-pool"
+job = "items/hotel-pool-crop/job.toml"
+
+[[item]]
+id = "hotel-pool-no-pool"
+family = "hotel-pool"
+job = "items/hotel-pool-no-pool/job.toml"
+
+[[item]]
+id = "village-street-grade"
+family = "village-street"
+job = "items/village-street-grade/job.toml"
+
+[[item]]
+id = "village-street-snow"
+family = "village-street"
+job = "items/village-street-snow/job.toml"
+
+[[item]]
+id = "village-street-rotate"
+family = "village-street"
+job = "items/village-street-rotate/job.toml"
+
+[[item]]
+id = "village-street-no-tower"
+family = "village-street"
+job = "items/village-street-no-tower/job.toml"
+
+[[item]]
+id = "red-barn-grade"
+family = "red-barn"
+job = "items/red-barn-grade/job.toml"
+
+[[item]]
+id = "red-barn-dusk"
+family = "red-barn"
+job = "items/red-barn-dusk/job.toml"
+
+[[item]]
+id = "red-barn-mirror"
+family = "red-barn"
+job = "items/red-barn-mirror/job.toml"
+
+[[item]]
+id = "red-barn-no-silo"
+family = "red-barn"
+job = "items/red-barn-no-silo/job.toml"
+
+[[item]]
+id = "river-bridge-grade"
+family = "river-bridge"
+job = "items/river-bridge-grade/job.toml"
+
+[[item]]
+id = "river-bridge-autumn"
+family = "river-bridge"
+job = "items/river-bridge-autumn/job.toml"
+
+[[item]]
+id = "river-bridge-crop"
+family = "river-bridge"
+job = "items/river-bridge-crop/job.toml"
+
+[[item]]
+id = "river-bridge-two-arches"
+family = "river-bridge"
+job = "items/river-bridge-two-arches/job.toml"

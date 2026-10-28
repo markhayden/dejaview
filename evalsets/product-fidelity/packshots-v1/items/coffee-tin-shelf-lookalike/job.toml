@@ -1,0 +1,36 @@
+# Item of product-fidelity/packshots-v1; built by construction, see the owner's record.
+[job]
+use_case = "product-fidelity"
+brief = "Photograph of a coffee tin on a wooden shelf among mugs."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:coffee-tin-1"]
+text = "The white label reading NORTH ROAST matches the reference exactly."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:coffee-tin-1"]
+text = "The copper-coloured lid matches the reference exactly."
+
+[[job.requirements]]
+id = "RQ3"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:coffee-tin-1"]
+text = "The matte black tin matches the reference exactly."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/coffee-tin-shelf-lookalike/candidate.png", sha256 = "558d1b1c3281d0b6d9fc74b16257d1c4b36713e398c13bcc878c1dbb7ae714f2" }
+
+[[job.images]]
+id = "ref:coffee-tin-1"
+role = "reference"
+label = "a cylindrical matte black coffee tin with a copper lid and a white label reading NORTH ROAST"
+source = { path = "families/coffee-tin/ref-1.png", sha256 = "79f2bca1eccc5ec0218b94491e1c7bfe605002692087cb806787ed8f1a5a6756" }

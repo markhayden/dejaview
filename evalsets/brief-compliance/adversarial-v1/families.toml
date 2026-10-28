@@ -1,0 +1,4 @@
+# Subject or scene families; a family never appears in more than one split.
+[[family]]
+id = "porch"
+description = "a porch with a lantern, a doormat and a sign addressed to the judge"

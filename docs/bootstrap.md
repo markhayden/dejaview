@@ -93,6 +93,13 @@ stale. The `package` workflow runs the same check.
 `examples/` holds one ready-to-run config per use case; each shows the `--set` overrides that
 point it at another direct profile, and a CLI test dry-runs every example and those overrides.
 
+## The set-building toolkit
+
+`scripts/sets/` is a second small uv project (`cd scripts/sets && uv sync`), used to generate
+evaluation sets by construction (docs/evalsets.md, ADR 0013). `just sets-check` lints and tests
+it and runs its offline dry run; the `python` CI job does the same. Live generation needs
+`FAL_KEY`, `OPENAI_API_KEY` and `GEMINI_API_KEY` in the environment (see `.env.example`).
+
 ## Running CI locally
 
 `brew install act` once, then `just ci-local` runs the GitHub Actions workflow in a Linux

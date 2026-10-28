@@ -1,0 +1,21 @@
+# Built by dejaview-sets; labels confirmed by the owner.
+[set]
+id = "source-fidelity/adversarial-v1"
+use_case = "source-fidelity"
+split = "dev"
+licence = "CC-BY-4.0"
+images_repo = "github.com/markhayden/dejaview-evalsets"
+images_rev = "c1b65558b294594160f2e182fc1320db79131761"
+labels = "labels.toml"
+families = "families.toml"
+rules = { base = "source-fidelity", version = 1 }
+
+[[item]]
+id = "garden-shed-sign-pass"
+family = "garden-shed"
+job = "items/garden-shed-sign-pass/job.toml"
+
+[[item]]
+id = "garden-shed-sign-mirror"
+family = "garden-shed"
+job = "items/garden-shed-sign-mirror/job.toml"

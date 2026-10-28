@@ -973,9 +973,10 @@ a miss.
 Model ids pinned; resolved model and API version on every report; `dejaview eval canary` reruns
 a fixed set uncached on a schedule or on a provider notice, comparing against the pinned baseline
 recorded when the configuration was qualified. One deviating canary marks the configuration
-`suspect`; two consecutive deviations against the same baseline recommend disabling it. Disabling
-requires the owner's explicit approval, and requalification is a full development-set run. No
-fallback to another model or provider.
+`suspect`; two consecutive deviations against the same baseline recommend disabling it; a canary
+in which an item ended in an operational error and nothing deviated is `inconclusive`, since an
+error is never a verdict. Disabling requires the owner's explicit approval, and requalification is
+a full development-set run under its own spend cap. No fallback to another model or provider.
 
 ### Data leaving the machine
 
@@ -1287,8 +1288,10 @@ headline number; other repetitions are reported descriptively as per-item agreem
 - **Detected failures**: expected fail with computed fail; count over expected fails.
 - **False rejects**: expected pass with computed fail; count over expected passes.
 - **Unsure rate** and **error rate**: counts over all items.
-- **Localisation**: for detected failures with labelled regions, a prediction and a label are
-  eligible only when they share the root image and their `obligation_ids` intersect; a hit is an
+- **Localisation**: for detected failures with labelled regions, a prediction is a checklist item
+  dispositioned `violation` with a location (its obligations are its instances') or a violation
+  finding, in root coordinates; a prediction and a label are eligible only when they share the
+  root image and their `obligation_ids` intersect; a hit is an
   eligible pair with IoU above 0.3 in root coordinates, or `whole_image` against a whole-image
   label, or `absent` against an `absent` label on the same image; eligible pairs are matched
   one-to-one greedily by descending IoU; unmatched predictions are spurious; reported as hits over
@@ -1409,11 +1412,16 @@ dejaview report prune --older-than 30d
 dejaview tools list --config dejaview.toml      # manifests as the model will see them
 dejaview sets check evalsets/
 dejaview sets fetch --set reference-consistency/pets-v1
-dejaview sets seal --set <blind set>            # writes labels_sha256, moves labels out
+dejaview sets seal --set <set> --attest "…"    # writes seal.toml; a blind set's labels move out (--labels-out)
+dejaview sets verify-seal --set <set>
+dejaview eval estimate --matrix matrix.toml      # every envelope, the sum, a cost range; warns over the cap
 dejaview eval run --matrix matrix.toml --out eval-out/<name>
+dejaview eval report --out eval-out/<name>       # regenerate metrics.json and report.md from saved results
 dejaview eval report eval-out/<name>
-dejaview eval gate --matrix matrix.toml --tool regions --set <sealed set>
-dejaview eval canary --config dejaview.toml
+dejaview eval gate --matrix matrix.toml --out eval-out/<name> --tool regions --set <sealed set> --stage initial --labels <owner labels>
+dejaview eval gate-table --fixture fixtures/stats/case-1.toml   # the gate table on a synthetic result table
+dejaview eval canary --config dejaview.toml --set <pinned set> --state canary.toml      # clear | suspect | recommend_disable; never disables
+dejaview eval requalify --config dejaview.toml --set <dev set> --state canary.toml --approve "…"   # records the new baseline
 dejaview check --config dejaview.toml --job job.toml --replay fixtures/adapters/anthropic-messages/first-look
 dejaview check --config dejaview.toml --job job.toml --record recordings/first-look
 dejaview catalog show claude-opus-5-5 [--json]
@@ -1442,20 +1450,22 @@ crates/
   dejaview-cli/                 the binary
 tools/python/                   dejaview-tools uv project (MCP server, segmenter, MODEL.md, uv.lock, bundle build, tests)
 scripts/                        repository checks, the credential scanner, publish, install-from-registry, archive and live smoke scripts
+scripts/sets/                   the set-building toolkit (uv project): plans, generators, construction ops, draft labels
 schemas/                        generated JSON Schemas: submission, envelope, manifest, config, report, tools/
 fixtures/
+  matrix/                       matrices the evaluation tests use
   adapters/<adapter>/           recorded conversations per capability combination
   profiles/<profile>/           recorded conversations per shipped profile, including routing
   images/                       golden images for built-in tools, flat and equirectangular
-evalsets/<use-case>/<set>/      set.toml, labels.toml or labels_sha256, families.toml, items/*/job.toml
-viewer/                         static report viewer
+evalsets/<use-case>/<set>/      set.toml, labels.toml or labels_sha256, families.toml, seal.toml, items/*/job.toml
+crates/dejaview-cli/viewer/     static report viewer, embedded in the binary (packaging keeps embedded assets inside their crate)
 docs/
   brief.md                      untracked, the starting brief
   adr/                          one file per decision, dated
   reviews/                      verbatim external reviews
   provider-data.md              enforced, attested and unverifiable per profile
   architecture.md               the diagram above, kept current
-  tools.md  rules.md  evalsets.md  viewer.md
+  tools.md  rules.md  evalsets.md  evaluation.md  viewer.md
 SPEC.md  PLAN.md  README.md  LICENSE
 ```
 

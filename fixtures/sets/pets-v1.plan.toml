@@ -1,0 +1,140 @@
+# The first dev set (task 3.2b): reference consistency, five subject families, four items each:
+# two new scenes from the references (pass, confirmed by the owner), one marking edit (RC2) and
+# one lookalike generated without the references (RC3). Generators mixed by family (ADR 0013).
+[set]
+id = "reference-consistency/pets-v1"
+use_case = "reference-consistency"
+split = "dev"
+licence = "CC-BY-4.0"
+images_repo = "github.com/markhayden/dejaview-evalsets"
+rules = { base = "reference-consistency", version = 1 }
+
+[[family]]
+id = "pip"
+kind = "subject"
+generator = "fal"
+description = "Pip, a golden retriever with a white chest patch and a red collar"
+subject = "Pip, an adult golden retriever with a distinct white patch of fur on the chest and a plain red collar"
+protected = ["Pip's white chest patch", "Pip's red collar"]
+references = [
+  { prompt = "Photograph of an adult golden retriever sitting and facing the camera, a distinct white patch of fur on the chest, a plain red collar, plain grey studio background, soft light.", seed = 101 },
+  { prompt = "Photograph of the same adult golden retriever standing on short grass, three-quarter view, the white chest patch visible, a plain red collar, overcast daylight.", seed = 102 },
+]
+[[family.item]]
+id = "pip-bridge"
+scene = { prompt = "Photograph of the dog sitting on the bridge of a starship, consoles glowing, evening light.", seed = 111 }
+[[family.item]]
+id = "pip-beach"
+scene = { prompt = "Photograph of the dog standing on a windy beach at low tide, grey sky.", seed = 112 }
+[[family.item]]
+id = "pip-bridge-no-patch"
+from = "pip-bridge"
+op = { kind = "edit", prompt = "Cover the white patch of fur on the dog's chest with light tan fur exactly like the fur around it, so no white patch remains and the chest looks like the rest of the coat. Change nothing else.", alters = "white chest patch" }
+[[family.item]]
+id = "pip-park-lookalike"
+scene = { prompt = "Photograph of a dog sitting in a city park, autumn leaves, afternoon light.", seed = 114 }
+lookalike = "an adult golden retriever with an all-golden chest, no white patch, wearing a blue collar"
+
+[[family]]
+id = "marlow"
+kind = "subject"
+generator = "openai"
+description = "Marlow, a grey tabby cat with one white front paw and a torn left ear"
+subject = "Marlow, a grey tabby cat with a single white front paw (the right one), a small notch torn from the left ear, and green eyes"
+protected = ["Marlow's single white front paw", "the notch in Marlow's left ear"]
+references = [
+  { prompt = "Photograph of a grey tabby cat sitting upright facing the camera, its right front paw white and the other paws grey, a small notch missing from the tip of its left ear, green eyes, plain cream background.", seed = 201 },
+  { prompt = "Photograph of the same grey tabby cat lying on a wooden floor, side view, the one white front paw visible, the notched left ear visible, window light.", seed = 202 },
+]
+[[family.item]]
+id = "marlow-bookshop"
+scene = { prompt = "Photograph of the cat sitting on a stack of books in a second-hand bookshop, warm lamplight.", seed = 211 }
+[[family.item]]
+id = "marlow-rooftop"
+scene = { prompt = "Photograph of the cat on a tiled rooftop at dusk, city lights behind.", seed = 212 }
+[[family.item]]
+id = "marlow-bookshop-two-white-paws"
+from = "marlow-bookshop"
+op = { kind = "edit", prompt = "Make the cat's grey front paw white to match the other front paw, so both front paws are white and blend naturally. Change nothing else.", alters = "single white front paw" }
+[[family.item]]
+id = "marlow-garden-lookalike"
+scene = { prompt = "Photograph of a cat sitting on a garden wall among ivy, morning light.", seed = 214 }
+lookalike = "a grey tabby cat with four grey paws, intact ears and amber eyes"
+
+[[family]]
+id = "ada"
+kind = "subject"
+generator = "gemini"
+description = "Ada, an African grey parrot with a bright red tail and a pale band on her right leg"
+subject = "Ada, an African grey parrot with a bright red tail, a narrow pale band on her right leg, and a small bare pink patch of skin around the eye"
+protected = ["Ada's bright red tail", "the pale band on Ada's right leg"]
+references = [
+  { prompt = "Photograph of an African grey parrot perched on a wooden stand facing slightly left, bright red tail feathers, a narrow pale band on its right leg, plain white background.", seed = 301 },
+  { prompt = "Photograph of the same African grey parrot perched on a branch, side view, red tail clearly visible, the pale leg band visible, daylight.", seed = 302 },
+]
+[[family.item]]
+id = "ada-kitchen"
+scene = { prompt = "Photograph of the parrot perched on the back of a kitchen chair, morning sun through a window.", seed = 311 }
+[[family.item]]
+id = "ada-library"
+scene = { prompt = "Photograph of the parrot perched on a brass lamp in an old library, warm light.", seed = 312 }
+[[family.item]]
+id = "ada-kitchen-grey-tail"
+from = "ada-kitchen"
+op = { kind = "edit", prompt = "Recolour the parrot's red tail feathers to the same soft grey as its body so the tail blends with the plumage. Change nothing else.", alters = "bright red tail" }
+[[family.item]]
+id = "ada-balcony-lookalike"
+scene = { prompt = "Photograph of a parrot perched on a balcony railing above a street, afternoon light.", seed = 314 }
+lookalike = "an African grey parrot with a grey tail and no leg band"
+
+[[family]]
+id = "bramble"
+kind = "subject"
+generator = "fal"
+description = "Bramble, a bay horse with a white blaze down the face and one white sock on the left hind leg"
+subject = "Bramble, a bay horse (brown body, black mane and tail) with a wide white blaze down the centre of the face and a single white sock on the left hind leg"
+protected = ["Bramble's white blaze", "the single white sock on Bramble's left hind leg"]
+references = [
+  { prompt = "Photograph of a bay horse standing side-on in a paddock, brown body, black mane and tail, a wide white blaze down the face, one white sock on the left hind leg, overcast daylight.", seed = 401 },
+  { prompt = "Photograph of the same bay horse, head and shoulders, three-quarter view, the white blaze clearly visible, stable doors behind.", seed = 402 },
+]
+[[family.item]]
+id = "bramble-beach"
+scene = { prompt = "Photograph of the horse walking along a beach at sunset, wet sand reflecting the sky.", seed = 411 }
+[[family.item]]
+id = "bramble-snow"
+scene = { prompt = "Photograph of the horse standing in a snowy field, bare trees behind, flat winter light.", seed = 412 }
+[[family.item]]
+id = "bramble-beach-no-blaze"
+from = "bramble-beach"
+op = { kind = "edit", prompt = "Replace the white blaze on the horse's face with brown hair matching the rest of the face, so the face is plain brown and blends naturally. Change nothing else.", alters = "white blaze" }
+[[family.item]]
+id = "bramble-meadow-lookalike"
+scene = { prompt = "Photograph of a horse grazing in a summer meadow, hills behind.", seed = 414 }
+lookalike = "a bay horse with a plain brown face, no blaze, and four dark legs"
+
+[[family]]
+id = "hobbes"
+kind = "subject"
+generator = "openai"
+description = "Hobbes, a tricolour corgi with a white stripe up the forehead and a black saddle"
+subject = "Hobbes, a tricolour Pembroke corgi with a white stripe running up the forehead between the eyes, a black saddle on the back, tan cheeks and white legs"
+protected = ["the white stripe up Hobbes's forehead", "Hobbes's black saddle"]
+references = [
+  { prompt = "Photograph of a tricolour Pembroke corgi sitting facing the camera, a white stripe up the forehead between the eyes, black saddle, tan cheeks, white legs, plain pale blue background.", seed = 501 },
+  { prompt = "Photograph of the same tricolour corgi standing on a pavement, side view, the black saddle and white legs visible, daylight.", seed = 502 },
+]
+[[family.item]]
+id = "hobbes-cafe"
+scene = { prompt = "Photograph of the corgi sitting under a cafe table on a cobbled street, morning light.", seed = 511 }
+[[family.item]]
+id = "hobbes-boat"
+scene = { prompt = "Photograph of the corgi sitting at the bow of a small wooden boat on a lake, evening light.", seed = 512 }
+[[family.item]]
+id = "hobbes-cafe-no-stripe"
+from = "hobbes-cafe"
+op = { kind = "edit", prompt = "Cover the white stripe on the corgi's forehead with tan fur exactly like the cheeks, so the whole forehead between the ears is plain tan with no white. Change nothing else.", alters = "white stripe up Hobbes's forehead" }
+[[family.item]]
+id = "hobbes-field-lookalike"
+scene = { prompt = "Photograph of a corgi running through a wheat field, late afternoon.", seed = 514 }
+lookalike = "a red-and-white Pembroke corgi with no black saddle and a plain tan forehead"

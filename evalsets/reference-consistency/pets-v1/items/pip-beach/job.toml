@@ -1,0 +1,35 @@
+# Item of reference-consistency/pets-v1; built by construction, see the owner's record.
+[job]
+use_case = "reference-consistency"
+brief = "Photograph of the dog standing on a windy beach at low tide, grey sky."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:pip-1", "ref:pip-2"]
+text = "Pip's white chest patch is present and unchanged in the candidate, as in the references."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:pip-1", "ref:pip-2"]
+text = "Pip's red collar is present and unchanged in the candidate, as in the references."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/pip-beach/candidate.png", sha256 = "bfcaa0a18123096e15c6db8b7eed281d2ea53251ee17f015f3d811a3d33b3608" }
+
+[[job.images]]
+id = "ref:pip-1"
+role = "reference"
+label = "Pip, a golden retriever with a white chest patch and a red collar"
+source = { path = "families/pip/ref-1.png", sha256 = "bd7534e916700b68949aec38474ecb4b8d14148f30a8f5f1f9115bbeb960bd1d" }
+
+[[job.images]]
+id = "ref:pip-2"
+role = "reference"
+label = "Pip, a golden retriever with a white chest patch and a red collar"
+source = { path = "families/pip/ref-2.png", sha256 = "2a0688a19cbbdd3ee150073d2465441870edfbd97ff40cb0e2b64d202bc757c5" }

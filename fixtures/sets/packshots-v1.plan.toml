@@ -1,0 +1,130 @@
+# Dev set 3.3d: product fidelity, five products, four items each: the product placed in a
+# scene from its packshot (pass), the label text changed (PF2), the colour changed (PF3), and a
+# lookalike product generated without the packshot (PF1, PF2). Generators mixed by family.
+[set]
+id = "product-fidelity/packshots-v1"
+use_case = "product-fidelity"
+split = "dev"
+licence = "CC-BY-4.0"
+images_repo = "github.com/markhayden/dejaview-evalsets"
+rules = { base = "product-fidelity", version = 1 }
+
+[[family]]
+id = "tonic"
+kind = "subject"
+generator = "fal"
+description = "a tall green glass bottle of tonic water with a white oval label reading HARBOUR TONIC"
+subject = "a tall green glass bottle with a white oval label that reads HARBOUR TONIC in black serif capitals and a silver screw cap"
+protected = ["the white oval label reading HARBOUR TONIC", "the silver screw cap", "the green glass colour"]
+references = [ { prompt = "Studio packshot of a tall green glass bottle with a white oval label that reads HARBOUR TONIC in black serif capitals and a silver screw cap, plain white background, soft even light.", seed = 8001 } ]
+[[family.item]]
+id = "tonic-bar"
+scene = { prompt = "Photograph of the bottle standing on a dark wooden bar counter with a glass of ice beside it, warm light.", seed = 8011 }
+[[family.item]]
+id = "tonic-bar-label"
+from = "tonic-bar"
+op = { kind = "edit", prompt = "Change the label text so it reads HARBOR TONIC instead of HARBOUR TONIC, in the same typeface. Change nothing else.", alters = "white oval label reading HARBOUR TONIC", aspect = "label" }
+[[family.item]]
+id = "tonic-bar-amber"
+from = "tonic-bar"
+op = { kind = "edit", prompt = "Make the bottle's glass amber brown instead of green. Change nothing else.", alters = "green glass colour", aspect = "colour" }
+[[family.item]]
+id = "tonic-picnic-lookalike"
+scene = { prompt = "Photograph of a bottle standing on a picnic blanket in a park, afternoon light.", seed = 8014 }
+lookalike = "a short brown glass bottle with a round red label and a black cap"
+
+[[family]]
+id = "coffee-tin"
+kind = "subject"
+generator = "openai"
+description = "a cylindrical matte black coffee tin with a copper lid and a white label reading NORTH ROAST"
+subject = "a cylindrical matte black coffee tin with a copper-coloured lid and a rectangular white label that reads NORTH ROAST in bold sans-serif capitals"
+protected = ["the white label reading NORTH ROAST", "the copper-coloured lid", "the matte black tin"]
+references = [ { prompt = "Studio packshot of a cylindrical matte black coffee tin with a copper-coloured lid and a rectangular white label that reads NORTH ROAST in bold sans-serif capitals, plain white background.", seed = 8101 } ]
+[[family.item]]
+id = "coffee-tin-kitchen"
+scene = { prompt = "Photograph of the tin on a marble kitchen counter beside a pour-over kettle, morning light.", seed = 8111 }
+[[family.item]]
+id = "coffee-tin-kitchen-label"
+from = "coffee-tin-kitchen"
+op = { kind = "edit", prompt = "Change the label text so it reads NORTH ROASTS instead of NORTH ROAST, in the same typeface. Change nothing else.", alters = "white label reading NORTH ROAST", aspect = "label" }
+[[family.item]]
+id = "coffee-tin-kitchen-silver"
+from = "coffee-tin-kitchen"
+op = { kind = "edit", prompt = "Make the tin's lid silver instead of copper. Change nothing else.", alters = "copper-coloured lid", aspect = "colour" }
+[[family.item]]
+id = "coffee-tin-shelf-lookalike"
+scene = { prompt = "Photograph of a coffee tin on a wooden shelf among mugs.", seed = 8114 }
+lookalike = "a tall white coffee tin with a black lid and a brown label"
+
+[[family]]
+id = "toothpaste"
+kind = "subject"
+generator = "gemini"
+description = "a white toothpaste tube with a green stripe and the name MINT LINE"
+subject = "a white toothpaste tube with a single green horizontal stripe and the name MINT LINE in green rounded letters, with a flat white flip cap"
+protected = ["the name MINT LINE on the tube", "the single green stripe", "the flat white flip cap"]
+references = [ { prompt = "Studio packshot of a white toothpaste tube with a single green horizontal stripe and the name MINT LINE in green rounded letters, a flat white flip cap, plain white background.", seed = 8201 } ]
+[[family.item]]
+id = "toothpaste-bathroom"
+scene = { prompt = "Photograph of the toothpaste tube on a bathroom shelf beside a toothbrush in a glass, soft light.", seed = 8211 }
+[[family.item]]
+id = "toothpaste-bathroom-label"
+from = "toothpaste-bathroom"
+op = { kind = "edit", prompt = "Change the name on the tube so it reads MINT LANE instead of MINT LINE, in the same lettering. Change nothing else.", alters = "name MINT LINE", aspect = "label" }
+[[family.item]]
+id = "toothpaste-bathroom-blue"
+from = "toothpaste-bathroom"
+op = { kind = "edit", prompt = "Make the stripe and the lettering on the tube blue instead of green. Change nothing else.", alters = "single green stripe", aspect = "colour" }
+[[family.item]]
+id = "toothpaste-sink-lookalike"
+scene = { prompt = "Photograph of a toothpaste tube lying beside a sink.", seed = 8214 }
+lookalike = "a blue toothpaste tube with two white stripes and a round cap"
+
+[[family]]
+id = "matches"
+kind = "subject"
+generator = "fal"
+description = "a small navy matchbox printed OAK & ASH with a gold tree emblem"
+subject = "a small navy blue matchbox printed OAK & ASH in gold serif capitals above a gold tree emblem"
+protected = ["the gold OAK & ASH lettering", "the gold tree emblem", "the navy blue box"]
+references = [ { prompt = "Studio packshot of a small navy blue matchbox printed OAK & ASH in gold serif capitals above a small gold tree emblem, plain white background.", seed = 8301 } ]
+[[family.item]]
+id = "matches-mantel"
+scene = { prompt = "Photograph of the matchbox on a stone mantelpiece beside a candle, warm light.", seed = 8311 }
+[[family.item]]
+id = "matches-mantel-label"
+from = "matches-mantel"
+op = { kind = "edit", prompt = "Change the lettering on the matchbox so it reads OAK & ELM instead of OAK & ASH, in the same gold serif. Change nothing else.", alters = "gold OAK & ASH lettering", aspect = "label" }
+[[family.item]]
+id = "matches-mantel-red"
+from = "matches-mantel"
+op = { kind = "edit", prompt = "Make the matchbox dark red instead of navy blue, keeping the gold lettering and emblem. Change nothing else.", alters = "navy blue box", aspect = "colour" }
+[[family.item]]
+id = "matches-table-lookalike"
+scene = { prompt = "Photograph of a matchbox on a cafe table beside an ashtray.", seed = 8314 }
+lookalike = "a long white matchbox with a red stripe and no emblem"
+
+[[family]]
+id = "jam"
+kind = "subject"
+generator = "openai"
+description = "a glass jar of amber jam with a gingham lid cover and a label reading PEAR & GINGER"
+subject = "a round glass jar of amber jam with a red gingham cloth lid cover tied with string and a cream label that reads PEAR & GINGER in brown script"
+protected = ["the label reading PEAR & GINGER", "the red gingham lid cover", "the amber jam colour"]
+references = [ { prompt = "Studio packshot of a round glass jar of amber jam with a red gingham cloth lid cover tied with string and a cream label that reads PEAR & GINGER in brown script, plain white background.", seed = 8401 } ]
+[[family.item]]
+id = "jam-breakfast"
+scene = { prompt = "Photograph of the jam jar on a breakfast table beside toast and a knife, morning light.", seed = 8411 }
+[[family.item]]
+id = "jam-breakfast-label"
+from = "jam-breakfast"
+op = { kind = "edit", prompt = "Change the label so it reads PEAR & GINGER JAM instead of PEAR & GINGER, in the same script. Change nothing else.", alters = "label reading PEAR & GINGER", aspect = "label" }
+[[family.item]]
+id = "jam-breakfast-blue"
+from = "jam-breakfast"
+op = { kind = "edit", prompt = "Make the gingham lid cover blue instead of red. Change nothing else.", alters = "red gingham lid cover", aspect = "colour" }
+[[family.item]]
+id = "jam-shelf-lookalike"
+scene = { prompt = "Photograph of a jam jar on a pantry shelf.", seed = 8414 }
+lookalike = "a square jar of dark purple jam with a plain gold metal lid and a white label"

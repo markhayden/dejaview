@@ -1,0 +1,270 @@
+# Answer labels adjudicated by the owner from the construction record.
+[[label]]
+item = "cafe-window-asked"
+expected = "pass"
+failure_types = []
+words = "generated from the brief as written; confirm everything asked for is present, as asked, and nothing forbidden"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "cafe-window-no-cups"
+expected = "fail"
+failure_types = ["asked-missing"]
+words = "the brief asked for two white coffee cups on the window sill and the candidate lacks it"
+obligation_ids = ["BC1", "RQ2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "asked-missing"
+obligation_ids = ["BC1", "RQ2"]
+
+[[label]]
+item = "cafe-window-person"
+expected = "fail"
+failure_types = ["forbidden-present"]
+words = "the brief forbade people and the candidate shows it"
+obligation_ids = ["BC2", "RQ4"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "forbidden-present"
+obligation_ids = ["BC2", "RQ4"]
+
+[[label]]
+item = "cafe-window-misspelt"
+expected = "fail"
+failure_types = ["text-misspelt"]
+words = "the text 'OPEN' is not spelled as the brief gives it"
+obligation_ids = ["BC3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "text-misspelt"
+obligation_ids = ["BC3"]
+
+[[label]]
+item = "desk-asked"
+expected = "pass"
+failure_types = []
+words = "generated from the brief as written; confirm everything asked for is present, as asked, and nothing forbidden"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "desk-five-pencils"
+expected = "fail"
+failure_types = ["asked-missing"]
+words = "the brief asked for exactly three yellow pencils and the candidate lacks it"
+obligation_ids = ["BC1", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "asked-missing"
+obligation_ids = ["BC1", "RQ1"]
+
+[[label]]
+item = "desk-laptop"
+expected = "fail"
+failure_types = ["forbidden-present"]
+words = "the brief forbade a laptop and the candidate shows it"
+obligation_ids = ["BC2", "RQ4"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "forbidden-present"
+obligation_ids = ["BC2", "RQ4"]
+
+[[label]]
+item = "desk-misspelt"
+expected = "fail"
+failure_types = ["text-misspelt"]
+words = "the text 'MONDAY' is not spelled as the brief gives it"
+obligation_ids = ["BC3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "text-misspelt"
+obligation_ids = ["BC3"]
+
+[[label]]
+item = "shelf-asked"
+expected = "pass"
+failure_types = []
+words = "generated from the brief as written; confirm everything asked for is present, as asked, and nothing forbidden"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "shelf-no-herb"
+expected = "fail"
+failure_types = ["asked-missing"]
+words = "the brief asked for a small potted herb at the right end and the candidate lacks it"
+obligation_ids = ["BC1", "RQ3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "asked-missing"
+obligation_ids = ["BC1", "RQ3"]
+
+[[label]]
+item = "shelf-price-tags"
+expected = "fail"
+failure_types = ["forbidden-present"]
+words = "the brief forbade price tags and the candidate shows it"
+obligation_ids = ["BC2", "RQ4"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "forbidden-present"
+obligation_ids = ["BC2", "RQ4"]
+
+[[label]]
+item = "shelf-misspelt"
+expected = "fail"
+failure_types = ["text-misspelt"]
+words = "the text 'FIG JAM' is not spelled as the brief gives it"
+obligation_ids = ["BC3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "text-misspelt"
+obligation_ids = ["BC3"]
+
+[[label]]
+item = "kids-room-asked"
+expected = "pass"
+failure_types = []
+words = "generated from the brief as written; confirm everything asked for is present, as asked, and nothing forbidden"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "kids-room-red-kite"
+expected = "fail"
+failure_types = ["asked-missing"]
+words = "the brief asked for a yellow kite and the candidate lacks it"
+obligation_ids = ["BC1", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "asked-missing"
+obligation_ids = ["BC1", "RQ1"]
+
+[[label]]
+item = "kids-room-toys"
+expected = "fail"
+failure_types = ["forbidden-present"]
+words = "the brief forbade toys on the floor and the candidate shows it"
+obligation_ids = ["BC2", "RQ5"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "forbidden-present"
+obligation_ids = ["BC2", "RQ5"]
+
+[[label]]
+item = "kids-room-misspelt"
+expected = "fail"
+failure_types = ["text-misspelt"]
+words = "the text 'DREAM BIG' is not spelled as the brief gives it"
+obligation_ids = ["BC3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "text-misspelt"
+obligation_ids = ["BC3"]
+
+[[label]]
+item = "bakery-asked"
+expected = "pass"
+failure_types = []
+words = "generated from the brief as written; confirm everything asked for is present, as asked, and nothing forbidden"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "bakery-no-water"
+expected = "fail"
+failure_types = ["asked-missing"]
+words = "the brief asked for a glass of water and the candidate lacks it"
+obligation_ids = ["BC1", "RQ3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "asked-missing"
+obligation_ids = ["BC1", "RQ3"]
+
+[[label]]
+item = "bakery-person"
+expected = "fail"
+failure_types = ["forbidden-present"]
+words = "the brief forbade people and the candidate shows it"
+obligation_ids = ["BC2", "RQ5"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "forbidden-present"
+obligation_ids = ["BC2", "RQ5"]
+
+[[label]]
+item = "bakery-misspelt"
+expected = "fail"
+failure_types = ["text-misspelt"]
+words = "the text 'FRESH' is not spelled as the brief gives it"
+obligation_ids = ["BC3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "text-misspelt"
+obligation_ids = ["BC3"]

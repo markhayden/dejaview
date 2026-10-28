@@ -1,0 +1,150 @@
+# A hand-computed metrics table (SPEC "Metrics"). One cell, six labelled items; items 1 to 4
+# have a second repetition. The golden section holds the expected numbers; the test compares
+# proportions to 1e-9 and counts, totals and medians exactly.
+#
+# Repetition 1 (the decision repetition), policy on_unsure = review, on_error = review:
+#   i1 expected fail, computed fail   -> detected         cost 0.10 wall 100
+#   i2 expected fail, computed pass   -> missed           cost 0.20 wall 200
+#   i3 expected fail, computed unsure -> unsure, not missed (review is not a pass)  cost 0.30 wall 300
+#   i4 expected pass, computed fail   -> false reject     cost 0.40 wall 400
+#   i5 expected pass, computed pass                        cost 0.50 wall 500
+#   i6 expected pass, computed error  -> error            cost 0.00 wall 50
+# Counts: items 6, expected fail 3, expected pass 3, detected 1, missed 1, false rejects 1,
+# unsure 1, errors 1. Rates: missed 1/3, detected 1/3, false rejects 1/3, unsure 1/6, error 1/6.
+# Wilson (z = 1.959963984540054): 1/3 -> [0.06149194472039621, 0.7923403991979522];
+# 1/6 -> [0.030053369748306635, 0.5635028221864702].
+# Cost total 1.50, median of [0.00, 0.10, 0.20, 0.30, 0.40, 0.50] = 0.25; wall total 1550,
+# median of [50, 100, 200, 300, 400, 500] = 250.
+# Repetition 2 covers i1 to i4: i1 fail (agrees), i2 fail (disagrees), i3 unsure (agrees),
+# i4 pass (disagrees): agreement 2/4 = 0.5.
+# Localisation, over detected failures with labelled regions (i1 only; i2 and i3 are not
+# detected): i1 has two labelled regions on `candidate` and three predictions.
+#   label L1 bbox [0.1,0.1,0.3,0.3] SF1; label L2 whole_image SF2.
+#   prediction P1 bbox [0.12,0.12,0.32,0.32] SF1: IoU with L1 = 0.18*0.18 / (0.04+0.04-0.0324)
+#     = 0.0324/0.0476 = 0.6807 > 0.3 -> hit.
+#   prediction P2 whole_image SF2 -> hit against L2.
+#   prediction P3 bbox [0.6,0.6,0.9,0.9] SF1: no eligible label left (L1 is taken) -> spurious.
+# Hits 2 of 2 labelled regions; spurious 1 of 3 predictions.
+cell = "fake:fake-model/A"
+
+[policy]
+on_unsure = "review"
+on_error = "review"
+
+[[rows]]
+item = "i1"
+repetition = 1
+expected = "fail"
+computed = "fail"
+cost_usd = 0.10
+wall_ms = 100
+labels = [
+  { image = "candidate", kind = "bbox", bbox = [0.1, 0.1, 0.3, 0.3], obligation_ids = ["SF1"] },
+  { image = "candidate", kind = "whole_image", obligation_ids = ["SF2"] },
+]
+predictions = [
+  { image = "candidate", kind = "bbox", bbox = [0.12, 0.12, 0.32, 0.32], obligation_ids = ["SF1"] },
+  { image = "candidate", kind = "whole_image", obligation_ids = ["SF2"] },
+  { image = "candidate", kind = "bbox", bbox = [0.6, 0.6, 0.9, 0.9], obligation_ids = ["SF1"] },
+]
+
+[[rows]]
+item = "i2"
+repetition = 1
+expected = "fail"
+computed = "pass"
+cost_usd = 0.20
+wall_ms = 200
+
+[[rows]]
+item = "i3"
+repetition = 1
+expected = "fail"
+computed = "unsure"
+cost_usd = 0.30
+wall_ms = 300
+
+[[rows]]
+item = "i4"
+repetition = 1
+expected = "pass"
+computed = "fail"
+cost_usd = 0.40
+wall_ms = 400
+
+[[rows]]
+item = "i5"
+repetition = 1
+expected = "pass"
+computed = "pass"
+cost_usd = 0.50
+wall_ms = 500
+
+[[rows]]
+item = "i6"
+repetition = 1
+expected = "pass"
+computed = "error"
+cost_usd = 0.00
+wall_ms = 50
+
+[[rows]]
+item = "i1"
+repetition = 2
+expected = "fail"
+computed = "fail"
+cost_usd = 0.10
+wall_ms = 100
+
+[[rows]]
+item = "i2"
+repetition = 2
+expected = "fail"
+computed = "fail"
+cost_usd = 0.20
+wall_ms = 200
+
+[[rows]]
+item = "i3"
+repetition = 2
+expected = "fail"
+computed = "unsure"
+cost_usd = 0.30
+wall_ms = 300
+
+[[rows]]
+item = "i4"
+repetition = 2
+expected = "pass"
+computed = "pass"
+cost_usd = 0.40
+wall_ms = 400
+
+[golden]
+items = 6
+expected_fail = 3
+expected_pass = 3
+detected = 1
+missed = 1
+false_rejects = 1
+unsure = 1
+errors = 1
+missed_rate = 0.3333333333333333
+missed_low = 0.06149194472039621
+missed_high = 0.7923403991979522
+detected_rate = 0.3333333333333333
+false_reject_rate = 0.3333333333333333
+unsure_rate = 0.16666666666666666
+unsure_low = 0.030053369748306635
+unsure_high = 0.5635028221864702
+error_rate = 0.16666666666666666
+cost_total_usd = 1.50
+cost_median_usd = 0.25
+wall_total_ms = 1550
+wall_median_ms = 250
+labelled_regions = 2
+hits = 2
+predictions = 3
+spurious = 1
+repetitions = 2
+agreement = 0.5

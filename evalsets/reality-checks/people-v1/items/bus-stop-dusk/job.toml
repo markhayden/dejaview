@@ -1,0 +1,9 @@
+# Item of reality-checks/people-v1; built by construction, see the owner's record.
+[job]
+use_case = "reality-checks"
+brief = "A photograph of a bus stop."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/bus-stop-dusk/candidate.png", sha256 = "2d08a739f18018904a6bef0ed88284844603cfcb24e613614dc17ae233628f2d" }

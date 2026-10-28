@@ -60,30 +60,32 @@ tag.
 - [ ] Recorded from the M2 review, not fixed: transport-error excerpts (up to 2 KB of a provider's error body) reach the journal and stderr without the redaction pass (the credential is never in a response body, so nothing has leaked; route them through the redaction list when the journal gains a redaction step); the `dist` installer in the `package` workflow is fetched by `curl | sh` without a checksum, as the generated release workflow does
 
 ## M3 Evaluation sets and baseline
-- [ ] 3.1 Set manifests, check, fetch, seal
-- [ ] 3.2a Set-building toolkit and ADR 0013
-- [ ] 3.2b First dev set adjudicated and published
-- [ ] 3.3a Source fidelity dev set
-- [ ] 3.3b Reality checks dev set
-- [ ] 3.3c Brief compliance dev set
-- [ ] 3.3d Product fidelity dev set
-- [ ] 3.3e Adversarial sets (five, one per use case) → tag `m3.1`
-- [ ] 3.4a Execution descriptor and durable evaluation ledger
-- [ ] 3.4b Matrix runner, arms and resume
-- [ ] 3.4c Pre-run estimate
-- [ ] 3.5a Metrics, localisation, report regeneration
-- [ ] 3.5b Gate lifecycle (stages, receipts, admissions)
-- [ ] 3.6 Static report viewer
-- [ ] 3.7 Canary and requalify
-- [ ] 3.8 Arm A baseline and publication
+- [x] 3.1 Set manifests, check, fetch, seal
+- [x] 3.2a Set-building toolkit and ADR 0013 (toolkit, dry run and ADR done 2026-10-27; the public `dejaview-evalsets` repository is the owner's to create, with README and licence, before 3.2b publishes images)
+- [x] 3.2b First dev set adjudicated and published (reference-consistency/pets-v1, 2026-10-27; images in markhayden/dejaview-evalsets, pushed by the owner)
+- [x] 3.3a Source fidelity dev set (source-fidelity/scenes-v1, 2026-10-27)
+- [x] 3.3b Reality checks dev set (reality-checks/people-v1, 2026-10-27)
+- [x] 3.3c Brief compliance dev set (brief-compliance/stills-v1, 2026-10-27)
+- [x] 3.3d Product fidelity dev set (product-fidelity/packshots-v1, 2026-10-27)
+- [x] 3.3e Adversarial sets (five, one per use case) → tag `m3.1` (2026-10-27)
+- [x] 3.4a Execution descriptor and durable evaluation ledger (2026-10-27)
+- [x] 3.4b Matrix runner, arms and resume (2026-10-27)
+- [x] 3.4c Pre-run estimate (2026-10-27)
+- [x] 3.5a Metrics, localisation, report regeneration
+- [x] 3.5b Gate lifecycle (stages, receipts, admissions)
+- [x] 3.6 Static report viewer
+- [x] 3.7 Canary and requalify
+- [x] 3.8 Arm A baseline and publication (docs/results/baseline-2026-10, 2026-10-28: six models, 1,320 decisions, ledger $46.54 of $75 with $18.48 of it refused Anthropic calls charged at bound; the first run found the localisation scorer ignoring checklist-item violations, fixed and re-scored)
+  - follow-ups from the baseline, owner decisions on the metric's definition, not blocking: `whole_image` labels against boxed predictions never match (label the defect's region, or let a whole-image label accept any box on that image); one defect reported under several obligations gives the same region several times and one-to-one matching counts the extras as spurious (count identical root geometries once with the union of their obligations); a call refused before processing (an error body, no usage) is charged at its bound in the ledger, which overstates spend after an outage or an empty balance; the estimate's expected-cost figure should lead with per-model observed medians (Anthropic ran at about five times the others per decision)
 - [ ] Checkpoint M3 → tag `m3`
+  - follow-ups recorded at the M3 review (2026-10-28), not blocking: a real SIGINT test of `eval run` through the binary; prompt equivalence across arms checked on the journaled system prompt; an automated devtools check of the viewer; a test that an environment-expanded matrix account is `[redacted]` in the report; the seal's image and rules components isolated in the mutation tests; one fixture per `sets check` failure mode; `JsonSchema` on `DecisionResult`, `Summary`, `Estimate` and `Matrix`; a concurrency cap on the viewer server; a harness-level test that instruction-like text in a label or brief never alters the prompt
 
 ## M4 Built-in tools and MCP client
 - [ ] 4.0 Alignment feasibility spike and ADR 0014
 - [ ] 4.1 Registry in production
 - [ ] 4.2a `view`, `resize`, equirectangular geometry
 - [ ] 4.2b Viewer equirectangular overlay
-- [ ] 4.3a `align` flat and `visual_only`
+- [ ] 4.3a `align` flat and `visual_only` (also: run `eval gate` end to end through the binary once arms C and D can run, and look at the gate tests' forty-second fake runs)
 - [ ] 4.3b `align` equirectangular
 - [ ] 4.3c `edge_similarity` and `change_map` → tag `m4.1`
 - [ ] 4.4a Full MCP client, ADR 0015, pagination, concurrency, images

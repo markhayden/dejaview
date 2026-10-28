@@ -1,0 +1,251 @@
+# Answer labels adjudicated by the owner from the construction record.
+[[label]]
+item = "market-clean"
+expected = "pass"
+failure_types = []
+words = "the generated image as it is; confirm nothing in it breaks the rules"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "market-evening"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (change the light to warm evening sun); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "market-six-fingers"
+expected = "fail"
+failure_types = ["anatomy"]
+words = "the vendor's hand on the bag has six fingers"
+obligation_ids = ["RE1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "anatomy"
+obligation_ids = ["RE1"]
+
+[[label]]
+item = "market-garbled-sign"
+expected = "fail"
+failure_types = ["text"]
+words = "the chalkboard sign is garbled letter-like scribbles instead of FRESH PEARS"
+obligation_ids = ["RE3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "text"
+obligation_ids = ["RE3"]
+bbox = [0.3145, 0.6641, 0.7109, 0.9336]
+
+[[label]]
+item = "barista-clean"
+expected = "pass"
+failure_types = []
+words = "the generated image as it is; confirm nothing in it breaks the rules"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "barista-mono"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (make the photograph black and white); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "barista-merged-hand"
+expected = "fail"
+failure_types = ["merge"]
+words = "the barista's hand is fused with the cup"
+obligation_ids = ["RE4"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "merge"
+obligation_ids = ["RE4"]
+
+[[label]]
+item = "barista-garbled-board"
+expected = "fail"
+failure_types = ["text"]
+words = "the menu board's words are garbled letter-like scribbles; the generator also changed 2 other area(s), check them"
+obligation_ids = ["RE3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "text"
+obligation_ids = ["RE3"]
+bbox = [0.7363, 0.0098, 0.8701, 0.2539]
+
+[[label]]
+item = "cyclist-clean"
+expected = "pass"
+failure_types = []
+words = "the generated image as it is; confirm nothing in it breaks the rules"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "cyclist-rain"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (make it just after rain: wet road reflecting the sky, grey light); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "anatomy"
+obligation_ids = ["RE1"]
+
+[[label]]
+item = "cyclist-two-heads"
+expected = "fail"
+failure_types = ["anatomy"]
+words = "the cyclist has two heads"
+obligation_ids = ["RE1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "anatomy"
+obligation_ids = ["RE1"]
+
+[[label]]
+item = "cyclist-garbled-sign"
+expected = "fail"
+failure_types = ["text"]
+words = "the street sign is garbled instead of NORTH STREET"
+obligation_ids = ["RE3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "text"
+obligation_ids = ["RE3"]
+bbox = [0.0918, 0.2314, 0.3477, 0.2646]
+
+[[label]]
+item = "bus-stop-clean"
+expected = "pass"
+failure_types = []
+words = "the generated image as it is; confirm nothing in it breaks the rules"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "bus-stop-dusk"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (change the time to dusk with the bus stop's light on); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "bus-stop-phone-merge"
+expected = "fail"
+failure_types = ["merge"]
+words = "the woman's fingers pass through the phone"
+obligation_ids = ["RE4"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "merge"
+obligation_ids = ["RE4"]
+
+[[label]]
+item = "bus-stop-fused-fingers"
+expected = "fail"
+failure_types = ["anatomy"]
+words = "the hand holding the phone has seven fingers"
+obligation_ids = ["RE1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "anatomy"
+obligation_ids = ["RE1"]
+
+[[label]]
+item = "skatepark-clean"
+expected = "pass"
+failure_types = []
+words = "the generated image as it is; confirm nothing in it breaks the rules"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "skatepark-sunset"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (change the light to low orange sunset light); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "skatepark-garbled-wall"
+expected = "fail"
+failure_types = ["text"]
+words = "the wall's word RIDE is garbled"
+obligation_ids = ["RE3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "text"
+obligation_ids = ["RE3"]
+bbox = [0.4473, 0.2295, 0.9824, 0.5674]
+
+[[label]]
+item = "skatepark-wrong-shadow"
+expected = "fail"
+failure_types = ["shadow"]
+words = "the skateboarder's shadow falls opposite to every other shadow"
+obligation_ids = ["RE2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "shadow"
+obligation_ids = ["RE2"]
+bbox = [0.4219, 0.7939, 0.8613, 1.0]

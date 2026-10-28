@@ -336,11 +336,14 @@ version = "0.1.0"
 dependencies = [
  "dejaview-core",
  "dejaview-providers",
- "dejaview-tools",
+ "dejaview-testkit",
  "rand",
  "rand_chacha",
  "serde",
+ "serde_json",
+ "sha2",
  "thiserror",
+ "tokio",
  "toml",
 ]
 

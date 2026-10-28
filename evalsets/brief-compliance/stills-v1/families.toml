@@ -1,0 +1,20 @@
+# Subject or scene families; a family never appears in more than one split.
+[[family]]
+id = "cafe-window"
+description = "a cafe window with a bicycle, two cups and an OPEN sign"
+
+[[family]]
+id = "desk"
+description = "a desk with three pencils and a MONDAY mug"
+
+[[family]]
+id = "shelf"
+description = "a shop shelf with jam jars labelled FIG JAM"
+
+[[family]]
+id = "kids-room"
+description = "a child's room with a yellow kite and a DREAM BIG poster"
+
+[[family]]
+id = "bakery"
+description = "a bakery counter with four croissants and a FRESH chalkboard"

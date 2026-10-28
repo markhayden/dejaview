@@ -1,0 +1,111 @@
+# Built by dejaview-sets; labels confirmed by the owner.
+[set]
+id = "product-fidelity/packshots-v1"
+use_case = "product-fidelity"
+split = "dev"
+licence = "CC-BY-4.0"
+images_repo = "github.com/markhayden/dejaview-evalsets"
+images_rev = "8105c350112de46bdcdf0c4c17e209dd6ef53749"
+labels = "labels.toml"
+families = "families.toml"
+rules = { base = "product-fidelity", version = 1 }
+
+[[item]]
+id = "tonic-bar"
+family = "tonic"
+job = "items/tonic-bar/job.toml"
+
+[[item]]
+id = "tonic-bar-label"
+family = "tonic"
+job = "items/tonic-bar-label/job.toml"
+
+[[item]]
+id = "tonic-bar-amber"
+family = "tonic"
+job = "items/tonic-bar-amber/job.toml"
+
+[[item]]
+id = "tonic-picnic-lookalike"
+family = "tonic"
+job = "items/tonic-picnic-lookalike/job.toml"
+
+[[item]]
+id = "coffee-tin-kitchen"
+family = "coffee-tin"
+job = "items/coffee-tin-kitchen/job.toml"
+
+[[item]]
+id = "coffee-tin-kitchen-label"
+family = "coffee-tin"
+job = "items/coffee-tin-kitchen-label/job.toml"
+
+[[item]]
+id = "coffee-tin-kitchen-silver"
+family = "coffee-tin"
+job = "items/coffee-tin-kitchen-silver/job.toml"
+
+[[item]]
+id = "coffee-tin-shelf-lookalike"
+family = "coffee-tin"
+job = "items/coffee-tin-shelf-lookalike/job.toml"
+
+[[item]]
+id = "toothpaste-bathroom"
+family = "toothpaste"
+job = "items/toothpaste-bathroom/job.toml"
+
+[[item]]
+id = "toothpaste-bathroom-label"
+family = "toothpaste"
+job = "items/toothpaste-bathroom-label/job.toml"
+
+[[item]]
+id = "toothpaste-bathroom-blue"
+family = "toothpaste"
+job = "items/toothpaste-bathroom-blue/job.toml"
+
+[[item]]
+id = "toothpaste-sink-lookalike"
+family = "toothpaste"
+job = "items/toothpaste-sink-lookalike/job.toml"
+
+[[item]]
+id = "matches-mantel"
+family = "matches"
+job = "items/matches-mantel/job.toml"
+
+[[item]]
+id = "matches-mantel-label"
+family = "matches"
+job = "items/matches-mantel-label/job.toml"
+
+[[item]]
+id = "matches-mantel-red"
+family = "matches"
+job = "items/matches-mantel-red/job.toml"
+
+[[item]]
+id = "matches-table-lookalike"
+family = "matches"
+job = "items/matches-table-lookalike/job.toml"
+
+[[item]]
+id = "jam-breakfast"
+family = "jam"
+job = "items/jam-breakfast/job.toml"
+
+[[item]]
+id = "jam-breakfast-label"
+family = "jam"
+job = "items/jam-breakfast-label/job.toml"
+
+[[item]]
+id = "jam-breakfast-blue"
+family = "jam"
+job = "items/jam-breakfast-blue/job.toml"
+
+[[item]]
+id = "jam-shelf-lookalike"
+family = "jam"
+job = "items/jam-shelf-lookalike/job.toml"

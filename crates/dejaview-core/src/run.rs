@@ -92,7 +92,8 @@ impl<'a> Services<'a> {
 }
 
 /// A cancellation handle: `cancel()` from a signal handler, `cancelled()` awaited by the run.
-#[derive(Debug)]
+/// Clones share the signal.
+#[derive(Debug, Clone)]
 pub struct Cancel {
     tx: tokio::sync::watch::Sender<bool>,
 }
@@ -288,6 +289,19 @@ fn outcome(dir: PathBuf, report: Report) -> Outcome {
 pub struct Setup {
     pub prepared: Prepared,
     pub images: Vec<CanonicalImage>,
+}
+
+/// The decision envelope a run of this job would reserve (SPEC "Cost ledger"), without running:
+/// the same setup and plan `check` uses, so an estimate equals the ledger's reservation.
+pub fn envelope(
+    config: &Config,
+    job: &Job,
+    job_base: &Path,
+    tools: &ToolRegistry,
+    pricing: &dyn Pricing,
+) -> Result<ledger::Envelope> {
+    let s = setup(config, job, job_base, tools)?;
+    ledger::plan(config, &plan_input(&s.prepared, job, tools), pricing)
 }
 
 /// Resolves the rules and decodes the images once per decision.
@@ -1447,6 +1461,10 @@ async fn execute_call(
             .map(|i| events::ReturnedImage {
                 frame: i.frame.clone(),
                 artifact: state.images_sent.get(&i.frame).cloned(),
+                parent: i.parent.clone(),
+                mapping: i.mapping.clone(),
+                width: i.width,
+                height: i.height,
             })
             .collect(),
         added: ingest.added.clone(),
@@ -1514,21 +1532,32 @@ fn finish(
             reason: item.reason.clone(),
             allowed_by: item.allowed_by.clone(),
             location: item.location.clone(),
+            root: item
+                .location
+                .as_ref()
+                .and_then(|l| root_location(&state.registry, l)),
             row,
         });
     }
     let mut finding_rows = Vec::new();
+    let mut finding_entries = Vec::new();
     for f in &sub.findings {
+        let root = root_location(&state.registry, &f.location);
+        let root_image = root.as_ref().map(|r| r.image.clone());
+        finding_entries.push(crate::report::FindingEntry {
+            obligation_ids: f.obligation_ids.clone(),
+            disposition: f.disposition,
+            confidence: f.confidence,
+            reason: f.reason.clone(),
+            allowed_by: f.allowed_by.clone(),
+            location: f.location.clone(),
+            root,
+        });
         let d: aggregate::Disposition = f.disposition.into();
         if d == aggregate::Disposition::Observed {
             continue;
         }
-        let root = state.registry.to_root(&f.location).ok().and_then(|m| {
-            state
-                .registry
-                .get(&m.location.frame)
-                .map(|fr| fr.root().to_string())
-        });
+        let root = root_image.clone();
         let row = aggregate::strictest(
             state
                 .instances
@@ -1546,8 +1575,27 @@ fn finish(
         items,
         findings: sub.findings.len(),
         finding_rows,
+        finding_entries,
     }))?;
     Ok(aggregate::verdict(&rows))
+}
+
+/// A submitted location mapped through the frame registry to the raw frame of its root image, for
+/// the report; `None` when the location does not resolve.
+fn root_location(
+    registry: &Registry,
+    location: &crate::frames::Location,
+) -> Option<crate::report::RootLocation> {
+    let mapped = registry.to_root(location).ok()?;
+    let image = registry.get(&mapped.location.frame)?.root().to_string();
+    Some(crate::report::RootLocation {
+        image,
+        frame: mapped.location.frame,
+        kind: mapped.location.kind,
+        bbox: mapped.location.bbox,
+        polygon: mapped.location.polygon,
+        partial: mapped.partial,
+    })
 }
 
 fn new_decision_dir(out_dir: &Path) -> Result<PathBuf> {

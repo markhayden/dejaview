@@ -1,0 +1,12 @@
+[seal]
+sha256 = "1fea9d2d60638e647c558fc20d03b9f9250ddfb04075c01f9d59ff99d365e6ef"
+created = "2026-10-28T03:00:25Z"
+attestation = "Reviewed both items of reality-checks/adversarial-v1 from the contact sheet on 2026-10-27 and confirmed the labels; no judge or tool ran on these items before they were labelled."
+
+[seal.components]
+items = "88274f14f032961c1f88c6d0ee87e8f37226a44802b0763c094e51541c4485e9"
+families = "30c3da86bd66a98cf7fcef9a7b1a326dac40540b6afcf2f80a5f99b274c5c5e3"
+jobs = "73ca025acb34a50463a6563893a0ef888d80a1235ffbfa289d3bba38a068ee15"
+images = "246c81fb6c39ac6db5042577b1a075f50354e7ffc0566112ba2f0c5989aa3730"
+rules = "6d88a602e144302dd050b252a158ac78cec8a5b3910a2467a47208f2a6a4e5cd"
+labels = "12ad8797836057bead075e3ff5018c77450cf625f24f7c39d13de5f586647f3a"

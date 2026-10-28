@@ -1,0 +1,12 @@
+[seal]
+sha256 = "f0537203fb4d27fdab9fc6d9f8e704135655bb7d45028e36f02133b1fa746205"
+created = "2026-10-28T02:50:31Z"
+attestation = "Reviewed every item of brief-compliance/stills-v1 from the contact sheets on 2026-10-27 and confirmed all twenty labels; no judge or tool ran on these items before they were labelled."
+
+[seal.components]
+items = "7ca1619fe0d0d14db34a7ccdd6e636c923d960d32eba7883b2a2bb519781d8d5"
+families = "642c0b007f0796ea40fea0ded446a2e87612f5492eb7560d3fd79dd93dd52b8b"
+jobs = "f54a722778b7c9a6ca410b2a96072a6acaf34f64edf7fb08015ced0739397d8e"
+images = "3ef0d6ba7e1c9a2d6376ac3ad01f33117d55f40514fed5879bacf41be7d83bf5"
+rules = "750d3b87e53c2a9c136f15456de7046bc18cc9734e328b5783c4f65de47927d9"
+labels = "d4a76379ef896f6ab63b622f4efc9e62fa1ed92b5736ef3c3dafcfe7b6829da6"

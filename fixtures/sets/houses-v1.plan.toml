@@ -1,0 +1,29 @@
+# The 3.2a dry-run plan: one source-fidelity family, built by construction. With `--fake` it runs
+# offline (the self-test); with the live generators it is the two-item dry run of ADR 0013.
+[set]
+id = "source-fidelity/houses-v1"
+use_case = "source-fidelity"
+split = "dev"
+licence = "CC-BY-4.0"
+images_repo = "github.com/markhayden/dejaview-evalsets"
+rules = { base = "source-fidelity", version = 1 }
+
+[[family]]
+id = "brick-house"
+generator = "fal"
+description = "a two-storey red-brick house with a dark green front door, a blue bicycle against the wall and a maple tree at the left edge"
+brief = "Restyle the scene; keep the structure and every named subject."
+protected = ["the dark green front door", "the blue bicycle leaning against the wall", "the maple tree at the left edge"]
+source = { prompt = "A photograph of a two-storey red-brick house with a dark green front door, a blue bicycle leaning against the wall left of the door, and a maple tree on the left edge of the frame. Overcast daylight, 35mm lens, eye level, no people, no text.", seed = 1234, size = 1024 }
+
+[[family.item]]
+id = "brick-house-grade"
+op = { kind = "grade", warmth = 0.12 }
+
+[[family.item]]
+id = "brick-house-no-bicycle"
+op = { kind = "edit", prompt = "Remove the blue bicycle leaning against the wall. Change nothing else: same house, same door, same tree, same framing and light.", removes = "bicycle" }
+
+[[family.item]]
+id = "brick-house-mirror"
+op = { kind = "mirror" }

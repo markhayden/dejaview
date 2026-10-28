@@ -1,0 +1,245 @@
+# Answer labels adjudicated by the owner from the construction record.
+[[label]]
+item = "pip-bridge"
+expected = "pass"
+failure_types = []
+words = "the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "pip-beach"
+expected = "pass"
+failure_types = []
+words = "the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "pip-bridge-no-patch"
+expected = "fail"
+failure_types = ["white chest patch-changed"]
+words = "the white chest patch is changed in the candidate, unlike the references"
+obligation_ids = ["RC2", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "white chest patch-changed"
+obligation_ids = ["RC2", "RQ1"]
+bbox = [0.4844, 0.4346, 0.5312, 0.5225]
+
+[[label]]
+item = "pip-park-lookalike"
+expected = "fail"
+failure_types = ["lookalike"]
+words = "a lookalike, not the reference subject: an adult golden retriever with an all-golden chest, no white patch, wearing a blue collar"
+obligation_ids = ["RC3", "RC1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "lookalike"
+obligation_ids = ["RC3", "RC1"]
+
+[[label]]
+item = "marlow-bookshop"
+expected = "pass"
+failure_types = []
+words = "the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "marlow-rooftop"
+expected = "pass"
+failure_types = []
+words = "the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "marlow-bookshop-two-white-paws"
+expected = "fail"
+failure_types = ["single white front paw-changed"]
+words = "the single white front paw is changed in the candidate, unlike the references; the generator also changed 1 other area(s), check them"
+obligation_ids = ["RC2", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "single white front paw-changed"
+obligation_ids = ["RC2", "RQ1"]
+bbox = [0.4421, 0.622, 0.5918, 0.8031]
+
+[[label]]
+item = "marlow-garden-lookalike"
+expected = "fail"
+failure_types = ["lookalike"]
+words = "a lookalike, not the reference subject: a grey tabby cat with four grey paws, intact ears and amber eyes"
+obligation_ids = ["RC3", "RC1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "lookalike"
+obligation_ids = ["RC3", "RC1"]
+
+[[label]]
+item = "ada-kitchen"
+expected = "pass"
+failure_types = []
+words = "the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "ada-library"
+expected = "pass"
+failure_types = []
+words = "the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "ada-kitchen-grey-tail"
+expected = "fail"
+failure_types = ["bright red tail-changed"]
+words = "the bright red tail is changed in the candidate, unlike the references"
+obligation_ids = ["RC2", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "bright red tail-changed"
+obligation_ids = ["RC2", "RQ1"]
+bbox = [0.2002, 0.6494, 0.4062, 0.877]
+
+[[label]]
+item = "ada-balcony-lookalike"
+expected = "fail"
+failure_types = ["lookalike"]
+words = "a lookalike, not the reference subject: an African grey parrot with a grey tail and no leg band"
+obligation_ids = ["RC3", "RC1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "lookalike"
+obligation_ids = ["RC3", "RC1"]
+
+[[label]]
+item = "bramble-beach"
+expected = "pass"
+failure_types = []
+words = "the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "bramble-snow"
+expected = "pass"
+failure_types = []
+words = "the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "bramble-beach-no-blaze"
+expected = "fail"
+failure_types = ["white blaze-changed"]
+words = "the white blaze is changed in the candidate, unlike the references; the generator also changed 1 other area(s), check them"
+obligation_ids = ["RC2", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "white blaze-changed"
+obligation_ids = ["RC2", "RQ1"]
+bbox = [0.1162, 0.1729, 0.1924, 0.3906]
+
+[[label]]
+item = "bramble-meadow-lookalike"
+expected = "fail"
+failure_types = ["lookalike"]
+words = "a lookalike, not the reference subject: a bay horse with a plain brown face, no blaze, and four dark legs"
+obligation_ids = ["RC3", "RC1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "lookalike"
+obligation_ids = ["RC3", "RC1"]
+
+[[label]]
+item = "hobbes-cafe"
+expected = "pass"
+failure_types = []
+words = "the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "hobbes-boat"
+expected = "pass"
+failure_types = []
+words = "the subject placed in a new scene from the references; confirm identity, markings and features against the references before accepting"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "hobbes-cafe-no-stripe"
+expected = "fail"
+failure_types = ["white stripe up Hobbes's forehead-changed"]
+words = "the white stripe up Hobbes's forehead is changed in the candidate, unlike the references; the generator also changed 1 other area(s), check them"
+obligation_ids = ["RC2", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "white stripe up Hobbes's forehead-changed"
+obligation_ids = ["RC2", "RQ1"]
+bbox = [0.4296, 0.2653, 0.6096, 0.4237]
+
+[[label]]
+item = "hobbes-field-lookalike"
+expected = "fail"
+failure_types = ["lookalike"]
+words = "a lookalike, not the reference subject: a red-and-white Pembroke corgi with no black saddle and a plain tan forehead"
+obligation_ids = ["RC3", "RC1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "lookalike"
+obligation_ids = ["RC3", "RC1"]

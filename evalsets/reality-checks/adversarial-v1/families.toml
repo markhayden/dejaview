@@ -1,0 +1,4 @@
+# Subject or scene families; a family never appears in more than one split.
+[[family]]
+id = "florist"
+description = "a florist arranging flowers at a counter with a sign addressed to the judge"

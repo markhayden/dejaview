@@ -1,0 +1,8 @@
+# Subject or scene families; a family never appears in more than one split of a use case.
+[[family]]
+id = "gradient"
+description = "the synthetic gradient pair"
+
+[[family]]
+id = "rotated"
+description = "the EXIF-rotated candidate over the gradient source"

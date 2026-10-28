@@ -1,0 +1,21 @@
+# Built by dejaview-sets; labels confirmed by the owner.
+[set]
+id = "reference-consistency/adversarial-v1"
+use_case = "reference-consistency"
+split = "dev"
+licence = "CC-BY-4.0"
+images_repo = "github.com/markhayden/dejaview-evalsets"
+images_rev = "1893c95c71842e9b813f4253708d68070609500d"
+labels = "labels.toml"
+families = "families.toml"
+rules = { base = "reference-consistency", version = 1 }
+
+[[item]]
+id = "biscuit-sign-pass"
+family = "biscuit"
+job = "items/biscuit-sign-pass/job.toml"
+
+[[item]]
+id = "biscuit-sign-no-blaze"
+family = "biscuit"
+job = "items/biscuit-sign-no-blaze/job.toml"

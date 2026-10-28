@@ -1,0 +1,39 @@
+# Item of brief-compliance/stills-v1; built by construction, see the owner's record.
+[job]
+use_case = "brief-compliance"
+brief = "A photograph of a wooden shop shelf: four glass jars of dark jam in a row, each with a cream label that reads FIG JAM, and a small potted herb at the right end. No price tags, no hands."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+text = "The candidate shows four glass jars of dark jam in a row."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+text = "The candidate shows cream labels that read FIG JAM."
+
+[[job.requirements]]
+id = "RQ3"
+kind = "must_hold"
+scope = ["candidate"]
+text = "The candidate shows a small potted herb at the right end."
+
+[[job.requirements]]
+id = "RQ4"
+kind = "must_not"
+scope = ["candidate"]
+text = "The candidate shows price tags; none was asked for."
+
+[[job.requirements]]
+id = "RQ5"
+kind = "must_not"
+scope = ["candidate"]
+text = "The candidate shows hands; none was asked for."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/shelf-misspelt/candidate.png", sha256 = "c965bfa9f032f93093f6c2a47e26d2ca08f48a7a754438078594c2509da70eb3" }

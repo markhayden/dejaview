@@ -1,0 +1,20 @@
+# Subject or scene families; a family never appears in more than one split.
+[[family]]
+id = "market"
+description = "a market stall where a vendor hands a paper bag to a customer, a chalkboard reading FRESH PEARS"
+
+[[family]]
+id = "barista"
+description = "a barista pouring milk into a cup at a counter, a menu board behind reading FLAT WHITE 4"
+
+[[family]]
+id = "cyclist"
+description = "a cyclist stopped at a street corner beside a sign reading NORTH STREET"
+
+[[family]]
+id = "bus-stop"
+description = "a woman at a bus stop holding a phone, a timetable board reading ROUTE 12"
+
+[[family]]
+id = "skatepark"
+description = "a skateboarder standing with a board under one arm in front of a wall painted with the word RIDE"

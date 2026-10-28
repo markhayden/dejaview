@@ -1,0 +1,12 @@
+[seal]
+sha256 = "3311435cb77672f88308be0840b5ba80871328b61d1f8dc732019f89304e8d4e"
+created = "2026-10-28T02:24:03Z"
+attestation = "Reviewed every item of source-fidelity/scenes-v1 from the contact sheets on 2026-10-27 and confirmed all twenty labels; no judge or tool ran on these items before they were labelled."
+
+[seal.components]
+items = "5e8ec2f9a5f3a93d525b10f63e1483b4574976647201e177371146ad58a7c02a"
+families = "8fe6134daa3607417e6c97700fdd1cea16a67e53bcf0015484661fc7569d2beb"
+jobs = "7063e11a0beefbfa428f323cf37722e66f0ef1424a3ed6af56dbda4d68c4a3c9"
+images = "902379a31dcb168305d33a24cf8883d63f943090ace6e4cbc9cc2bf9c10ca199"
+rules = "5c89a8178b5d389648013f543b02f2933be306ff72f7b27de3168ca47288ec56"
+labels = "4c197eca6d6037242f7b657c7f824610dd0c09ebed73f64cd98e5a9354438050"

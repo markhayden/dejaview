@@ -19,7 +19,10 @@ fn spec(id: &str, path: &str) -> ImageSpec {
         id: id.into(),
         role: Role::Candidate,
         label: None,
-        source: ImageSource::Path { path: path.into() },
+        source: ImageSource::Path {
+            path: path.into(),
+            sha256: None,
+        },
         projection: None,
     }
 }
@@ -29,6 +32,30 @@ fn bounds() -> DecodeBounds {
 }
 
 // ---- images --------------------------------------------------------------------------------
+
+/// A path source may pin the file's SHA-256 (evaluation sets do); a mismatch is an image error
+/// naming the hash, a match loads, and no pin loads as before.
+#[test]
+fn a_pinned_sha256_must_match_the_file() {
+    let bytes = std::fs::read(root().join("fixtures/images/candidate-64x48.png")).unwrap();
+    let actual = image::sha256_hex(&bytes);
+    let pinned = |sha: &str| ImageSpec {
+        id: "candidate".into(),
+        role: Role::Candidate,
+        label: None,
+        source: ImageSource::Path {
+            path: "fixtures/images/candidate-64x48.png".into(),
+            sha256: Some(sha.into()),
+        },
+        projection: None,
+    };
+    image::load(&pinned(&actual), &root(), &bounds()).expect("matching pin loads");
+    let err = image::load(&pinned(&"0".repeat(64)), &root(), &bounds()).unwrap_err();
+    assert!(
+        matches!(&err, Error::Image(m) if m.contains("sha256") && m.contains("candidate")),
+        "{err}"
+    );
+}
 
 #[test]
 fn oversized_pixel_count_is_refused_before_decode() {

@@ -1,0 +1,35 @@
+# Item of reference-consistency/pets-v1; built by construction, see the owner's record.
+[job]
+use_case = "reference-consistency"
+brief = "Photograph of the parrot perched on the back of a kitchen chair, morning sun through a window."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:ada-1", "ref:ada-2"]
+text = "Ada's bright red tail is present and unchanged in the candidate, as in the references."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["ref:ada-1", "ref:ada-2"]
+text = "The pale band on Ada's right leg is present and unchanged in the candidate, as in the references."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/ada-kitchen-grey-tail/candidate.png", sha256 = "e430c1cd7f135f29917c49bc8d3d162c2775204d26f9dce6d2334ae8894d498f" }
+
+[[job.images]]
+id = "ref:ada-1"
+role = "reference"
+label = "Ada, an African grey parrot with a bright red tail and a pale band on her right leg"
+source = { path = "families/ada/ref-1.png", sha256 = "93dcad54e64bd82dbb912b04b76230e5ce397f9ff512b140347da5c9b731e9bd" }
+
+[[job.images]]
+id = "ref:ada-2"
+role = "reference"
+label = "Ada, an African grey parrot with a bright red tail and a pale band on her right leg"
+source = { path = "families/ada/ref-2.png", sha256 = "ab479163f1ba41dbbadf870945043a89ef168e865a1da3653a2155345d7c5b77" }

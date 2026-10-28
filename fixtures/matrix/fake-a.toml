@@ -1,0 +1,13 @@
+# The runner tests' matrix: the fake profile under arm A over the fixture set, two repetitions.
+[matrix]
+name = "fake-a"
+config = "fixtures/config/minimal.toml"
+sets = ["source-fidelity/pairs-v1"]
+arms = ["A"]
+decision_runs = 1
+repetitions = 2
+spend_cap_usd = 5.0
+
+[[matrix.models]]
+profile = "fake"
+model = "fake-model"

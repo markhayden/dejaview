@@ -37,4 +37,20 @@ set -e
 if [ "$code" -ne 64 ] || ! grep -q 'auth:' <<< "$err"; then
   echo "check without a credential: expected exit 64 with an auth error, got exit $code: $err" >&2; exit 1
 fi
+# The report viewer serves on loopback: a directory with a report answers with the embedded page.
+mkdir -p view-dir
+echo '{"report_version":1}' > view-dir/report.json
+"$bin" report view view-dir --port 0 > view.log 2>&1 &
+view_pid=$!
+trap 'kill "$view_pid" 2>/dev/null; rm -rf "$work"' EXIT
+url=""
+for _ in $(seq 1 50); do
+  url="$(grep -o 'http://127\.0\.0\.1:[0-9]*/' view.log 2>/dev/null | head -n1 || true)"
+  [ -n "$url" ] && break
+  sleep 0.1
+done
+[ -n "$url" ] || { echo "report view printed no URL: $(cat view.log)" >&2; exit 1; }
+curl -fsS "$url" | grep -q '<title>dejaview report</title>' || { echo "report view did not serve the viewer at $url" >&2; exit 1; }
+curl -fsS "${url}report.json" | grep -q '"report_version":1' || { echo "report view did not serve report.json" >&2; exit 1; }
+kill "$view_pid"
 echo "offline smoke ok: $version"

@@ -4,6 +4,8 @@
 mod catalog;
 mod eval;
 mod report;
+mod sets;
+mod viewer;
 
 use std::path::{Path, PathBuf};
 
@@ -41,12 +43,14 @@ enum Command {
     Rules(RulesArgs),
     /// Inspect tools.
     Tools(ToolsArgs),
-    /// Rebuild a report from a decision directory, or prune old decisions.
+    /// View a decision directory in the static viewer, rebuild its report, or prune old decisions.
     Report(report::ReportArgs),
     /// Evaluation: the admission gate on a result table (the runner arrives with M3).
     Eval(eval::EvalArgs),
     /// The model catalog: limits, prices, capabilities and sources per model.
     Catalog(catalog::CatalogArgs),
+    /// Evaluation sets: check, fetch images, seal and verify a seal.
+    Sets(sets::SetsArgs),
 }
 
 #[derive(clap::Args)]
@@ -178,6 +182,7 @@ fn main() {
         Some(Command::Report(args)) => report::run(&args),
         Some(Command::Eval(args)) => eval::run(&args),
         Some(Command::Catalog(args)) => catalog::run(&args),
+        Some(Command::Sets(args)) => sets::run(&args),
     };
     std::process::exit(code);
 }
@@ -411,7 +416,31 @@ fn load_job(args: &CheckArgs) -> Result<Job, String> {
 /// The provider for this run: the scripted fake (testkit builds, `--provider-script`), a replay of
 /// a recorded conversation, or the live adapter for the configured profile and model over HTTPS,
 /// optionally recording every exchange. The credential joins the redaction list before any run.
+/// Where a provider's conversation comes from or goes to, beyond the live endpoint.
+#[derive(Default)]
+struct ProviderOptions<'a> {
+    replay: Option<&'a Path>,
+    record: Option<&'a Path>,
+    #[cfg(feature = "testkit")]
+    provider_script: Option<&'a Path>,
+}
+
 fn select_provider(args: &CheckArgs, config: &mut Config) -> Result<Box<dyn Provider>, String> {
+    let opts = ProviderOptions {
+        replay: args.replay.as_deref(),
+        record: args.record.as_deref(),
+        #[cfg(feature = "testkit")]
+        provider_script: args.provider_script.as_deref(),
+    };
+    provider_for(config, &opts)
+}
+
+/// The provider for a config: the catalog's adapter over a live client, a recording or, in a
+/// testkit build, a script. A live credential is added to the config's secrets.
+fn provider_for(
+    config: &mut Config,
+    opts: &ProviderOptions<'_>,
+) -> Result<Box<dyn Provider>, String> {
     use std::sync::Arc;
 
     use dejaview_providers::anthropic::AnthropicProvider;
@@ -420,7 +449,7 @@ fn select_provider(args: &CheckArgs, config: &mut Config) -> Result<Box<dyn Prov
     use dejaview_providers::privacy::credential;
     use dejaview_providers::replay::{Player, Recorder};
     #[cfg(feature = "testkit")]
-    if let Some(path) = &args.provider_script {
+    if let Some(path) = opts.provider_script {
         return dejaview_testkit::ScriptedProvider::from_path(path)
             .map(|p| Box::new(p) as Box<dyn Provider>)
             .map_err(|e| e.to_string());
@@ -445,7 +474,7 @@ fn select_provider(args: &CheckArgs, config: &mut Config) -> Result<Box<dyn Prov
         "openai-responses" => dejaview_providers::openai::OpenAiProvider::volatile(),
         other => return Err(format!("adapter {other} is not implemented")),
     };
-    let (cred, transport): (_, Arc<dyn Transport>) = match &args.replay {
+    let (cred, transport): (_, Arc<dyn Transport>) = match opts.replay {
         Some(dir) => {
             let cred =
                 credential(profile, &|_| Some("replay".into())).map_err(|e| e.to_string())?;
@@ -461,7 +490,7 @@ fn select_provider(args: &CheckArgs, config: &mut Config) -> Result<Box<dyn Prov
             ))
             .map_err(|e| e.to_string())?;
             let base: Arc<dyn Transport> = Arc::new(client);
-            match &args.record {
+            match opts.record {
                 Some(dir) => {
                     let recorder =
                         Recorder::new(base, dir, vec![cred.expose().to_string()], volatile)
@@ -630,7 +659,7 @@ fn tools_list(args: &ToolsListArgs) -> i32 {
             return EXIT_USAGE;
         }
     };
-    for pack in &packs {
+    for (pack, _) in &packs {
         known.extend(pack.manifests().iter().cloned());
     }
     let mut listed = Vec::new();
@@ -675,12 +704,35 @@ fn tools_list(args: &ToolsListArgs) -> i32 {
 
 /// The tools available to this build, then narrowed to the config's enabled list.
 fn build_tools(args: &CheckArgs, config: &Config) -> Result<ToolRegistry, String> {
+    #[cfg(feature = "testkit")]
+    let script = args.tool_script.as_deref();
+    #[cfg(not(feature = "testkit"))]
+    let script = {
+        let _ = args;
+        None
+    };
+    tools_for_config(config, script).map(|(registry, _)| registry)
+}
+
+/// The tool registry for a config: the configured packs, then the built-in (and in a testkit
+/// build the scripted) tools, enabled and ordered as the config says; with the lock digest of
+/// the installed pack each enabled pack tool came from (a pack run by `command` has none).
+fn tools_for_config(
+    config: &Config,
+    tool_script: Option<&Path>,
+) -> Result<(ToolRegistry, std::collections::BTreeMap<String, String>), String> {
     // Packs first; a built-in or scripted tool of the same name yields to the pack's.
     let mut available: Vec<Box<dyn Tool>> = Vec::new();
-    for pack in connect_packs(config)? {
-        available.extend(pack.tools());
+    let mut digests = std::collections::BTreeMap::new();
+    for (pack, lock_digest) in connect_packs(config)? {
+        for tool in pack.tools() {
+            if let Some(d) = &lock_digest {
+                digests.insert(tool.manifest().name.clone(), d.clone());
+            }
+            available.push(tool);
+        }
     }
-    for tool in available_tools(args)? {
+    for tool in available_tools(tool_script)? {
         if !available
             .iter()
             .any(|t| t.manifest().name == tool.manifest().name)
@@ -688,8 +740,10 @@ fn build_tools(args: &CheckArgs, config: &Config) -> Result<ToolRegistry, String
             available.push(tool);
         }
     }
-    ToolRegistry::new(available, &config.tools.enabled, &config.tools.order)
-        .map_err(|e| e.to_string())
+    let registry = ToolRegistry::new(available, &config.tools.enabled, &config.tools.order)
+        .map_err(|e| e.to_string())?;
+    digests.retain(|name, _| config.tools.enabled.contains(name));
+    Ok((registry, digests))
 }
 
 fn tools_setup(args: &ToolsSetupArgs) -> i32 {
@@ -723,26 +777,31 @@ fn tools_setup(args: &ToolsSetupArgs) -> i32 {
 
 /// Connects every pack the config names: by `command`, or by `package` and `version` from an
 /// installed bundle.
-fn connect_packs(
-    config: &Config,
-) -> Result<Vec<std::sync::Arc<dejaview_tools::mcp::Pack>>, String> {
+/// A connected pack and, when it came from an installed bundle, that bundle's lock digest.
+type ConnectedPack = (std::sync::Arc<dejaview_tools::mcp::Pack>, Option<String>);
+
+fn connect_packs(config: &Config) -> Result<Vec<ConnectedPack>, String> {
     use dejaview_tools::mcp::{Pack, Spawn, Timeouts};
     use dejaview_tools::provision::{Installed, data_home};
     use std::time::Duration;
     let mut packs = Vec::new();
     for (name, pack) in &config.tools.packs {
-        let spawn = match (&pack.command, &pack.package, &pack.version) {
-            (Some(command), _, _) => Spawn {
-                command: command.clone(),
-                args: pack.args.clone(),
-                declared_env: pack.env.clone(),
-                cwd: None,
-                extra_env: Vec::new(),
-            },
+        let (spawn, lock_digest) = match (&pack.command, &pack.package, &pack.version) {
+            (Some(command), _, _) => (
+                Spawn {
+                    command: command.clone(),
+                    args: pack.args.clone(),
+                    declared_env: pack.env.clone(),
+                    cwd: None,
+                    extra_env: Vec::new(),
+                },
+                None,
+            ),
             (None, Some(package), Some(version)) => {
-                Installed::locate(&data_home(), package, version)
-                    .map_err(|e| e.to_string())?
-                    .spawn(pack.env.clone())
+                let installed =
+                    Installed::locate(&data_home(), package, version).map_err(|e| e.to_string())?;
+                let digest = installed.lock_digest.clone();
+                (installed.spawn(pack.env.clone()), Some(digest))
             }
             _ => continue,
         };
@@ -751,17 +810,18 @@ fn connect_packs(
             call: Duration::from_secs(config.budget.tool_timeout_s),
             shutdown_grace: Duration::from_secs(5),
         };
-        packs.push(
+        packs.push((
             Pack::connect(name, spawn, timeouts, std::env::vars()).map_err(|e| e.to_string())?,
-        );
+            lock_digest,
+        ));
     }
     Ok(packs)
 }
 
 #[cfg(feature = "testkit")]
-fn available_tools(args: &CheckArgs) -> Result<Vec<Box<dyn Tool>>, String> {
+fn available_tools(tool_script: Option<&Path>) -> Result<Vec<Box<dyn Tool>>, String> {
     let mut out: Vec<Box<dyn Tool>> = Vec::new();
-    match &args.tool_script {
+    match tool_script {
         Some(path) => out.push(Box::new(
             dejaview_testkit::ScriptedTool::fake_regions_from_path(path)
                 .map_err(|e| e.to_string())?,
@@ -774,6 +834,6 @@ fn available_tools(args: &CheckArgs) -> Result<Vec<Box<dyn Tool>>, String> {
 }
 
 #[cfg(not(feature = "testkit"))]
-fn available_tools(_args: &CheckArgs) -> Result<Vec<Box<dyn Tool>>, String> {
+fn available_tools(_tool_script: Option<&Path>) -> Result<Vec<Box<dyn Tool>>, String> {
     Ok(Vec::new())
 }

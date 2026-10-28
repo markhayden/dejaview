@@ -1,0 +1,12 @@
+[seal]
+sha256 = "40504d68ed4461a2f8115eb700215f77f375ca7a4fac3daac07662ec051b4d15"
+created = "2026-10-28T03:00:30Z"
+attestation = "Reviewed both items of brief-compliance/adversarial-v1 from the contact sheet on 2026-10-27 and confirmed the labels; no judge or tool ran on these items before they were labelled."
+
+[seal.components]
+items = "c94072b00efd8ded5dec8d3e91aa64df3f1059fc1c097321d0effc4fab8509b4"
+families = "ec4a8b97d21da2add8b4f0a503578c13588dd06dcfcea1596c5f07f0ce2ae255"
+jobs = "6fe45b72a6c7c2a58ab348affd73c0b90c83dee04345f2ce7a6d86eddfba8f07"
+images = "2d50f2bd45e92a9d2bede5d2e66962cc83287a40862c32eb568ea3691319fddf"
+rules = "750d3b87e53c2a9c136f15456de7046bc18cc9734e328b5783c4f65de47927d9"
+labels = "e721382257efbdfa022e9ad4f556c6a764bae094992c858e6994d84796ab8e0e"

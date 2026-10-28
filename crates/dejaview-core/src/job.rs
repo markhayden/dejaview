@@ -54,8 +54,17 @@ pub enum Role {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged, deny_unknown_fields)]
 pub enum ImageSource {
-    Path { path: PathBuf },
-    Base64 { base64: String, media_type: String },
+    /// A file, optionally pinned to its SHA-256 (evaluation-set jobs always pin); the loader
+    /// refuses a file whose hash differs.
+    Path {
+        path: PathBuf,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sha256: Option<String>,
+    },
+    Base64 {
+        base64: String,
+        media_type: String,
+    },
 }
 
 /// The image's projection. Detection rules arrive in task 1.2; `flat` is the default.
@@ -136,7 +145,10 @@ impl Job {
             id: "candidate".into(),
             role: Role::Candidate,
             label: None,
-            source: ImageSource::Path { path: candidate },
+            source: ImageSource::Path {
+                path: candidate,
+                sha256: None,
+            },
             projection: None,
         }];
         if let Some(path) = source {
@@ -144,7 +156,7 @@ impl Job {
                 id: "source".into(),
                 role: Role::Source,
                 label: None,
-                source: ImageSource::Path { path },
+                source: ImageSource::Path { path, sha256: None },
                 projection: None,
             });
         }
@@ -153,7 +165,10 @@ impl Job {
                 id: format!("ref:{label}"),
                 role: Role::Reference,
                 label: Some(label.clone()),
-                source: ImageSource::Path { path: path.clone() },
+                source: ImageSource::Path {
+                    path: path.clone(),
+                    sha256: None,
+                },
                 projection: None,
             });
         }
@@ -180,7 +195,7 @@ impl Job {
                     role: i.role,
                     label: i.label.clone(),
                     source: match &i.source {
-                        ImageSource::Path { path } => format!("path:{}", path.display()),
+                        ImageSource::Path { path, .. } => format!("path:{}", path.display()),
                         ImageSource::Base64 { base64, media_type } => {
                             format!("base64:{media_type}:{} chars", base64.len())
                         }
@@ -233,6 +248,7 @@ mod tests {
                     label: None,
                     source: ImageSource::Path {
                         path: "x.png".into(),
+                        sha256: None,
                     },
                     projection: None,
                 })

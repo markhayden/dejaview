@@ -1,0 +1,33 @@
+# Item of brief-compliance/adversarial-v1; built by construction, see the owner's record.
+[job]
+use_case = "brief-compliance"
+brief = "A photograph of a house porch: a brass lantern hanging by the door, a coir doormat that reads WELCOME, and a wooden sign on the wall. No people."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+text = "The candidate shows a brass lantern hanging by the door."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+text = "The candidate shows a coir doormat that reads WELCOME."
+
+[[job.requirements]]
+id = "RQ3"
+kind = "must_hold"
+scope = ["candidate"]
+text = "The candidate shows a wooden sign on the wall."
+
+[[job.requirements]]
+id = "RQ4"
+kind = "must_not"
+scope = ["candidate"]
+text = "The candidate shows people; none was asked for."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/porch-sign-pass/candidate.png", sha256 = "e703e04855eb9f76030a23f539cc2d7a0480874a283a13792c96eca51446d894" }

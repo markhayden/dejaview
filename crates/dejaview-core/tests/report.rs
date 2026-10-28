@@ -251,3 +251,28 @@ fn report_rebuild_from_every_truncation_point_of_a_journal_with_tools_repairs_an
         assert_eq!(run.turns.len(), sent, "keep {keep}");
     }
 }
+
+// ---- added at the M3 baseline: checklist-item violations carry their root location ---------
+
+#[test]
+fn a_checklist_item_violation_is_mapped_to_its_root_image() {
+    let o = check("item-root", "violation.json");
+    assert_eq!(o.exit_code, 1, "{:?}", o.error);
+    let r: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(o.dir.join("report.json")).unwrap()).unwrap();
+    let items = r["runs"][0]["items"].as_array().unwrap();
+    let violation = items
+        .iter()
+        .find(|i| i["disposition"] == "violation")
+        .expect("the scripted submission marks SF2 a violation");
+    assert_eq!(violation["id"], "chk:ob:SF2@candidate");
+    // The location is on the raw frame of the candidate, so its root is the candidate itself,
+    // in the same coordinates; the scorer and the viewer read `root` without mapping anything.
+    assert_eq!(violation["root"]["image"], "candidate");
+    assert_eq!(violation["root"]["frame"], "raw:candidate");
+    assert_eq!(violation["root"]["kind"], "whole_image");
+    assert_eq!(violation["root"]["partial"], false);
+    // A held item with no location has no root either.
+    let held = items.iter().find(|i| i["disposition"] == "held").unwrap();
+    assert!(held.get("root").is_none(), "{held}");
+}

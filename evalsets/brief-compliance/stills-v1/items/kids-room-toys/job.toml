@@ -1,0 +1,39 @@
+# Item of brief-compliance/stills-v1; built by construction, see the owner's record.
+[job]
+use_case = "brief-compliance"
+brief = "A photograph of a child's bedroom: a yellow kite hanging on the wall, a poster above the bed that reads DREAM BIG, and a blue rug on the floor. No people, no toys on the floor."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+text = "The candidate shows a yellow kite hanging on the wall."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+text = "The candidate shows a poster above the bed that reads DREAM BIG."
+
+[[job.requirements]]
+id = "RQ3"
+kind = "must_hold"
+scope = ["candidate"]
+text = "The candidate shows a blue rug on the floor."
+
+[[job.requirements]]
+id = "RQ4"
+kind = "must_not"
+scope = ["candidate"]
+text = "The candidate shows people; none was asked for."
+
+[[job.requirements]]
+id = "RQ5"
+kind = "must_not"
+scope = ["candidate"]
+text = "The candidate shows toys on the floor; none was asked for."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/kids-room-toys/candidate.png", sha256 = "5d76c494fc6ba2fce4e73eb952bca8c8cdc173853cd544418d78689fab87e277" }

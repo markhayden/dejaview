@@ -127,6 +127,31 @@ impl Client {
     }
 }
 
+impl Client {
+    /// Fetches a resource by GET under the same redirect policy as requests: the body of a 2xx
+    /// response, or a transport error carrying the status. Used by `dejaview sets fetch` for
+    /// evaluation-set images; no header beyond the user agent is sent.
+    pub async fn get_bytes(&self, url: &str) -> Result<Vec<u8>> {
+        let response = self.inner.get(url).send().await.map_err(map_send_error)?;
+        let status = response.status().as_u16();
+        let bytes = response.bytes().await.map_err(|e| {
+            Error::Transport(TransportError {
+                status: Some(status),
+                retry_after: None,
+                message: format!("reading the response body: {}", strip_url(e)),
+            })
+        })?;
+        if !(200..300).contains(&status) {
+            return Err(Error::Transport(TransportError {
+                status: Some(status),
+                retry_after: None,
+                message: format!("HTTP {status}"),
+            }));
+        }
+        Ok(bytes.to_vec())
+    }
+}
+
 impl Transport for Client {
     fn post_json<'a>(
         &'a self,

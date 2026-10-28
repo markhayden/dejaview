@@ -1,0 +1,111 @@
+# Built by dejaview-sets; labels confirmed by the owner.
+[set]
+id = "reference-consistency/pets-v1"
+use_case = "reference-consistency"
+split = "dev"
+licence = "CC-BY-4.0"
+images_repo = "github.com/markhayden/dejaview-evalsets"
+images_rev = "07b5e43f33cc53bd4ef0fbc79950ae754be77b79"
+labels = "labels.toml"
+families = "families.toml"
+rules = { base = "reference-consistency", version = 1 }
+
+[[item]]
+id = "pip-bridge"
+family = "pip"
+job = "items/pip-bridge/job.toml"
+
+[[item]]
+id = "pip-beach"
+family = "pip"
+job = "items/pip-beach/job.toml"
+
+[[item]]
+id = "pip-bridge-no-patch"
+family = "pip"
+job = "items/pip-bridge-no-patch/job.toml"
+
+[[item]]
+id = "pip-park-lookalike"
+family = "pip"
+job = "items/pip-park-lookalike/job.toml"
+
+[[item]]
+id = "marlow-bookshop"
+family = "marlow"
+job = "items/marlow-bookshop/job.toml"
+
+[[item]]
+id = "marlow-rooftop"
+family = "marlow"
+job = "items/marlow-rooftop/job.toml"
+
+[[item]]
+id = "marlow-bookshop-two-white-paws"
+family = "marlow"
+job = "items/marlow-bookshop-two-white-paws/job.toml"
+
+[[item]]
+id = "marlow-garden-lookalike"
+family = "marlow"
+job = "items/marlow-garden-lookalike/job.toml"
+
+[[item]]
+id = "ada-kitchen"
+family = "ada"
+job = "items/ada-kitchen/job.toml"
+
+[[item]]
+id = "ada-library"
+family = "ada"
+job = "items/ada-library/job.toml"
+
+[[item]]
+id = "ada-kitchen-grey-tail"
+family = "ada"
+job = "items/ada-kitchen-grey-tail/job.toml"
+
+[[item]]
+id = "ada-balcony-lookalike"
+family = "ada"
+job = "items/ada-balcony-lookalike/job.toml"
+
+[[item]]
+id = "bramble-beach"
+family = "bramble"
+job = "items/bramble-beach/job.toml"
+
+[[item]]
+id = "bramble-snow"
+family = "bramble"
+job = "items/bramble-snow/job.toml"
+
+[[item]]
+id = "bramble-beach-no-blaze"
+family = "bramble"
+job = "items/bramble-beach-no-blaze/job.toml"
+
+[[item]]
+id = "bramble-meadow-lookalike"
+family = "bramble"
+job = "items/bramble-meadow-lookalike/job.toml"
+
+[[item]]
+id = "hobbes-cafe"
+family = "hobbes"
+job = "items/hobbes-cafe/job.toml"
+
+[[item]]
+id = "hobbes-boat"
+family = "hobbes"
+job = "items/hobbes-boat/job.toml"
+
+[[item]]
+id = "hobbes-cafe-no-stripe"
+family = "hobbes"
+job = "items/hobbes-cafe-no-stripe/job.toml"
+
+[[item]]
+id = "hobbes-field-lookalike"
+family = "hobbes"
+job = "items/hobbes-field-lookalike/job.toml"

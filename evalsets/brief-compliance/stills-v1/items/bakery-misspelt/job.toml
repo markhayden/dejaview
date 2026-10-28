@@ -1,0 +1,39 @@
+# Item of brief-compliance/stills-v1; built by construction, see the owner's record.
+[job]
+use_case = "brief-compliance"
+brief = "A photograph of a bakery counter: exactly four croissants on a wooden board, a small chalkboard that reads FRESH, and a glass of water. No logos, no people."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+text = "The candidate shows exactly four croissants on a wooden board."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+text = "The candidate shows a small chalkboard that reads FRESH."
+
+[[job.requirements]]
+id = "RQ3"
+kind = "must_hold"
+scope = ["candidate"]
+text = "The candidate shows a glass of water."
+
+[[job.requirements]]
+id = "RQ4"
+kind = "must_not"
+scope = ["candidate"]
+text = "The candidate shows logos; none was asked for."
+
+[[job.requirements]]
+id = "RQ5"
+kind = "must_not"
+scope = ["candidate"]
+text = "The candidate shows people; none was asked for."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/bakery-misspelt/candidate.png", sha256 = "5dd92c2736349e0a0f79703cee79c1c619ea7dcd8bc2f0ca09fcee07e019e880" }

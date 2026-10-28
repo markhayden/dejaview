@@ -79,6 +79,12 @@ check-filter package *filters:
 python-check:
     cd tools/python && uv sync --frozen && uv run --frozen --offline --no-sync ruff check . && uv run --frozen --offline --no-sync ruff format --check . && uv run --frozen --offline --no-sync pytest -q
 
+# The set-building toolkit (scripts/sets): lint, format check, tests, and the offline dry run
+# checked by the harness (needs uv; network on the first `uv sync`).
+sets-check:
+    cd scripts/sets && uv sync --frozen && uv run --frozen --offline --no-sync ruff check . && uv run --frozen --offline --no-sync ruff format --check . && uv run --frozen --offline --no-sync pytest -q
+    scripts/sets-dry-run.sh
+
 # Build the pack's provisioning bundle into tools/python/dist/bundle-<version>/.
 bundle:
     scripts/build-bundle.sh

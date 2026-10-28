@@ -74,6 +74,11 @@ jobs:
       - if: steps.pack.outputs.present == 'true'
         run: uv run --frozen --offline --no-sync pytest
         working-directory: tools/python
+      # The set-building toolkit (scripts/sets): lint, tests, and the offline dry run checked by
+      # the harness, which needs the Rust toolchain installed below; it runs after that step.
+      - if: steps.pack.outputs.present == 'true'
+        run: uv sync --frozen && uv run --frozen --offline --no-sync ruff check . && uv run --frozen --offline --no-sync ruff format --check . && uv run --frozen --offline --no-sync pytest -q
+        working-directory: scripts/sets
       # The provisioning proof: build the bundle, fetch and build the Rust side with the network,
       # then install and launch the pack with no network namespace at all (`unshare -rn`).
       - if: steps.pack.outputs.present == 'true'
@@ -89,6 +94,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: provisioning
+      - if: steps.pack.outputs.present == 'true'
+        name: The set-building toolkit's offline dry run, checked by the harness
+        run: scripts/sets-dry-run.sh
       - if: steps.pack.outputs.present == 'true'
         name: Build the provisioning bundle
         run: scripts/build-bundle.sh

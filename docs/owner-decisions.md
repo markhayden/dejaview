@@ -9,7 +9,7 @@ A blank entry blocks the task named in its row. Dates are when the owner decided
 | 2 | Anthropic account for recordings: enforced-thinking (created on or after 2026-08-31) or not | 2.5b | 2026-10-26: the existing account, with the prefix check switched on per request (`thinking-binding-controls` beta, `prefix_mismatch_behavior = "error"`) during recording |
 | 3 | Spend cap: fixture recordings (all three vendors) | 2.5b | 2026-10-26: $25 for the Anthropic recordings (spent about $1.15 across Opus 5.5, Sonnet 5.5 and Haiku 5.5). 2026-10-27: $25 each for the Gemini and OpenAI recordings |
 | 4 | Spend cap: release and gateway smoke tests | 2.8, 2.10b | 2026-10-27: the standing $25 per vendor applies; each vendor's account also carries its own credit limit. Estimated for the 2.10b live smoke: under $1 in total across the three direct profiles |
-| 5 | Spend cap: image generation for public sets | 3.2a | decide before 3.2a |
+| 5 | Spend cap: image generation for public sets | 3.2a | 2026-10-27: the standing $25 per vendor applies (fal, OpenAI, Google); generation costs about one to five cents an image |
 | 6 | Spend cap: arm A baseline | 3.8 | decide before 3.8, against `eval estimate` |
 | 7 | Spend cap: arm C | 4.5 | decide before 4.5, against `eval estimate` |
 | 8 | Spend cap: initial gate | 5.6 | decide before 5.6, against `eval estimate` |
@@ -17,7 +17,7 @@ A blank entry blocks the task named in its row. Dates are when the owner decided
 | 10 | Labelling plan: worksheet format, batch size, adjudicator | 3.2b | 2026-10-26: draft answer key from construction plus a contact sheet per batch; batches of 20 to 25; the owner confirms or corrects |
 | 11 | Reuse of prototype images, outputs and the segmenter export | 3.2a, 4.0, 4.6 | 2026-10-26: nothing from the prototype. Public upstream models (for example the EoMT-L ADE20K weights on Hugging Face under their own licences) are not prototype assets and may be exported afresh; golden panoramas are newly generated. Task 4.6 produces its own export and provenance record |
 | 12 | Whether M6 (confirmation) is funded in this release | 6.1 | 2026-10-26: yes, funded |
-| 13 | Set generators and publication licence | 3.2a | deferred to 3.2a by design (ADR 0013) |
+| 13 | Set generators and publication licence | 3.2a | 2026-10-27: a family-level mix of three generators so no set carries one vendor's fingerprint: FLUX.2 klein 4B (via fal, seeded), OpenAI gpt-image-2 and Gemini 3.1 Flash Image; one generator per family, recorded per item. Chosen after one sample from each on the same prompt. Publication licence and each vendor's output terms verified and recorded in ADR 0013 |
 
 ## Notes on the decisions
 

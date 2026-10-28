@@ -1,0 +1,24 @@
+[project]
+name = "dejaview-sets"
+version = "0.0.1"
+description = "dejaview set-building toolkit: generate families, plant defects by construction, draft labels"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+dependencies = ["pillow>=11.0"]
+
+[project.scripts]
+dejaview-sets = "dejaview_sets.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.0,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = ["pytest>=8.0", "ruff>=0.14"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

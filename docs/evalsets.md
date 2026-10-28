@@ -59,3 +59,38 @@ tests mutate.
 
 The seal records the owner's attestation; prior exposure of the items to a judge or tool cannot
 be proven by code, and gate scoring treats journal searches as supporting evidence only.
+
+## Building a set (task 3.2a, ADR 0013)
+
+`scripts/sets/` is a small Python toolkit (`uv run dejaview-sets …` from that directory). A
+**plan** names the set and its families; each family is one scene or subject with one generator
+(`fal` for FLUX.2 klein, `openai` for gpt-image-2, `gemini` for Gemini 3.1 Flash Image, or
+`fake`), a source prompt and seed, the protected subjects, a brief, and its items, each made from
+the source by one construction op. `fixtures/sets/houses-v1.plan.toml` is the dry-run plan.
+
+Ops and what they mean: `grade` (a mild colour grade: a pass), `mirror`, `rotate`, `crop` (the
+structural rule, a fail over the whole image) and `edit` (the generator changes one named thing,
+the identity rule, a fail whose region is the bounding box of the pixel difference). The draft
+label comes from the op alone; nobody looks at the picture to write it, and no judge or tool runs.
+
+```
+cd scripts/sets
+uv run dejaview-sets build --plan <plan.toml> --out evalsets/<use-case>/<set> --owner <owner storage>
+# review <owner storage>/<set id>/contact-<family>.png and labels-draft.toml:
+# set each label's status to "confirmed" or "struck", fill adjudicated_on
+uv run dejaview-sets promote --draft <owner storage>/<set id>/labels-draft.toml --set evalsets/<use-case>/<set>
+dejaview sets check evalsets/
+```
+
+`build` writes the public set directory (manifest, families, one job per item with pinned
+images, the family's source stored once under `families/`) and, to owner storage, the
+construction record (generator, model, prompt, seed, every edit instruction, hashes, dates), the
+draft labels and a contact sheet per family. `promote` publishes the confirmed labels as
+`labels.toml` and removes struck items from the set; a draft still unreviewed is refused. The
+owner then pushes the images to the `dejaview-evalsets` repository and commits the manifest,
+jobs and labels here. `just sets-check` lints and tests the toolkit and runs the offline dry run
+through `dejaview sets check`; the live dry run of 2026-10-27 is recorded in ADR 0013.
+
+Credentials for the generators come from the environment only (`FAL_KEY`, `OPENAI_API_KEY`,
+`GEMINI_API_KEY`); the toolkit never writes them anywhere. Owner storage is a directory outside
+both repositories; nothing in it is ever committed.

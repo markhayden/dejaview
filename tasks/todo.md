@@ -61,7 +61,7 @@ tag.
 
 ## M3 Evaluation sets and baseline
 - [x] 3.1 Set manifests, check, fetch, seal
-- [ ] 3.2a Set-building toolkit and ADR 0013
+- [x] 3.2a Set-building toolkit and ADR 0013 (toolkit, dry run and ADR done 2026-10-27; the public `dejaview-evalsets` repository is the owner's to create, with README and licence, before 3.2b publishes images)
 - [ ] 3.2b First dev set adjudicated and published
 - [ ] 3.3a Source fidelity dev set
 - [ ] 3.3b Reality checks dev set

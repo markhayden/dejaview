@@ -4,94 +4,18 @@
 //! repetition, and prompts across arms differ only in the Tools section.
 #![allow(clippy::unwrap_used)]
 
-use std::path::{Path, PathBuf};
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
+mod common;
 
-use dejaview_core::config::Config;
-use dejaview_core::provider::Provider;
+use std::path::Path;
+
+use common::{Fake, plan, root, tempdir};
 use dejaview_core::run::Cancel;
 use dejaview_core::tool::{Tool, ToolRegistry};
-use dejaview_eval::arms::ToolSelection;
-use dejaview_eval::matrix::{Cell, Matrix};
-use dejaview_eval::runner::{Factories, Plan, Summary, run};
-use dejaview_testkit::{ScriptedProvider, ScriptedTool};
-
-fn root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
-}
-
-fn tempdir(tag: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("dejaview-runner-{tag}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(&dir).unwrap();
-    dir
-}
-
-/// A fake provider per decision from a script, counting decisions and cancelling after `n`.
-struct Fake {
-    script: PathBuf,
-    decisions: AtomicUsize,
-    cancel_after: Option<(usize, Cancel)>,
-    tool_envelopes: Mutex<Option<PathBuf>>,
-}
-
-impl Factories for Fake {
-    fn provider(&self, _cell: &Cell, _config: &Config) -> dejaview_eval::Result<Box<dyn Provider>> {
-        let n = self.decisions.fetch_add(1, Ordering::SeqCst) + 1;
-        if let Some((after, cancel)) = &self.cancel_after
-            && n > *after
-        {
-            cancel.cancel();
-        }
-        Ok(Box::new(ScriptedProvider::from_path(&self.script).unwrap()))
-    }
-
-    fn tools(
-        &self,
-        selection: &ToolSelection,
-        _config: &Config,
-    ) -> dejaview_eval::Result<ToolRegistry> {
-        let mut available: Vec<Box<dyn Tool>> = Vec::new();
-        if let Some(path) = self.tool_envelopes.lock().unwrap().clone() {
-            let text = std::fs::read_to_string(path).unwrap();
-            available.push(Box::new(ScriptedTool::fake_regions(
-                serde_json::from_str(&text).unwrap(),
-            )));
-        }
-        Ok(ToolRegistry::new(available, &selection.enabled, &[]).unwrap())
-    }
-}
-
-fn plan(eval_dir: &Path, matrix_file: &str) -> Plan {
-    let matrix_path = root().join("fixtures/matrix").join(matrix_file);
-    let matrix_text = std::fs::read_to_string(&matrix_path).unwrap();
-    let matrix = Matrix::parse(&matrix_text).unwrap();
-    // A cache is configured so that bypassing it is observable (`off` would prove nothing).
-    let config_text = std::fs::read_to_string(root().join(&matrix.matrix.config)).unwrap()
-        + &format!(
-            "\n[cache]\ndir = {:?}\n",
-            eval_dir.join("cache").display().to_string()
-        );
-    Plan {
-        eval_dir: eval_dir.to_path_buf(),
-        matrix,
-        matrix_text,
-        config_text,
-        evalsets_root: root().join("fixtures/evalsets"),
-        admissions: None,
-        harness_version: "0.1.0 (test)".into(),
-        allow_fake: true,
-    }
-}
+use dejaview_eval::runner::{Summary, run};
+use dejaview_testkit::ScriptedTool;
 
 fn fake(script: &str) -> Fake {
-    Fake {
-        script: root().join("fixtures/scripts").join(script),
-        decisions: AtomicUsize::new(0),
-        cancel_after: None,
-        tool_envelopes: Mutex::new(None),
-    }
+    Fake::new(script)
 }
 
 fn summary(dir: &Path) -> Summary {

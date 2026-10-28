@@ -5,7 +5,7 @@
 //! `dejaview check --job`; labels live in a separate file so blind sets ship without them. Image
 //! paths in an item's job are relative to the set directory and every image is pinned by SHA-256.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use dejaview_core::image::sha256_hex;
@@ -360,46 +360,54 @@ impl Set {
                     format!("a {split} set must name its labels file (labels.toml)"),
                 ));
             }
-            (_, Some(labels), _) => {
-                let mut labelled = BTreeMap::new();
-                for l in &labels.label {
-                    if !seen.contains_key(&l.item) {
-                        return Err(sets_err(
-                            id,
-                            format!("label for item {:?}, which the set does not have", l.item),
-                        ));
-                    }
-                    if labelled.insert(l.item.clone(), ()).is_some() {
-                        return Err(sets_err(id, format!("item {} is labelled twice", l.item)));
-                    }
-                    for r in &l.regions {
-                        match (r.kind, &r.polygon, &r.bbox) {
-                            (RegionKind::Polygon, Some(p), None) if p.len() >= 3 => {}
-                            (RegionKind::Bbox, None, Some(_)) => {}
-                            (RegionKind::WholeImage | RegionKind::Absent, None, None) => {}
-                            _ => {
-                                return Err(sets_err(
-                                    id,
-                                    format!(
-                                        "item {}: region of kind {:?} with the wrong geometry",
-                                        l.item, r.kind
-                                    ),
-                                ));
-                            }
-                        }
-                    }
-                }
-                for item in seen.keys() {
-                    if !labelled.contains_key(item) {
-                        return Err(sets_err(id, format!("item {item} has no label")));
-                    }
-                }
-            }
+            (_, Some(labels), _) => self.check_labels(labels)?,
         }
         Ok(SetReport {
             items: self.jobs.len(),
             images: images.len(),
         })
+    }
+
+    /// Labels for this set: every item labelled exactly once, nothing else labelled, every
+    /// region with the geometry of its kind. Used for the set's own label file and for the
+    /// labels supplied to a gate on a blind set.
+    pub fn check_labels(&self, labels: &Labels) -> Result<()> {
+        let id = &self.manifest.set.id;
+        let items: BTreeSet<&str> = self.jobs.iter().map(|(i, _)| i.as_str()).collect();
+        let mut labelled = BTreeSet::new();
+        for l in &labels.label {
+            if !items.contains(l.item.as_str()) {
+                return Err(sets_err(
+                    id,
+                    format!("label for item {:?}, which the set does not have", l.item),
+                ));
+            }
+            if !labelled.insert(l.item.as_str()) {
+                return Err(sets_err(id, format!("item {} is labelled twice", l.item)));
+            }
+            for r in &l.regions {
+                match (r.kind, &r.polygon, &r.bbox) {
+                    (RegionKind::Polygon, Some(p), None) if p.len() >= 3 => {}
+                    (RegionKind::Bbox, None, Some(_)) => {}
+                    (RegionKind::WholeImage | RegionKind::Absent, None, None) => {}
+                    _ => {
+                        return Err(sets_err(
+                            id,
+                            format!(
+                                "item {}: region of kind {:?} with the wrong geometry",
+                                l.item, r.kind
+                            ),
+                        ));
+                    }
+                }
+            }
+        }
+        for item in &items {
+            if !labelled.contains(item) {
+                return Err(sets_err(id, format!("item {item} has no label")));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -750,7 +758,7 @@ pub fn verify_seal(dir: &Path) -> Result<()> {
 }
 
 /// The current time as `YYYY-MM-DDTHH:MM:SSZ`.
-fn utc_now() -> String {
+pub(crate) fn utc_now() -> String {
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())

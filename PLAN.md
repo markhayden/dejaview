@@ -626,7 +626,7 @@ with unequal family sizes, type-7 quantiles, the detection-indicator family pred
 Bonferroni-adjusted endpoints and insufficient-tail rule, Wilson intervals, each against
 hand-computed fixtures.
 
-**CLI scenario.** `dejaview eval gate --fixture fixtures/stats/case-1.toml` prints the interval
+**CLI scenario.** `dejaview eval gate-table --fixture fixtures/stats/case-1.toml` prints the interval
 and outcome for a synthetic result table.
 
 **Acceptance.**

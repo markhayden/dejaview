@@ -1415,7 +1415,8 @@ dejaview eval estimate --matrix matrix.toml      # every envelope, the sum, a co
 dejaview eval run --matrix matrix.toml --out eval-out/<name>
 dejaview eval report --out eval-out/<name>       # regenerate metrics.json and report.md from saved results
 dejaview eval report eval-out/<name>
-dejaview eval gate --matrix matrix.toml --tool regions --set <sealed set>
+dejaview eval gate --matrix matrix.toml --out eval-out/<name> --tool regions --set <sealed set> --stage initial --labels <owner labels>
+dejaview eval gate-table --fixture fixtures/stats/case-1.toml   # the gate table on a synthetic result table
 dejaview eval canary --config dejaview.toml
 dejaview check --config dejaview.toml --job job.toml --replay fixtures/adapters/anthropic-messages/first-look
 dejaview check --config dejaview.toml --job job.toml --record recordings/first-look

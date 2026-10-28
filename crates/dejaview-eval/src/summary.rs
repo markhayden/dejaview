@@ -15,7 +15,7 @@ use dejaview_core::submission::FindingDisposition;
 use crate::gate_rules::{Computed, Policy};
 use crate::metrics::{self, CellMetrics, ItemRow, MatrixMetrics, Region, RegionKind};
 use crate::runner::{DecisionResult, SUMMARY_FILE, Summary};
-use crate::sets::Set;
+use crate::sets::{Labels, Set};
 use crate::{Error, Result};
 
 pub const METRICS_FILE: &str = "metrics.json";
@@ -101,13 +101,23 @@ fn predictions_of(report: &dejaview_core::report::Report) -> Vec<Region> {
         .collect()
 }
 
+/// The labels of every set that has them, by set id.
+pub fn labels_of(sets: &[Set]) -> BTreeMap<&str, &Labels> {
+    sets.iter()
+        .filter_map(|s| s.labels.as_ref().map(|l| (s.manifest.set.id.as_str(), l)))
+        .collect()
+}
+
 /// One row per decision of a labelled item, with the policy the reports record. Items without a
 /// label are not scored; decisions whose report is missing contribute no predictions.
-pub fn rows(eval_dir: &Path, sets: &[Set], summary: &Summary) -> Result<(Vec<ItemRow>, Policy)> {
-    let labels: BTreeMap<(&str, &str), &crate::sets::Label> = sets
+pub fn rows(
+    eval_dir: &Path,
+    labels: &BTreeMap<&str, &Labels>,
+    summary: &Summary,
+) -> Result<(Vec<ItemRow>, Policy)> {
+    let labels: BTreeMap<(&str, &str), &crate::sets::Label> = labels
         .iter()
-        .filter_map(|s| s.labels.as_ref().map(|l| (s.manifest.set.id.as_str(), l)))
-        .flat_map(|(set, l)| l.label.iter().map(move |l| ((set, l.item.as_str()), l)))
+        .flat_map(|(set, l)| l.label.iter().map(move |l| ((*set, l.item.as_str()), l)))
         .collect();
     let mut policy = None;
     let mut out = Vec::new();
@@ -167,7 +177,7 @@ pub fn rows(eval_dir: &Path, sets: &[Set], summary: &Summary) -> Result<(Vec<Ite
 
 /// Compute the metrics of an evaluation directory and write `metrics.json` and `report.md`.
 pub fn write(eval_dir: &Path, sets: &[Set], summary: &Summary) -> Result<MatrixMetrics> {
-    let (rows, policy) = rows(eval_dir, sets, summary)?;
+    let (rows, policy) = rows(eval_dir, &labels_of(sets), summary)?;
     let m = metrics::compute(&rows, &policy);
     let json = serde_json::to_string_pretty(&m).map_err(|e| Error::Runner(e.to_string()))?;
     std::fs::write(eval_dir.join(METRICS_FILE), json + "\n").map_err(|e| io(eval_dir, e))?;

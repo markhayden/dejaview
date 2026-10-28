@@ -1,5 +1,6 @@
-//! Task 3.4b at the binary: `eval run` over the fixture set with the scripted provider, then the
-//! same command again resuming with nothing redone.
+//! Tasks 3.4b, 3.4c, 3.5a and 3.5b at the binary: `eval run` over the fixture set with the
+//! scripted provider, resuming with nothing redone; `eval estimate`; `eval report` byte for byte;
+//! `eval gate` over a synthetic sealed blind set.
 #![cfg(feature = "testkit")]
 #![allow(clippy::unwrap_used)]
 
@@ -159,4 +160,178 @@ fn eval_estimate_prints_every_envelope_and_warns_over_the_cap() {
     let e: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
     assert_eq!(e["over_cap"], true);
     assert_eq!(e["decisions"].as_array().unwrap().len(), 4);
+}
+
+fn dejaview(cwd: &Path, args: &[&str]) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_dejaview"))
+        .current_dir(cwd)
+        .args(args)
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn eval_gate_scores_a_blind_set_writes_the_receipt_and_publishes_the_labels() {
+    let dir = std::env::temp_dir().join(format!("dejaview-eval-gate-cli-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let evalsets = dir.join("evalsets");
+    let set = "source-fidelity/blind-cli-v1";
+    let set_dir = dejaview_testkit::synthetic_set(
+        &evalsets,
+        &repo_root().join("fixtures/evalsets/source-fidelity/pairs-v1/items"),
+        set,
+        "blind",
+        "cli",
+        7,
+    )
+    .unwrap();
+    let owner = dir.join("owner");
+    let o = dejaview(
+        &repo_root(),
+        &[
+            "sets",
+            "seal",
+            "--set",
+            set_dir.to_str().unwrap(),
+            "--attest",
+            "no judge has seen these",
+            "--labels-out",
+            owner.to_str().unwrap(),
+        ],
+    );
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    let matrix = dir.join("matrix.toml");
+    std::fs::write(
+        &matrix,
+        format!(
+            "[matrix]\nname = \"gate-cli\"\nconfig = \"fixtures/config/minimal.toml\"\nsets = [{set:?}]\narms = [\"C\", \"D_fake_regions\"]\ndecision_runs = 1\nrepetitions = 1\nspend_cap_usd = 50.0\n\n[matrix.gate]\nseed = 3\nresamples = 1000\n\n[[matrix.models]]\nprofile = \"fake\"\nmodel = \"fake-model\"\n"
+        ),
+    )
+    .unwrap();
+    let out = dir.join("eval");
+    // Arms C and D_<tool> need `view` and `align`, which arrive in M4, so the binary cannot run
+    // this matrix yet; the evaluation directory is produced in process with a fake that runs the
+    // control arm without them. One script for every decision: both arms fail every item, so the
+    // tool detects nothing beyond the control and the gate rejects it; the lifecycle still runs
+    // end to end through the binary.
+    {
+        use dejaview_eval::runner::{Factories, Plan};
+        struct Fake;
+        impl Factories for Fake {
+            fn provider(
+                &self,
+                _cell: &dejaview_eval::matrix::Cell,
+                _config: &dejaview_core::config::Config,
+            ) -> dejaview_eval::Result<Box<dyn dejaview_core::provider::Provider>> {
+                Ok(Box::new(
+                    dejaview_testkit::ScriptedProvider::from_path(
+                        &repo_root().join("fixtures/scripts/violation.json"),
+                    )
+                    .unwrap(),
+                ))
+            }
+            fn tools(
+                &self,
+                selection: &dejaview_eval::arms::ToolSelection,
+                _config: &dejaview_core::config::Config,
+            ) -> dejaview_eval::Result<dejaview_core::tool::ToolRegistry> {
+                let tool = dejaview_testkit::ScriptedTool::fake_regions_from_path(
+                    &repo_root().join("fixtures/tool-scripts/regions-25.json"),
+                )
+                .unwrap();
+                let enabled: Vec<String> = selection
+                    .enabled
+                    .iter()
+                    .filter(|n| *n == "fake_regions")
+                    .cloned()
+                    .collect();
+                Ok(
+                    dejaview_core::tool::ToolRegistry::new(vec![Box::new(tool)], &enabled, &[])
+                        .unwrap(),
+                )
+            }
+        }
+        let matrix_text = std::fs::read_to_string(&matrix).unwrap();
+        let parsed = dejaview_eval::matrix::Matrix::parse(&matrix_text).unwrap();
+        let config_text = std::fs::read_to_string(repo_root().join(&parsed.matrix.config)).unwrap();
+        let plan = Plan {
+            eval_dir: out.clone(),
+            matrix: parsed,
+            matrix_text,
+            config_text,
+            evalsets_root: evalsets.clone(),
+            admissions: None,
+            harness_version: "0.1.0 (test)".into(),
+            allow_fake: true,
+        };
+        let s = dejaview_eval::runner::run(&plan, &Fake, None).unwrap();
+        assert_eq!(s.decisions.len(), 42, "21 items × 2 cells");
+    }
+    let gate = |extra: &[&str]| {
+        let mut args = vec![
+            "eval",
+            "gate",
+            "--matrix",
+            matrix.to_str().unwrap(),
+            "--out",
+            out.to_str().unwrap(),
+            "--tool",
+            "fake_regions",
+            "--set",
+            set,
+            "--stage",
+            "initial",
+            "--evalsets-root",
+            evalsets.to_str().unwrap(),
+        ];
+        args.extend_from_slice(extra);
+        dejaview(&repo_root(), &args)
+    };
+    let o = gate(&[]);
+    assert_eq!(o.status.code(), Some(64), "a blind set needs --labels");
+    let labels = owner.join("labels.toml");
+    let o = gate(&["--labels", labels.to_str().unwrap()]);
+    let text = String::from_utf8_lossy(&o.stdout);
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    assert!(
+        text.contains("(21 items): rejected") && text.contains("admission: unchanged"),
+        "{text}"
+    );
+    assert!(
+        text.contains("gate not held: detected failures: not higher than C"),
+        "{text}"
+    );
+    assert!(text.contains("review and commit"), "{text}");
+    assert!(evalsets.join("receipts").read_dir().unwrap().count() == 1);
+    assert!(set_dir.join("labels.toml").exists());
+    assert!(
+        std::fs::read_to_string(set_dir.join("set.toml"))
+            .unwrap()
+            .contains("split = \"heldout\"")
+    );
+    assert!(
+        !evalsets.join("admissions.toml").exists(),
+        "a rejection records nothing"
+    );
+    // Again: resumed from the receipt, as JSON.
+    let o = gate(&["--labels", labels.to_str().unwrap(), "--json"]);
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    let v: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
+    assert_eq!(v["resumed"], true);
+    assert_eq!(v["receipt"]["receipt"]["outcome"], "rejected");
 }

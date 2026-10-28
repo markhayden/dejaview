@@ -9,6 +9,7 @@ pub mod descriptor;
 pub mod estimate;
 pub mod eval_ledger;
 pub mod fixture;
+pub mod gate;
 pub mod gate_rules;
 pub mod matrix;
 pub mod metrics;
@@ -43,6 +44,9 @@ pub enum Error {
     /// an evaluation directory that cannot be written.
     #[error("runner: {0}")]
     Runner(String),
+    /// The gate lifecycle: a refused scoring, a receipt or publication that cannot be written.
+    #[error("gate: {0}")]
+    Gate(String),
 }
 
 /// Result alias for this crate.

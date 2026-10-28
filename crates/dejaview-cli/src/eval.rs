@@ -1,5 +1,5 @@
-//! `dejaview eval`: the matrix runner (3.4b), the estimate (3.4c), the report (3.5a) and the
-//! gate on a statistics fixture (1.15); the gate lifecycle arrives with 3.5b.
+//! `dejaview eval`: the matrix runner (3.4b), the estimate (3.4c), the report (3.5a), the gate
+//! lifecycle (3.5b) and the gate table on a statistics fixture (1.15).
 
 use std::path::{Path, PathBuf};
 
@@ -11,6 +11,7 @@ use dejaview_core::tool::ToolRegistry;
 use dejaview_eval::admissions::Admissions;
 use dejaview_eval::arms::ToolSelection;
 use dejaview_eval::fixture::StatsFixture;
+use dejaview_eval::gate::{self, GateStage};
 use dejaview_eval::matrix::{Cell, Matrix};
 use dejaview_eval::runner::{self, Factories, Plan};
 
@@ -33,8 +34,12 @@ pub enum EvalCommand {
     /// Regenerate `metrics.json` and `report.md` in an evaluation directory from its saved
     /// results and the sets' labels; nothing is sent.
     Report(ReportArgs),
-    /// Apply the admission gate to a synthetic result table and print the interval and outcome.
+    /// Score one hypothesis (one tool, one model, one sealed set) from a finished evaluation
+    /// directory: verify the seal and the descriptor, write the receipt, publish a blind set's
+    /// labels for the owner to review and commit, and record the admission.
     Gate(GateArgs),
+    /// Apply the gate table to a synthetic result table and print the interval and outcome.
+    GateTable(GateTableArgs),
 }
 
 #[derive(clap::Args)]
@@ -313,7 +318,7 @@ fn eval_run(args: &RunArgs) -> i32 {
 }
 
 #[derive(clap::Args)]
-pub struct GateArgs {
+pub struct GateTableArgs {
     /// A statistics fixture (`fixtures/stats/case-1.toml`).
     #[arg(long)]
     fixture: PathBuf,
@@ -322,16 +327,168 @@ pub struct GateArgs {
     json: bool,
 }
 
+#[derive(clap::Args)]
+pub struct GateArgs {
+    /// The matrix the evaluation was run from; its `[matrix.gate]` section freezes the gate.
+    #[arg(long)]
+    matrix: PathBuf,
+    /// The evaluation directory `eval run` finished.
+    #[arg(long)]
+    out: PathBuf,
+    /// The tool under test (arm `D_<tool>` against arm `C`).
+    #[arg(long)]
+    tool: String,
+    /// The sealed set to score (`<use-case>/<set>`).
+    #[arg(long)]
+    set: String,
+    /// `initial` (a blind set of at least 20 items) or `confirmation` (a distinct set of at least
+    /// 50 items from families disjoint with every earlier set, under the identical judging
+    /// configuration).
+    #[arg(long)]
+    stage: GateStage,
+    /// `<profile>:<model>`; needed when the matrix has several models.
+    #[arg(long)]
+    model: Option<String>,
+    /// The owner-held label file of a blind set.
+    #[arg(long)]
+    labels: Option<PathBuf>,
+    /// The initial stage's receipt id, required by the confirmation stage.
+    #[arg(long)]
+    initial_receipt: Option<String>,
+    /// An ADR reference permitting a set to be scored again.
+    #[arg(long)]
+    adr: Option<String>,
+    /// The evalsets root the set lives under; receipts go to `<root>/receipts/`.
+    #[arg(long, default_value = "evalsets")]
+    evalsets_root: PathBuf,
+    /// The admission record to update; defaults to `<evalsets root>/admissions.toml`.
+    #[arg(long)]
+    admissions: Option<PathBuf>,
+    /// Print JSON instead of the text form.
+    #[arg(long)]
+    json: bool,
+}
+
+fn eval_gate(args: &GateArgs) -> i32 {
+    let matrix = match Matrix::load(&args.matrix) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("dejaview: {e}");
+            return EXIT_USAGE;
+        }
+    };
+    let admissions = args
+        .admissions
+        .clone()
+        .unwrap_or_else(|| args.evalsets_root.join("admissions.toml"));
+    let report = gate::gate(&gate::Request {
+        eval_dir: &args.out,
+        matrix: &matrix,
+        evalsets_root: &args.evalsets_root,
+        set: &args.set,
+        tool: &args.tool,
+        model: args.model.as_deref(),
+        stage: args.stage,
+        labels: args.labels.as_deref(),
+        initial_receipt: args.initial_receipt.as_deref(),
+        adr: args.adr.as_deref(),
+        admissions: &admissions,
+    });
+    let r = match report {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("dejaview: {e}");
+            return EXIT_USAGE;
+        }
+    };
+    if args.json {
+        println!("{}", serde_json::to_string_pretty(&r).unwrap_or_default());
+        return 0;
+    }
+    let b = &r.receipt.receipt;
+    println!(
+        "gate {} stage {} for {} on {} ({} items): {}{}",
+        b.tool,
+        b.stage,
+        b.model,
+        b.set,
+        b.items,
+        serde_json::to_string(&b.outcome)
+            .unwrap_or_default()
+            .trim_matches('"'),
+        if r.resumed {
+            " (resumed from the receipt)"
+        } else {
+            ""
+        }
+    );
+    println!(
+        "C: detected {}/{} missed {} false rejects {} unsure {} errors {} cost ${:.4}",
+        b.c.detected,
+        b.c.expected_fail,
+        b.c.missed,
+        b.c.false_rejects,
+        b.c.unsure,
+        b.c.errors,
+        b.c.cost_usd
+    );
+    println!(
+        "X: detected {}/{} missed {} false rejects {} unsure {} errors {} cost ${:.4}",
+        b.x.detected,
+        b.x.expected_fail,
+        b.x.missed,
+        b.x.false_rejects,
+        b.x.unsure,
+        b.x.errors,
+        b.x.cost_usd
+    );
+    let bs = &b.bootstrap;
+    println!(
+        "paired bootstrap: point {:.4}, interval [{:.4}, {:.4}], {} resamples, seed {}, {} of {} families differ{}",
+        bs.point,
+        bs.lower,
+        bs.upper,
+        bs.resamples,
+        bs.seed,
+        bs.differing_families,
+        bs.families,
+        if bs.insufficient_tail {
+            " (tail unresolved)"
+        } else {
+            ""
+        }
+    );
+    for reason in &b.failed {
+        println!("gate not held: {reason}");
+    }
+    println!("receipt {}", b.id);
+    match r.admission {
+        Some(stage) => println!(
+            "admission: {}",
+            serde_json::to_string(&stage)
+                .unwrap_or_default()
+                .trim_matches('"')
+        ),
+        None => println!("admission: unchanged"),
+    }
+    for path in &r.written {
+        println!("wrote {}", path.display());
+    }
+    println!("review and commit the written files; the gate never commits");
+    0
+}
+
 pub fn run(args: &EvalArgs) -> i32 {
     match &args.command {
         EvalCommand::Run(a) => eval_run(a),
         EvalCommand::Estimate(a) => eval_estimate(a),
         EvalCommand::Report(a) => eval_report(a),
-        EvalCommand::Gate(a) => gate(a),
+        EvalCommand::Gate(a) => eval_gate(a),
+        EvalCommand::GateTable(a) => gate_table(a),
     }
 }
 
-fn gate(args: &GateArgs) -> i32 {
+fn gate_table(args: &GateTableArgs) -> i32 {
     let evaluation = StatsFixture::load(&args.fixture).and_then(|f| f.evaluate());
     let e = match evaluation {
         Ok(e) => e,

@@ -20,6 +20,12 @@ spend_cap_usd = 25.0                       # the evaluation's cap, above the per
 profile = "anthropic"
 model = "claude-haiku-5-5"
 controls = { effort = "low" }              # optional, validated against the catalog by the runner
+
+[matrix.gate]                              # required by `eval gate`; frozen with the identity
+seed = 20261101                            # the bootstrap seed
+resamples = 10000                          # default 10000
+# hypotheses = 1                           # default: models × D_<tool> arms
+# thresholds = { max_error_rate = 0.05, min_detected_gain = 3, max_false_reject_gain = 1, max_unsure_rate = 0.25, max_cost_ratio = 2.0, min_families = 5 }
 ```
 
 A **cell** is one model under one arm, named `<profile>:<model>/<arm>`; the matrix makes
@@ -126,6 +132,51 @@ Later repetitions never move a headline number; they are reported as the share o
 repetition) pairs whose computed verdict agrees with repetition 1. `fixtures/stats/metrics-1.toml`
 is the hand-computed fixture the tests hold the numbers to, and `fixtures/stats/metrics-1.md` its
 stored rendering.
+
+## The gate
+
+```
+dejaview eval gate --matrix matrix.toml --out eval-out/<name> --tool <tool> --set <use-case>/<set> --stage initial --labels <owner labels> [--model <profile>:<model>] [--adr "<ref>"] [--evalsets-root evalsets] [--admissions evalsets/admissions.toml] [--json]
+dejaview eval gate --matrix matrix.toml --out eval-out/<name> --tool <tool> --set <use-case>/<set> --stage confirmation --initial-receipt <id>
+dejaview eval gate-table --fixture fixtures/stats/case-1.toml      # the gate table alone, on a synthetic result table
+```
+
+A gate scores one hypothesis, one tool under one model on one sealed set, from a finished
+evaluation directory, under the configuration the matrix froze (`[matrix.gate]`, the cells, the
+decision runs) and the policy the decision reports record. In order:
+
+1. The set's seal must hold (`sets verify-seal`), and the labels must hash to the seal's labels
+   component: a heldout set's own `labels.toml`, or for a blind set the owner's label file given
+   with `--labels`, which must label every item exactly once.
+2. The results must belong to the matrix: the descriptor's matrix identity equals the given
+   matrix's, the descriptor's seal components for the set equal the seal's, `summary.json` was
+   written under that descriptor, and the evaluation was not cancelled.
+3. The receipt id is sixteen hex digits over stage, tool, set, matrix identity, results hash
+   (`summary.json`) and seal hash. If `receipts/<id>.toml` already exists the scoring is resumed:
+   nothing is rescored and the remaining writes are redone. Otherwise, if any receipt names the
+   set, the set was scored before and scoring it again needs `--adr` with a reference no earlier
+   receipt of the set carries.
+4. The stage. `initial` needs a blind set of at least 20 items. `confirmation` needs
+   `--initial-receipt`: an admitted initial receipt for the same tool, use case and model; a
+   different set of at least 50 items whose families appear in no set an earlier receipt of the use
+   case names; and the same judging digest (harness, config, prompt, catalog, tool manifests and
+   lock digests, model, decision runs, policy, thresholds).
+5. Scoring: repetition 1 rows of arm `C` and arm `D_<tool>` for every item (a missing decision
+   refuses), the arm metrics under the policy, the paired bootstrap with the matrix's seed,
+   resamples and hypothesis count, and the gate table. The receipt is written first, durably.
+6. Publication, for a blind set: the labels are written beside the manifest as `labels.toml`, the
+   manifest's `labels_sha256` line becomes `labels = "labels.toml"` and its split becomes
+   `heldout`; the set is checked and its seal verified again (the manifest is not a component, and
+   the labels hash to the same component). Nothing is committed: the owner reviews and commits.
+7. Admission: an admitted initial stage records the tool as `provisional`, an admitted
+   confirmation as `confirmed` (one record per tool and use case; an initial stage never demotes a
+   confirmed tool); other outcomes leave the record alone. Arm D includes only confirmed tools.
+
+The receipt (`receipts/<id>.toml` under the evalsets root) holds the stage, tool, use case, set,
+model, item count, matrix identity, descriptor and seal hashes, labels hash, results hash, judging
+digest, ADR reference, initial receipt, outcome with the gates that did not hold, both arms'
+metrics and the bootstrap (seed, resamples, hypotheses, families, differing families, point and
+interval). Receipts are public material: hashes and counts, no labels.
 
 ## Estimating first
 

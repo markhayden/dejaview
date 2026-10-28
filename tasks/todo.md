@@ -72,7 +72,7 @@ tag.
 - [x] 3.4b Matrix runner, arms and resume (2026-10-27)
 - [x] 3.4c Pre-run estimate (2026-10-27)
 - [x] 3.5a Metrics, localisation, report regeneration
-- [ ] 3.5b Gate lifecycle (stages, receipts, admissions)
+- [x] 3.5b Gate lifecycle (stages, receipts, admissions)
 - [ ] 3.6 Static report viewer
 - [ ] 3.7 Canary and requalify
 - [ ] 3.8 Arm A baseline and publication
@@ -83,7 +83,7 @@ tag.
 - [ ] 4.1 Registry in production
 - [ ] 4.2a `view`, `resize`, equirectangular geometry
 - [ ] 4.2b Viewer equirectangular overlay
-- [ ] 4.3a `align` flat and `visual_only`
+- [ ] 4.3a `align` flat and `visual_only` (also: run `eval gate` end to end through the binary once arms C and D can run, and look at the gate tests' forty-second fake runs)
 - [ ] 4.3b `align` equirectangular
 - [ ] 4.3c `edge_similarity` and `change_map` → tag `m4.1`
 - [ ] 4.4a Full MCP client, ADR 0015, pagination, concurrency, images

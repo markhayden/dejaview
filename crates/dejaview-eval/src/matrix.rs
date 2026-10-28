@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use dejaview_core::image::sha256_hex;
+
+use crate::gate_rules::Thresholds;
 use serde::{Deserialize, Serialize};
 
 use crate::{Error, Result};
@@ -32,6 +34,29 @@ pub struct MatrixSpec {
     pub decision_runs: u32,
     pub repetitions: u32,
     pub spend_cap_usd: f64,
+    /// The frozen gate configuration (SPEC "Gates"); required by `eval gate`, part of the
+    /// identity like everything else here.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gate: Option<GateSpec>,
+}
+
+/// What a gate freezes before unsealing besides the cells: the bootstrap seed and resample
+/// count, the hypothesis count for the Bonferroni adjustment, and the thresholds.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GateSpec {
+    pub seed: u64,
+    #[serde(default = "default_resamples")]
+    pub resamples: usize,
+    /// Defaults to models × `D_<tool>` arms, the hypotheses the matrix declares on its sets.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hypotheses: Option<usize>,
+    #[serde(default)]
+    pub thresholds: Thresholds,
+}
+
+fn default_resamples() -> usize {
+    10_000
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -145,7 +170,28 @@ impl Matrix {
         if m.spend_cap_usd.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater) {
             return Err(Error::Matrix("spend_cap_usd must be positive".into()));
         }
+        if let Some(g) = &m.gate {
+            if g.resamples == 0 {
+                return Err(Error::Matrix("gate.resamples must be positive".into()));
+            }
+            if g.hypotheses == Some(0) {
+                return Err(Error::Matrix("gate.hypotheses must be positive".into()));
+            }
+        }
         Ok(())
+    }
+
+    /// The hypotheses the matrix declares: `gate.hypotheses`, or models × `D_<tool>` arms (at
+    /// least 1).
+    pub fn hypotheses(&self) -> usize {
+        let m = &self.matrix;
+        m.gate
+            .as_ref()
+            .and_then(|g| g.hypotheses)
+            .unwrap_or_else(|| {
+                let tools = m.arms.iter().filter(|a| matches!(a, Arm::DX(_))).count();
+                (m.models.len() * tools).max(1)
+            })
     }
 
     /// Every model under every arm, models outer, arms inner.

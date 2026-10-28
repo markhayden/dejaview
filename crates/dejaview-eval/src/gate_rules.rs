@@ -110,6 +110,7 @@ fn rate(count: usize, total: usize) -> f64 {
 
 /// The gate table's thresholds (SPEC "Gates", defaults).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, default)]
 pub struct Thresholds {
     pub max_error_rate: f64,
     pub min_detected_gain: usize,

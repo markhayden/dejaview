@@ -1,4 +1,4 @@
-//! Task 1.15 CLI scenario: `dejaview eval gate --fixture fixtures/stats/case-1.toml` prints the
+//! Task 1.15 CLI scenario: `dejaview eval gate-table --fixture fixtures/stats/case-1.toml` prints the
 //! interval and outcome for a synthetic result table.
 #![allow(clippy::unwrap_used)]
 
@@ -16,7 +16,12 @@ fn repo_root() -> PathBuf {
 fn eval_gate_prints_the_interval_and_outcome() {
     let o = Command::new(env!("CARGO_BIN_EXE_dejaview"))
         .current_dir(repo_root())
-        .args(["eval", "gate", "--fixture", "fixtures/stats/case-1.toml"])
+        .args([
+            "eval",
+            "gate-table",
+            "--fixture",
+            "fixtures/stats/case-1.toml",
+        ])
         .output()
         .unwrap();
     assert_eq!(
@@ -36,7 +41,7 @@ fn eval_gate_prints_the_interval_and_outcome() {
         .current_dir(repo_root())
         .args([
             "eval",
-            "gate",
+            "gate-table",
             "--fixture",
             "fixtures/stats/case-1.toml",
             "--json",

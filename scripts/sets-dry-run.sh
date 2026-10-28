@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
-for set_id in source-fidelity/houses-v1 reference-consistency/pets-v1; do
+for set_id in source-fidelity/houses-v1 reference-consistency/pets-v1 source-fidelity/scenes-v1 reality-checks/people-v1 brief-compliance/stills-v1 product-fidelity/packshots-v1; do
   plan="fixtures/sets/$(basename "$set_id").plan.toml"
   (cd scripts/sets && uv run --frozen --offline --no-sync dejaview-sets build \
     --plan "../../$plan" --out "$work/evalsets/$set_id" --owner "$work/owner" --fake)

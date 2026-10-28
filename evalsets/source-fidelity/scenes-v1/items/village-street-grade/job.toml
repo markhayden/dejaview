@@ -1,0 +1,28 @@
+# Item of source-fidelity/scenes-v1; built by construction, see the owner's record.
+[job]
+use_case = "source-fidelity"
+brief = "Restyle the scene; keep the structure and every named subject."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+text = "The stone church tower at the end of the street keeps its identity, shape, position and extent relative to the source."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+text = "The cobbled road keeps its identity, shape, position and extent relative to the source."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/village-street-grade/candidate.png", sha256 = "2a9d1b294749728c7a0e28c92b8de6d565ed2d4dc8d9c2dacd50cffa180f3fdd" }
+
+[[job.images]]
+id = "source"
+role = "source"
+source = { path = "families/village-street/source.png", sha256 = "ef7cbd44c628a6ad7da2023499977b33411fd5b33c60112bbad05c8e18236b56" }

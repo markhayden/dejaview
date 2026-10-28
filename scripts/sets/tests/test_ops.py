@@ -93,3 +93,22 @@ def test_unknown_op_is_refused():
         assert "explode" in str(e)
     else:
         raise AssertionError("accepted an unknown op")
+
+
+def test_restyle_is_a_permitted_edit_that_keeps_structure():
+    out, label = ops.apply(
+        {
+            "kind": "restyle",
+            "prompt": "Make it dusk with warm window light. Keep every structure and object exactly where it is.",
+        },
+        png(),
+        generator=FakeGen(),
+        seed=3,
+    )
+    assert load(out).size == (64, 48)
+    assert label.expected == "pass"
+    assert label.obligation_ids == []
+    assert label.region_kind is None
+    assert "restyle" in label.words.lower()
+    assert label.notes["prompt"].startswith("Make it dusk")
+    assert "changed_area" in label.notes, "the reviewer is told where the edit landed"

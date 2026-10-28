@@ -1,0 +1,28 @@
+# Item of source-fidelity/scenes-v1; built by construction, see the owner's record.
+[job]
+use_case = "source-fidelity"
+brief = "Restyle the scene; keep the structure and every named subject."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+text = "The rectangular swimming pool keeps its identity, shape, position and extent relative to the source."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+text = "The two-storey colonnade behind the pool keeps its identity, shape, position and extent relative to the source."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/hotel-pool-no-pool/candidate.png", sha256 = "4179ac0940004ba322579d621695eebb80204eba4a5a60f4a8c5ada54b17a76b" }
+
+[[job.images]]
+id = "source"
+role = "source"
+source = { path = "families/hotel-pool/source.png", sha256 = "8bc8769181a0600fbc005798e40185b816bcc3a5e0b48eab7cca40254f7a9ef6" }

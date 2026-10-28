@@ -1,0 +1,105 @@
+# Dev set 3.3b: reality checks, five scene families of people, hands and signage, four items
+# each: the clean image (pass), a clean restyle (pass), and two planted defects (anatomy, text,
+# shadow or merge). Every job is the candidate alone. Generators mixed by family.
+[set]
+id = "reality-checks/people-v1"
+use_case = "reality-checks"
+split = "dev"
+licence = "CC-BY-4.0"
+images_repo = "github.com/markhayden/dejaview-evalsets"
+rules = { base = "reality-checks", version = 1 }
+
+[[family]]
+id = "market"
+generator = "fal"
+description = "a market stall where a vendor hands a paper bag to a customer, a chalkboard reading FRESH PEARS"
+brief = "A photograph of a fruit market stall."
+source = { prompt = "A photograph of a fruit market stall: a vendor in an apron hands a brown paper bag to a customer, both hands clearly visible, a chalkboard sign on the stall reads FRESH PEARS in clear capitals, morning light, 35mm lens.", seed = 6001 }
+[[family.item]]
+id = "market-clean"
+op = { kind = "as_is" }
+[[family.item]]
+id = "market-evening"
+op = { kind = "restyle", prompt = "Change the light to warm evening sun. Keep every person, hand, object and the sign exactly as they are; change nothing else." }
+[[family.item]]
+id = "market-six-fingers"
+op = { kind = "edit", prompt = "Give the vendor's hand that holds the bag six clearly visible fingers. Change nothing else.", defect = "anatomy", words = "the vendor's hand holding the bag has six fingers" }
+[[family.item]]
+id = "market-garbled-sign"
+op = { kind = "edit", prompt = "Replace the writing on the chalkboard with letter-like scribbles that spell no word. Change nothing else.", defect = "text", words = "the chalkboard sign is garbled letter-like scribbles instead of FRESH PEARS" }
+
+[[family]]
+id = "barista"
+generator = "openai"
+description = "a barista pouring milk into a cup at a counter, a menu board behind reading FLAT WHITE 4"
+brief = "A photograph of a cafe counter."
+source = { prompt = "A photograph of a barista at a cafe counter pouring milk from a steel jug into a cup held in the other hand, both hands clearly visible, a menu board behind reads FLAT WHITE 4 in clear letters, soft window light.", seed = 6101 }
+[[family.item]]
+id = "barista-clean"
+op = { kind = "as_is" }
+[[family.item]]
+id = "barista-mono"
+op = { kind = "restyle", prompt = "Make the photograph black and white. Keep every person, hand, object and the board exactly as they are; change nothing else." }
+[[family.item]]
+id = "barista-merged-hand"
+op = { kind = "edit", prompt = "Make the barista's hand holding the cup merge into the cup so fingers and ceramic blend into one surface. Change nothing else.", defect = "merge", words = "the barista's hand merges into the cup" }
+[[family.item]]
+id = "barista-wrong-shadow"
+op = { kind = "edit", prompt = "Make the shadow of the milk jug fall towards the window, opposite to every other shadow in the scene. Change nothing else.", defect = "shadow", words = "the jug's shadow falls opposite to every other shadow" }
+
+[[family]]
+id = "cyclist"
+generator = "gemini"
+description = "a cyclist stopped at a street corner beside a sign reading NORTH STREET"
+brief = "A photograph of a street corner."
+source = { prompt = "A photograph of a cyclist in a yellow jacket stopped at a street corner, one foot on the ground, both hands on the handlebars, a street name sign on the wall reads NORTH STREET in clear capitals, overcast daylight.", seed = 6201 }
+[[family.item]]
+id = "cyclist-clean"
+op = { kind = "as_is" }
+[[family.item]]
+id = "cyclist-rain"
+op = { kind = "restyle", prompt = "Make it just after rain: wet road reflecting the sky, grey light. Keep the cyclist, the bicycle, the sign and the framing exactly as they are; change nothing else." }
+[[family.item]]
+id = "cyclist-third-arm"
+op = { kind = "edit", prompt = "Give the cyclist a third arm reaching from the shoulder to the handlebar. Change nothing else.", defect = "anatomy", words = "the cyclist has three arms" }
+[[family.item]]
+id = "cyclist-garbled-sign"
+op = { kind = "edit", prompt = "Replace the street sign's letters with letter-like shapes that spell no word. Change nothing else.", defect = "text", words = "the street sign is garbled instead of NORTH STREET" }
+
+[[family]]
+id = "bus-stop"
+generator = "fal"
+description = "a woman at a bus stop holding a phone, a timetable board reading ROUTE 12"
+brief = "A photograph of a bus stop."
+source = { prompt = "A photograph of a woman standing at a bus stop holding a phone in one hand, the hand and phone clearly visible, a timetable board beside her reads ROUTE 12 in clear capitals, afternoon light.", seed = 6301 }
+[[family.item]]
+id = "bus-stop-clean"
+op = { kind = "as_is" }
+[[family.item]]
+id = "bus-stop-dusk"
+op = { kind = "restyle", prompt = "Change the time to dusk with the bus stop's light on. Keep the woman, the phone, the board and the framing exactly as they are; change nothing else." }
+[[family.item]]
+id = "bus-stop-phone-merge"
+op = { kind = "edit", prompt = "Make the phone pass through the woman's fingers so the fingers and the phone overlap as one. Change nothing else.", defect = "merge", words = "the phone passes through the woman's fingers" }
+[[family.item]]
+id = "bus-stop-fused-fingers"
+op = { kind = "edit", prompt = "Fuse the fingers of the hand holding the phone into a single smooth mitten-like shape. Change nothing else.", defect = "anatomy", words = "the fingers of the hand holding the phone are fused" }
+
+[[family]]
+id = "skatepark"
+generator = "openai"
+description = "a skateboarder standing with a board under one arm in front of a wall painted with the word RIDE"
+brief = "A photograph of a skate park."
+source = { prompt = "A photograph of a skateboarder standing in a skate park with a board under one arm, both hands clearly visible, a concrete wall behind painted with the single word RIDE in large clear letters, bright daylight.", seed = 6401 }
+[[family.item]]
+id = "skatepark-clean"
+op = { kind = "as_is" }
+[[family.item]]
+id = "skatepark-sunset"
+op = { kind = "restyle", prompt = "Change the light to low orange sunset light. Keep the skateboarder, the board, the wall and the framing exactly as they are; change nothing else." }
+[[family.item]]
+id = "skatepark-garbled-wall"
+op = { kind = "edit", prompt = "Replace the painted word on the wall with letter-like shapes that spell no word. Change nothing else.", defect = "text", words = "the wall's word RIDE is garbled" }
+[[family.item]]
+id = "skatepark-wrong-shadow"
+op = { kind = "edit", prompt = "Make the skateboarder's shadow fall towards the sun, opposite to every other shadow in the scene. Change nothing else.", defect = "shadow", words = "the skateboarder's shadow falls opposite to every other shadow" }

@@ -68,18 +68,34 @@ be proven by code, and gate scoring treats journal searches as supporting eviden
 `fake`), a source prompt and seed, the protected subjects, a brief, and its items, each made from
 the source by one construction op. `fixtures/sets/houses-v1.plan.toml` is the dry-run plan.
 
-Two family kinds. A **scene** family (source fidelity) has one source and items made from it by
-an op: `grade` (a mild colour grade: a pass), `mirror`, `rotate`, `crop` (the structural rule, a
-fail over the whole image) and `edit` (the generator changes one named thing, the identity rule,
-a fail whose region is the densest patch of pixel difference; any other dense patch the generator
-changed unasked is reported as a secondary change for the reviewer). A **subject** family
-(reference consistency) has one to four generated references of one subject and three item
-forms: a `scene` composed from the references (a pass whose identity the owner confirms), an
-item built `from` an earlier candidate by an `edit` that changes a marking (RC2), and a `scene`
-with a `lookalike` description generated without the references (RC3). The draft label comes
-from the construction alone; nobody looks at the picture to write it, and no judge or tool runs.
-`fixtures/sets/pets-v1.plan.toml` is the first dev set's plan; the set itself is
-`evalsets/reference-consistency/pets-v1` and `evalsets/README.md` tabulates every published set.
+Three family kinds cover the five use cases.
+
+- A **scene** family has one generated source and items made from it by an op. Under source
+  fidelity the job carries the source and one requirement per protected subject: `grade` (a mild
+  colour grade: a pass), `restyle` (the generator makes a permitted change such as light, season
+  or dressing: a pass the owner confirms kept the structure), `mirror`, `rotate`, `crop` (the
+  structural rule, a fail over the whole image) and `edit` (the generator removes or changes a
+  protected subject, the identity rule, a fail whose region is the densest patch of pixel
+  difference; any other dense patch the generator changed unasked is reported as a secondary
+  change for the reviewer). Under reality checks the job is the candidate alone: `as_is` (the
+  clean image, a pass), `restyle` (a clean variant, a pass) and `edit` with a `defect` of
+  `anatomy`, `shadow`, `text` or `merge`, which plants that defect and labels RE1 to RE4.
+- A **subject** family has one to four generated references of one subject and three item
+  forms: a `scene` composed from the references (a pass whose identity the owner confirms), an
+  item built `from` an earlier candidate by an `edit` that changes a marking, and a `scene` with
+  a `lookalike` description generated without the references. Under reference consistency the
+  edit labels RC2 and the lookalike RC3 and RC1; under product fidelity the edit's `aspect`
+  (`label`, `colour`, `shape`) labels PF2, PF3 or PF1 and the lookalike PF1 and PF2.
+- A **brief** family (brief compliance) is a brief with what it `asks` for, what it `forbids`
+  and the exact `text` it specifies, each ask and forbid becoming a job requirement. Every item
+  is `generate` with a seed: from the brief as written (a pass), or from an altered prompt that
+  `violates` BC1 (something asked for missing), BC2 (something forbidden present) or BC3 (the
+  text misspelt), naming what it is `about`.
+
+The draft label comes from the construction alone; nobody looks at the picture to write it, and
+no judge or tool runs. The plans of the dev sets are under `fixtures/sets/` (and double as the
+offline self-test with the fake generator); the sets themselves are under `evalsets/` and
+`evalsets/README.md` tabulates every published set.
 
 ```
 cd scripts/sets
@@ -93,6 +109,10 @@ dejaview sets check evalsets/
 `rebuild --item <id> [--seed-offset N]` regenerates one item from the family's images already on
 disk, with the plan as it now reads (a reworded edit, a new seed offset), and puts only that
 item's label back to draft; this is the review loop for an item the owner struck.
+`scripts/sets-publish.sh <id> "<attestation>"` runs the publishing steps for a reviewed set:
+confirms the drafts with the date, promotes, commits the images into the evalsets clone beside
+the harness, pins that commit in the manifest, places the set under `evalsets/`, seals it with the
+owner's attestation and checks it; pushing the clone and committing here follow.
 `build` writes the public set directory (manifest, families, one job per item with pinned
 images, the family's source stored once under `families/`) and, to owner storage, the
 construction record (generator, model, prompt, seed, every edit instruction, hashes, dates), the

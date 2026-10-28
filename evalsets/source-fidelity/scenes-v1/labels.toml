@@ -1,0 +1,245 @@
+# Answer labels adjudicated by the owner from the construction record.
+[[label]]
+item = "brick-house-grade"
+expected = "pass"
+failure_types = []
+words = "a mild colour grade (warmth +0.12); structure and subjects unchanged"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "brick-house-golden-hour"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (change the light to warm golden-hour sunlight from the right with long shadows); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "brick-house-mirror"
+expected = "fail"
+failure_types = ["mirrored"]
+words = "the candidate is the source mirrored left to right"
+obligation_ids = ["SF2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "mirrored"
+obligation_ids = ["SF2"]
+
+[[label]]
+item = "brick-house-no-bicycle"
+expected = "fail"
+failure_types = ["bicycle-changed"]
+words = "the bicycle is gone from the candidate"
+obligation_ids = ["SF1", "RQ2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "bicycle-changed"
+obligation_ids = ["SF1", "RQ2"]
+bbox = [0.1953, 0.7861, 0.4375, 0.9609]
+
+[[label]]
+item = "hotel-pool-grade"
+expected = "pass"
+failure_types = []
+words = "a mild colour grade (warmth +0.08); structure and subjects unchanged"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "hotel-pool-chairs"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (replace the wooden loungers with white folding chairs and add a striped parasol beside them); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "hotel-pool-crop"
+expected = "fail"
+failure_types = ["cropped"]
+words = "the candidate is the central 80% of the source; the edges are cropped away"
+obligation_ids = ["SF2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "cropped"
+obligation_ids = ["SF2"]
+
+[[label]]
+item = "hotel-pool-no-pool"
+expected = "fail"
+failure_types = ["swimming pool-changed"]
+words = "the swimming pool is gone from the candidate; the generator also changed 1 other area(s), check them"
+obligation_ids = ["SF1", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "swimming pool-changed"
+obligation_ids = ["SF1", "RQ1"]
+bbox = [0.0, 0.3203, 1.0, 1.0]
+
+[[label]]
+item = "village-street-grade"
+expected = "pass"
+failure_types = []
+words = "a mild colour grade (warmth -0.08); structure and subjects unchanged"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "village-street-snow"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (make it a snowy winter morning: snow on the road, roofs and cars, pale low sun); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "village-street-rotate"
+expected = "fail"
+failure_types = ["rotated"]
+words = "the candidate is the source rotated by 90 degrees"
+obligation_ids = ["SF2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "rotated"
+obligation_ids = ["SF2"]
+
+[[label]]
+item = "village-street-no-tower"
+expected = "fail"
+failure_types = ["church tower-changed"]
+words = "the church tower is gone from the candidate"
+obligation_ids = ["SF1", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "church tower-changed"
+obligation_ids = ["SF1", "RQ1"]
+bbox = [0.4062, 0.1641, 0.625, 0.6641]
+
+[[label]]
+item = "red-barn-grade"
+expected = "pass"
+failure_types = []
+words = "a mild colour grade (warmth +0.10); structure and subjects unchanged"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "red-barn-dusk"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (change the time to blue-hour dusk with the barn's yard light on); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "red-barn-mirror"
+expected = "fail"
+failure_types = ["mirrored"]
+words = "the candidate is the source mirrored left to right"
+obligation_ids = ["SF2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "mirrored"
+obligation_ids = ["SF2"]
+
+[[label]]
+item = "red-barn-no-silo"
+expected = "fail"
+failure_types = ["silo-changed"]
+words = "the silo is gone from the candidate"
+obligation_ids = ["SF1", "RQ2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "silo-changed"
+obligation_ids = ["SF1", "RQ2"]
+bbox = [0.3516, 0.1475, 0.8408, 0.6484]
+
+[[label]]
+item = "river-bridge-grade"
+expected = "pass"
+failure_types = []
+words = "a mild colour grade (warmth +0.10); structure and subjects unchanged"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "river-bridge-autumn"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (make it autumn: the willow trees in orange and yellow leaf, a few leaves on the water); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label]]
+item = "river-bridge-crop"
+expected = "fail"
+failure_types = ["cropped"]
+words = "the candidate is the central 75% of the source; the edges are cropped away"
+obligation_ids = ["SF2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "cropped"
+obligation_ids = ["SF2"]
+
+[[label]]
+item = "river-bridge-two-arches"
+expected = "fail"
+failure_types = ["three-arch stone bridge-changed"]
+words = "the three-arch stone bridge is changed in the candidate"
+obligation_ids = ["SF1", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-27"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "three-arch stone bridge-changed"
+obligation_ids = ["SF1", "RQ1"]
+bbox = [0.1875, 0.4531, 0.6426, 0.7021]

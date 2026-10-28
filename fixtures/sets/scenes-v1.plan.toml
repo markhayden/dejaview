@@ -1,0 +1,111 @@
+# Dev set 3.3a: source fidelity, five scene families, four items each: a colour grade (pass), a
+# permitted restyle or dressing change (pass, exemption-adjacent), a structural transform (SF2)
+# and an edit that removes or changes a protected structure (SF1). Built venues and streets so
+# the architectural profile's structure rules are exercised too. Generators mixed by family.
+[set]
+id = "source-fidelity/scenes-v1"
+use_case = "source-fidelity"
+split = "dev"
+licence = "CC-BY-4.0"
+images_repo = "github.com/markhayden/dejaview-evalsets"
+rules = { base = "source-fidelity", version = 1 }
+
+[[family]]
+id = "brick-house"
+generator = "fal"
+description = "a two-storey red-brick house with a dark green front door, a blue bicycle against the wall and a maple tree at the left edge"
+brief = "Restyle the scene; keep the structure and every named subject."
+protected = ["the dark green front door", "the blue bicycle leaning against the wall", "the maple tree at the left edge"]
+source = { prompt = "A photograph of a two-storey red-brick house with a dark green front door, a blue bicycle leaning against the wall left of the door, and a maple tree on the left edge of the frame. Overcast daylight, 35mm lens, eye level, no people, no text.", seed = 1234 }
+[[family.item]]
+id = "brick-house-grade"
+op = { kind = "grade", warmth = 0.12 }
+[[family.item]]
+id = "brick-house-golden-hour"
+op = { kind = "restyle", prompt = "Change the light to warm golden-hour sunlight from the right with long shadows. Keep every structure and object exactly where it is; change nothing else." }
+[[family.item]]
+id = "brick-house-mirror"
+op = { kind = "mirror" }
+[[family.item]]
+id = "brick-house-no-bicycle"
+op = { kind = "edit", prompt = "Remove the blue bicycle leaning against the wall. Change nothing else: same house, same door, same tree, same framing and light.", removes = "bicycle" }
+
+[[family]]
+id = "hotel-pool"
+generator = "openai"
+description = "a hotel courtyard with a rectangular swimming pool, a two-storey colonnade behind it, loungers and palm trees"
+brief = "Restyle the scene; keep the structure and every named subject."
+protected = ["the rectangular swimming pool", "the two-storey colonnade behind the pool"]
+source = { prompt = "A photograph of a hotel courtyard: a rectangular swimming pool in the foreground, a two-storey white colonnade with arches behind it, four wooden loungers along the right side, two palm trees, clear midday light, no people, no text.", seed = 2001 }
+[[family.item]]
+id = "hotel-pool-grade"
+op = { kind = "grade", warmth = 0.08 }
+[[family.item]]
+id = "hotel-pool-chairs"
+op = { kind = "restyle", prompt = "Replace the wooden loungers with white folding chairs and add a striped parasol beside them. Keep the pool, the colonnade, the palm trees and the framing exactly as they are; change nothing else." }
+[[family.item]]
+id = "hotel-pool-crop"
+op = { kind = "crop", keep = 0.8 }
+[[family.item]]
+id = "hotel-pool-no-pool"
+op = { kind = "edit", prompt = "Replace the swimming pool with a flat lawn of short grass at the same level as the paving. Change nothing else: same colonnade, loungers, palms, framing and light.", removes = "swimming pool" }
+
+[[family]]
+id = "village-street"
+generator = "gemini"
+description = "a cobbled village street leading to a stone church tower, terraced houses on both sides, two parked cars"
+brief = "Restyle the scene; keep the structure and every named subject."
+protected = ["the stone church tower at the end of the street", "the cobbled road"]
+source = { prompt = "A photograph of a narrow cobbled village street leading straight to a square stone church tower at the far end, terraced stone houses on both sides, two parked cars on the left, soft overcast light, no people, no text.", seed = 3001 }
+[[family.item]]
+id = "village-street-grade"
+op = { kind = "grade", warmth = -0.08 }
+[[family.item]]
+id = "village-street-snow"
+op = { kind = "restyle", prompt = "Make it a snowy winter morning: snow on the road, roofs and cars, pale low sun. Keep every building, the tower, the cars and the framing exactly where they are; change nothing else." }
+[[family.item]]
+id = "village-street-rotate"
+op = { kind = "rotate", degrees = 90 }
+[[family.item]]
+id = "village-street-no-tower"
+op = { kind = "edit", prompt = "Remove the church tower at the end of the street so the street ends in open sky above the houses. Change nothing else: same houses, cars, road, framing and light.", removes = "church tower" }
+
+[[family]]
+id = "red-barn"
+generator = "fal"
+description = "a red wooden barn with a tall grain silo beside it and a green tractor in front"
+brief = "Restyle the scene; keep the structure and every named subject."
+protected = ["the red wooden barn", "the tall grain silo beside the barn", "the green tractor"]
+source = { prompt = "A photograph of a red wooden barn with a grey tin roof, a tall cylindrical grain silo to its right, and a green tractor parked in front on a gravel yard, flat farmland behind, late afternoon light, no people, no text.", seed = 4001 }
+[[family.item]]
+id = "red-barn-grade"
+op = { kind = "grade", warmth = 0.1 }
+[[family.item]]
+id = "red-barn-dusk"
+op = { kind = "restyle", prompt = "Change the time to blue-hour dusk with the barn's yard light on. Keep the barn, silo, tractor and framing exactly where they are; change nothing else." }
+[[family.item]]
+id = "red-barn-mirror"
+op = { kind = "mirror" }
+[[family.item]]
+id = "red-barn-no-silo"
+op = { kind = "edit", prompt = "Remove the grain silo so there is open sky and farmland to the right of the barn. Change nothing else: same barn, tractor, yard, framing and light.", removes = "silo" }
+
+[[family]]
+id = "river-bridge"
+generator = "openai"
+description = "a three-arch stone bridge over a river with an old mill building on the far bank"
+brief = "Restyle the scene; keep the structure and every named subject."
+protected = ["the three-arch stone bridge", "the old mill building on the far bank"]
+source = { prompt = "A photograph of a three-arch stone bridge crossing a calm river, an old brick mill building with a tall chimney on the far bank to the right, willow trees on the left bank, soft morning light, no people, no text.", seed = 5001 }
+[[family.item]]
+id = "river-bridge-grade"
+op = { kind = "grade", warmth = 0.1 }
+[[family.item]]
+id = "river-bridge-autumn"
+op = { kind = "restyle", prompt = "Make it autumn: the willow trees in orange and yellow leaf, a few leaves on the water. Keep the bridge, the mill, the river and the framing exactly as they are; change nothing else." }
+[[family.item]]
+id = "river-bridge-crop"
+op = { kind = "crop", keep = 0.75 }
+[[family.item]]
+id = "river-bridge-two-arches"
+op = { kind = "edit", prompt = "Change the stone bridge so it has two wide arches instead of three. Change nothing else: same mill, river, trees, framing and light.", alters = "three-arch stone bridge" }

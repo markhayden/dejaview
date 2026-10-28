@@ -1,0 +1,20 @@
+# Subject or scene families; a family never appears in more than one split.
+[[family]]
+id = "brick-house"
+description = "a two-storey red-brick house with a dark green front door, a blue bicycle against the wall and a maple tree at the left edge"
+
+[[family]]
+id = "hotel-pool"
+description = "a hotel courtyard with a rectangular swimming pool, a two-storey colonnade behind it, loungers and palm trees"
+
+[[family]]
+id = "village-street"
+description = "a cobbled village street leading to a stone church tower, terraced houses on both sides, two parked cars"
+
+[[family]]
+id = "red-barn"
+description = "a red wooden barn with a tall grain silo beside it and a green tractor in front"
+
+[[family]]
+id = "river-bridge"
+description = "a three-arch stone bridge over a river with an old mill building on the far bank"

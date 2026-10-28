@@ -1,0 +1,28 @@
+# Item of source-fidelity/scenes-v1; built by construction, see the owner's record.
+[job]
+use_case = "source-fidelity"
+brief = "Restyle the scene; keep the structure and every named subject."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+text = "The three-arch stone bridge keeps its identity, shape, position and extent relative to the source."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+text = "The old mill building on the far bank keeps its identity, shape, position and extent relative to the source."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/river-bridge-grade/candidate.png", sha256 = "743e8d93c22ba33c09334db1ed311e9790eca5e145315f2b2298c3a82d65908a" }
+
+[[job.images]]
+id = "source"
+role = "source"
+source = { path = "families/river-bridge/source.png", sha256 = "886ae472291f1767f1bad4369553650c04e93c0369afb9f987ef3cd422010af3" }

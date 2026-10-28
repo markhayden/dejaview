@@ -59,6 +59,11 @@ class Family:
     references: list[Source] = field(default_factory=list)
     # Protected subjects, one job requirement each (SF1/RC rules protect what they name).
     protected: list[str] = field(default_factory=list)
+    # Brief families: what the brief asks for and forbids (one requirement each) and the exact
+    # text it specifies.
+    asks: list[str] = field(default_factory=list)
+    forbids: list[str] = field(default_factory=list)
+    text: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -104,8 +109,8 @@ def parse(text: str) -> Plan:
     for f in doc["family"]:
         where = f"family {f.get('id', '?')}"
         kind = f.get("kind", "scene")
-        if kind not in ("scene", "subject"):
-            raise ValueError(f"{where}: kind must be scene or subject")
+        if kind not in ("scene", "subject", "brief"):
+            raise ValueError(f"{where}: kind must be scene, subject or brief")
         if f.get("generator") not in GENERATORS:
             raise ValueError(f"{where}: generator must be one of {GENERATORS}")
         if kind == "scene":
@@ -122,6 +127,26 @@ def parse(text: str) -> Plan:
                 prompt=src["prompt"], seed=int(src["seed"]), size=int(src.get("size", 1024))
             )
             references: list[Source] = []
+        elif kind == "brief":
+            _only(
+                f,
+                {
+                    "id",
+                    "kind",
+                    "generator",
+                    "description",
+                    "brief",
+                    "asks",
+                    "forbids",
+                    "text",
+                    "item",
+                    "size",
+                },
+                where,
+            )
+            _require(f, ("id", "generator", "description", "brief", "asks"), where)
+            source = None
+            references = []
         else:
             _only(
                 f,
@@ -167,6 +192,15 @@ def parse(text: str) -> Plan:
                 if "kind" not in it["op"]:
                     raise ValueError(f"{iw}: op needs a kind")
                 items.append(Item(id=it["id"], op=dict(it["op"])))
+            elif kind == "brief":
+                _only(it, {"id", "op"}, iw)
+                _require(it, ("id", "op"), iw)
+                op = dict(it["op"])
+                if op.get("kind") != "generate" or "seed" not in op:
+                    raise ValueError(f"{iw}: a brief item's op is generate with a seed")
+                if op.get("violates") not in (None, "BC1", "BC2", "BC3"):
+                    raise ValueError(f"{iw}: violates must be BC1, BC2 or BC3")
+                items.append(Item(id=it["id"], op=op))
             else:
                 _only(it, {"id", "scene", "from", "op", "lookalike"}, iw)
                 scene = None
@@ -212,6 +246,9 @@ def parse(text: str) -> Plan:
                 references=references,
                 items=items,
                 protected=[str(x) for x in f.get("protected", [])],
+                asks=[str(x) for x in f.get("asks", [])],
+                forbids=[str(x) for x in f.get("forbids", [])],
+                text=[str(x) for x in f.get("text", [])],
             )
         )
     return Plan(set=spec, families=families)

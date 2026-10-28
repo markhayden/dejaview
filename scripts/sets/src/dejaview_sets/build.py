@@ -111,16 +111,8 @@ def _match_requirements(
             label.obligation_ids.append(rq["id"])
 
 
-def _build_scene_family(
-    family: Family, gen: Any, out: Path
-) -> tuple[list[_Built], dict[str, Any], list[tuple[str, bytes, DraftLabel | None]]]:
-    assert family.source is not None
-    source = gen.generate(family.source.prompt, family.source.seed, family.source.size)
-    source_rel = f"families/{family.id}/{SOURCE_FILE}"
-    (out / source_rel).parent.mkdir(parents=True, exist_ok=True)
-    (out / source_rel).write_bytes(source)
-    source_sha = _sha256(source)
-    requirements = [
+def _scene_requirements(family: Family) -> list[dict[str, Any]]:
+    return [
         {
             "id": f"RQ{n}",
             "kind": "must_hold",
@@ -130,6 +122,20 @@ def _build_scene_family(
         }
         for n, subject in enumerate(family.protected, start=1)
     ]
+
+
+def _build_scene_family(
+    family: Family, gen: Any, out: Path, use_case: str = "source-fidelity"
+) -> tuple[list[_Built], dict[str, Any], list[tuple[str, bytes, DraftLabel | None]]]:
+    assert family.source is not None
+    # Only source fidelity judges against the source; a reality-check job is the candidate alone.
+    with_source = use_case == "source-fidelity"
+    source = gen.generate(family.source.prompt, family.source.seed, family.source.size)
+    source_rel = f"families/{family.id}/{SOURCE_FILE}"
+    (out / source_rel).parent.mkdir(parents=True, exist_ok=True)
+    (out / source_rel).write_bytes(source)
+    source_sha = _sha256(source)
+    requirements = _scene_requirements(family) if with_source else []
     record = {
         "id": family.id,
         "kind": "scene",
@@ -161,7 +167,7 @@ def _build_scene_family(
                 label=label,
                 brief=family.brief,
                 record=rec,
-                others=[("source", "source", None, source_rel, source_sha)],
+                others=[("source", "source", None, source_rel, source_sha)] if with_source else [],
                 requirements=requirements,
             )
         )
@@ -169,8 +175,118 @@ def _build_scene_family(
     return built, record, cells
 
 
+def _brief_requirements(family: Family) -> list[dict[str, Any]]:
+    reqs = [
+        {
+            "id": f"RQ{n}",
+            "kind": "must_hold",
+            "scope": ["candidate"],
+            "text": f"The candidate shows {ask}.",
+        }
+        for n, ask in enumerate(family.asks, start=1)
+    ]
+    for n, forbid in enumerate(family.forbids, start=len(reqs) + 1):
+        reqs.append(
+            {
+                "id": f"RQ{n}",
+                "kind": "must_not",
+                "scope": ["candidate"],
+                "text": f"The candidate shows {forbid}; none was asked for.",
+            }
+        )
+    return reqs
+
+
+def _brief_item(
+    family: Family, item: Item, gen: Any, requirements: list[dict[str, Any]], seed_offset: int = 0
+) -> _Built:
+    assert item.op is not None
+    prompt = item.op.get("prompt") or family.brief
+    seed = int(item.op["seed"]) + seed_offset
+    candidate = gen.generate(prompt, seed, int(item.op.get("size", 1024)))
+    violates = item.op.get("violates")
+    about = item.op.get("about")
+    if violates is None:
+        label = DraftLabel(
+            expected="pass",
+            failure_type=None,
+            obligation_ids=[],
+            words="generated from the brief as written; confirm everything asked for is present, as asked, and nothing forbidden",
+            notes={"prompt": prompt},
+        )
+    else:
+        label = DraftLabel(
+            expected="fail",
+            failure_type={
+                "BC1": "asked-missing",
+                "BC2": "forbidden-present",
+                "BC3": "text-misspelt",
+            }[violates],
+            obligation_ids=[violates],
+            words={
+                "BC1": f"the brief asked for {about} and the candidate lacks it",
+                "BC2": f"the brief forbade {about} and the candidate shows it",
+                "BC3": f"the text {about!r} is not spelled as the brief gives it",
+            }[violates],
+            region_kind="whole_image",
+            notes={"prompt": prompt},
+        )
+        if violates in ("BC1", "BC2") and about:
+            for rq in requirements:
+                if about.lower() in rq["text"].lower():
+                    label.obligation_ids.append(rq["id"])
+    rec = {
+        "id": item.id,
+        "family": family.id,
+        "op": dict(item.op),
+        "prompt": prompt,
+        "generated_on": _today(),
+    }
+    if seed_offset:
+        rec["seed_offset"] = seed_offset
+    return _Built(
+        id=item.id,
+        candidate=candidate,
+        label=label,
+        brief=family.brief,
+        record=rec,
+        others=[],
+        requirements=requirements,
+    )
+
+
+def _build_brief_family(
+    family: Family, gen: Any
+) -> tuple[list[_Built], dict[str, Any], list[tuple[str, bytes, DraftLabel | None]]]:
+    requirements = _brief_requirements(family)
+    record = {
+        "id": family.id,
+        "kind": "brief",
+        "generator": family.generator,
+        "model": getattr(gen, "model", family.generator),
+        "brief": family.brief,
+        "asks": list(family.asks),
+        "forbids": list(family.forbids),
+        "text": list(family.text),
+        "generated_on": _today(),
+    }
+    built = [_brief_item(family, item, gen, requirements) for item in family.items]
+    cells: list[tuple[str, bytes, DraftLabel | None]] = [
+        (b.id, b.candidate, b.label) for b in built
+    ]
+    return built, record, cells
+
+
+def _subject_rules(use_case: str, aspect: str | None) -> tuple[list[str], list[str]]:
+    """(rules a marking edit breaks, rules a lookalike breaks) for the use case."""
+    if use_case == "product-fidelity":
+        edit = {"label": "PF2", "colour": "PF3", "shape": "PF1"}.get(aspect or "label", "PF2")
+        return [edit], ["PF1", "PF2"]
+    return ["RC2"], ["RC3", "RC1"]
+
+
 def _build_subject_family(
-    family: Family, gen: Any, out: Path
+    family: Family, gen: Any, out: Path, use_case: str = "reference-consistency"
 ) -> tuple[list[_Built], dict[str, Any], list[tuple[str, bytes, DraftLabel | None]]]:
     refs: list[tuple[str, bytes, str, str]] = []  # (image id, bytes, rel path, sha)
     ref_records = []
@@ -185,7 +301,7 @@ def _build_subject_family(
             {"prompt": ref.prompt, "seed": ref.seed, "size": ref.size, "sha256": sha}
         )
     ref_ids = [r[0] for r in refs]
-    requirements = _subject_requirements(family, ref_ids)
+    requirements = _subject_requirements(family, ref_ids, use_case)
     record = {
         "id": family.id,
         "kind": "subject",
@@ -202,21 +318,30 @@ def _build_subject_family(
     by_id: dict[str, bytes] = {}
     cells: list[tuple[str, bytes, DraftLabel | None]] = [(rid, b, None) for rid, b, _, _ in refs]
     for item in family.items:
-        b = _subject_item(family, item, gen, ref_bytes, by_id, others, requirements)
+        b = _subject_item(
+            family, item, gen, ref_bytes, by_id, others, requirements, use_case=use_case
+        )
         built.append(b)
         by_id[item.id] = b.candidate
         cells.append((item.id, b.candidate, b.label))
     return built, record, cells
 
 
-def _subject_requirements(family: Family, ref_ids: list[str]) -> list[dict[str, Any]]:
+def _subject_requirements(
+    family: Family, ref_ids: list[str], use_case: str = "reference-consistency"
+) -> list[dict[str, Any]]:
+    text = (
+        "{s} matches the reference exactly."
+        if use_case == "product-fidelity"
+        else "{s} is present and unchanged in the candidate, as in the references."
+    )
     return [
         {
             "id": f"RQ{n}",
             "kind": "must_hold",
             "scope": ["candidate"],
             "evidence": list(ref_ids),
-            "text": f"{_cap(subject)} is present and unchanged in the candidate, as in the references.",
+            "text": text.format(s=_cap(subject)),
         }
         for n, subject in enumerate(family.protected, start=1)
     ]
@@ -231,6 +356,7 @@ def _subject_item(
     others: list[tuple[str, str, str | None, str, str]],
     requirements: list[dict[str, Any]],
     seed_offset: int = 0,
+    use_case: str = "reference-consistency",
 ) -> _Built:
     """One subject-family item from the family's references and, for a from item, the base
     candidate; `seed_offset` varies the seed on a rebuild."""
@@ -247,7 +373,7 @@ def _subject_item(
         label = DraftLabel(
             expected="fail",
             failure_type=f"{alters}-changed" if alters else "edited",
-            obligation_ids=["RC2"],
+            obligation_ids=list(_subject_rules(use_case, item.op.get("aspect"))[0]),
             words=f"the {alters} is changed in the candidate, unlike the references"
             if alters
             else f"edited: {item.op['prompt']}",
@@ -280,7 +406,7 @@ def _subject_item(
         label = DraftLabel(
             expected="fail",
             failure_type="lookalike",
-            obligation_ids=["RC3", "RC1"],
+            obligation_ids=list(_subject_rules(use_case, None)[1]),
             words=f"a lookalike, not the reference subject: {item.lookalike}",
             region_kind="whole_image",
             notes={"prompt": prompt},
@@ -415,30 +541,33 @@ def rebuild(
             data = (out / rel).read_bytes()
             refs.append((f"ref:{family.id}-{n}", data, rel, _sha256(data)))
         others = [(rid, "reference", family.description, rel, sha) for rid, _, rel, sha in refs]
-        requirements = _subject_requirements(family, [r[0] for r in refs])
+        requirements = _subject_requirements(family, [r[0] for r in refs], plan.set.use_case)
         by_id = {}
         if item.from_item is not None:
             by_id[item.from_item] = (out / "items" / item.from_item / CANDIDATE_FILE).read_bytes()
         b = _subject_item(
-            family, item, gen, [r[1] for r in refs], by_id, others, requirements, seed_offset
+            family,
+            item,
+            gen,
+            [r[1] for r in refs],
+            by_id,
+            others,
+            requirements,
+            seed_offset,
+            plan.set.use_case,
         )
         cells: list[tuple[str, bytes, DraftLabel | None]] = [
             (rid, data, None) for rid, data, _, _ in refs
         ]
+    elif family.kind == "brief":
+        b = _brief_item(family, item, gen, _brief_requirements(family), seed_offset)
+        cells = []
     else:
         assert family.source is not None and item.op is not None
+        with_source = plan.set.use_case == "source-fidelity"
         source_rel = f"families/{family.id}/{SOURCE_FILE}"
         source = (out / source_rel).read_bytes()
-        requirements = [
-            {
-                "id": f"RQ{n}",
-                "kind": "must_hold",
-                "scope": ["candidate"],
-                "evidence": ["source"],
-                "text": f"{_cap(subject)} keeps its identity, shape, position and extent relative to the source.",
-            }
-            for n, subject in enumerate(family.protected, start=1)
-        ]
+        requirements = _scene_requirements(family) if with_source else []
         n = family.items.index(item)
         candidate, label = ops.apply(item.op, source, gen, family.source.seed + n + 1 + seed_offset)
         if label.expected == "fail" and label.obligation_ids == ["SF1"]:
@@ -456,7 +585,7 @@ def rebuild(
             label=label,
             brief=family.brief,
             record=rec,
-            others=[("source", "source", None, source_rel, _sha256(source))],
+            others=[("source", "source", None, source_rel, _sha256(source))] if with_source else [],
             requirements=requirements,
         )
         cells = [("source", source, None)]
@@ -517,10 +646,12 @@ def build(plan: Plan, out: Path, owner: Path, generators: dict[str, Any]) -> Bui
         if gen is None:
             raise ValueError(f"family {family.id}: no generator {family.generator!r} available")
         if family.kind == "subject":
-            built, record, cells = _build_subject_family(family, gen, out)
+            built, record, cells = _build_subject_family(family, gen, out, plan.set.use_case)
             report.images += len(family.references)
+        elif family.kind == "brief":
+            built, record, cells = _build_brief_family(family, gen)
         else:
-            built, record, cells = _build_scene_family(family, gen, out)
+            built, record, cells = _build_scene_family(family, gen, out, plan.set.use_case)
             report.images += 1
         families_out.append({"id": family.id, "description": family.description})
         record_families.append(record)

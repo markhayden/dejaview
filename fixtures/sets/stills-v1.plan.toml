@@ -1,0 +1,120 @@
+# Dev set 3.3c: brief compliance, five briefs, four items each: generated from the brief as
+# written (pass), with something asked for missing (BC1), with something forbidden present (BC2),
+# and with the specified text misspelt (BC3). Every job is the candidate plus the brief.
+[set]
+id = "brief-compliance/stills-v1"
+use_case = "brief-compliance"
+split = "dev"
+licence = "CC-BY-4.0"
+images_repo = "github.com/markhayden/dejaview-evalsets"
+rules = { base = "brief-compliance", version = 1 }
+
+[[family]]
+id = "cafe-window"
+kind = "brief"
+generator = "fal"
+description = "a cafe window with a bicycle, two cups and an OPEN sign"
+brief = "A photograph of a cafe window seen from the street: a red bicycle leaning on the wall below the window, two white coffee cups on the window sill, and a hanging sign in the window that reads OPEN. No people."
+asks = ["a red bicycle leaning on the wall below the window", "two white coffee cups on the window sill", "a hanging sign that reads OPEN"]
+forbids = ["people"]
+text = ["OPEN"]
+[[family.item]]
+id = "cafe-window-asked"
+op = { kind = "generate", seed = 7001 }
+[[family.item]]
+id = "cafe-window-no-cups"
+op = { kind = "generate", seed = 7002, prompt = "A photograph of a cafe window seen from the street: a red bicycle leaning on the wall below the window, an empty window sill, and a hanging sign in the window that reads OPEN. No people.", violates = "BC1", about = "two white coffee cups on the window sill" }
+[[family.item]]
+id = "cafe-window-person"
+op = { kind = "generate", seed = 7003, prompt = "A photograph of a cafe window seen from the street: a red bicycle leaning on the wall below the window, two white coffee cups on the window sill, a hanging sign in the window that reads OPEN, and a man in a coat standing at the cafe door.", violates = "BC2", about = "people" }
+[[family.item]]
+id = "cafe-window-misspelt"
+op = { kind = "generate", seed = 7004, prompt = "A photograph of a cafe window seen from the street: a red bicycle leaning on the wall below the window, two white coffee cups on the window sill, and a hanging sign in the window that reads OPNE. No people.", violates = "BC3", about = "OPEN" }
+
+[[family]]
+id = "desk"
+kind = "brief"
+generator = "openai"
+description = "a desk with three pencils and a MONDAY mug"
+brief = "A photograph of a wooden desk from above: exactly three yellow pencils lying side by side, a white mug printed with the word MONDAY, and a closed green notebook. No laptop, no phone."
+asks = ["exactly three yellow pencils lying side by side", "a white mug printed with the word MONDAY", "a closed green notebook"]
+forbids = ["a laptop", "a phone"]
+text = ["MONDAY"]
+[[family.item]]
+id = "desk-asked"
+op = { kind = "generate", seed = 7101 }
+[[family.item]]
+id = "desk-five-pencils"
+op = { kind = "generate", seed = 7102, prompt = "A photograph of a wooden desk from above: five yellow pencils lying side by side, a white mug printed with the word MONDAY, and a closed green notebook. No laptop, no phone.", violates = "BC1", about = "exactly three yellow pencils" }
+[[family.item]]
+id = "desk-laptop"
+op = { kind = "generate", seed = 7103, prompt = "A photograph of a wooden desk from above: exactly three yellow pencils lying side by side, a white mug printed with the word MONDAY, a closed green notebook, and an open silver laptop.", violates = "BC2", about = "a laptop" }
+[[family.item]]
+id = "desk-misspelt"
+op = { kind = "generate", seed = 7104, prompt = "A photograph of a wooden desk from above: exactly three yellow pencils lying side by side, a white mug printed with the word MONDAI, and a closed green notebook. No laptop, no phone.", violates = "BC3", about = "MONDAY" }
+
+[[family]]
+id = "shelf"
+kind = "brief"
+generator = "gemini"
+description = "a shop shelf with jam jars labelled FIG JAM"
+brief = "A photograph of a wooden shop shelf: four glass jars of dark jam in a row, each with a cream label that reads FIG JAM, and a small potted herb at the right end. No price tags, no hands."
+asks = ["four glass jars of dark jam in a row", "cream labels that read FIG JAM", "a small potted herb at the right end"]
+forbids = ["price tags", "hands"]
+text = ["FIG JAM"]
+[[family.item]]
+id = "shelf-asked"
+op = { kind = "generate", seed = 7201 }
+[[family.item]]
+id = "shelf-no-herb"
+op = { kind = "generate", seed = 7202, prompt = "A photograph of a wooden shop shelf: four glass jars of dark jam in a row, each with a cream label that reads FIG JAM, nothing else on the shelf. No price tags, no hands.", violates = "BC1", about = "a small potted herb at the right end" }
+[[family.item]]
+id = "shelf-price-tags"
+op = { kind = "generate", seed = 7203, prompt = "A photograph of a wooden shop shelf: four glass jars of dark jam in a row, each with a cream label that reads FIG JAM, a small potted herb at the right end, and a white price tag in front of each jar.", violates = "BC2", about = "price tags" }
+[[family.item]]
+id = "shelf-misspelt"
+op = { kind = "generate", seed = 7204, prompt = "A photograph of a wooden shop shelf: four glass jars of dark jam in a row, each with a cream label that reads FIG JAN, and a small potted herb at the right end. No price tags, no hands.", violates = "BC3", about = "FIG JAM" }
+
+[[family]]
+id = "kids-room"
+kind = "brief"
+generator = "fal"
+description = "a child's room with a yellow kite and a DREAM BIG poster"
+brief = "A photograph of a child's bedroom: a yellow kite hanging on the wall, a poster above the bed that reads DREAM BIG, and a blue rug on the floor. No people, no toys on the floor."
+asks = ["a yellow kite hanging on the wall", "a poster above the bed that reads DREAM BIG", "a blue rug on the floor"]
+forbids = ["people", "toys on the floor"]
+text = ["DREAM BIG"]
+[[family.item]]
+id = "kids-room-asked"
+op = { kind = "generate", seed = 7301 }
+[[family.item]]
+id = "kids-room-red-kite"
+op = { kind = "generate", seed = 7302, prompt = "A photograph of a child's bedroom: a red kite hanging on the wall, a poster above the bed that reads DREAM BIG, and a blue rug on the floor. No people, no toys on the floor.", violates = "BC1", about = "a yellow kite" }
+[[family.item]]
+id = "kids-room-toys"
+op = { kind = "generate", seed = 7303, prompt = "A photograph of a child's bedroom: a yellow kite hanging on the wall, a poster above the bed that reads DREAM BIG, a blue rug on the floor, and wooden toy blocks scattered across the floor.", violates = "BC2", about = "toys on the floor" }
+[[family.item]]
+id = "kids-room-misspelt"
+op = { kind = "generate", seed = 7304, prompt = "A photograph of a child's bedroom: a yellow kite hanging on the wall, a poster above the bed that reads DREAM BUG, and a blue rug on the floor. No people, no toys on the floor.", violates = "BC3", about = "DREAM BIG" }
+
+[[family]]
+id = "bakery"
+kind = "brief"
+generator = "openai"
+description = "a bakery counter with four croissants and a FRESH chalkboard"
+brief = "A photograph of a bakery counter: exactly four croissants on a wooden board, a small chalkboard that reads FRESH, and a glass of water. No logos, no people."
+asks = ["exactly four croissants on a wooden board", "a small chalkboard that reads FRESH", "a glass of water"]
+forbids = ["logos", "people"]
+text = ["FRESH"]
+[[family.item]]
+id = "bakery-asked"
+op = { kind = "generate", seed = 7401 }
+[[family.item]]
+id = "bakery-no-water"
+op = { kind = "generate", seed = 7402, prompt = "A photograph of a bakery counter: exactly four croissants on a wooden board and a small chalkboard that reads FRESH. No glass, no logos, no people.", violates = "BC1", about = "a glass of water" }
+[[family.item]]
+id = "bakery-person"
+op = { kind = "generate", seed = 7403, prompt = "A photograph of a bakery counter: exactly four croissants on a wooden board, a small chalkboard that reads FRESH, a glass of water, and a baker in a white apron behind the counter.", violates = "BC2", about = "people" }
+[[family.item]]
+id = "bakery-misspelt"
+op = { kind = "generate", seed = 7404, prompt = "A photograph of a bakery counter: exactly four croissants on a wooden board, a small chalkboard that reads FRESCH, and a glass of water. No logos, no people.", violates = "BC3", about = "FRESH" }

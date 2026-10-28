@@ -63,7 +63,7 @@ tag.
 - [x] 3.1 Set manifests, check, fetch, seal
 - [x] 3.2a Set-building toolkit and ADR 0013 (toolkit, dry run and ADR done 2026-10-27; the public `dejaview-evalsets` repository is the owner's to create, with README and licence, before 3.2b publishes images)
 - [x] 3.2b First dev set adjudicated and published (reference-consistency/pets-v1, 2026-10-27; images in markhayden/dejaview-evalsets, pushed by the owner)
-- [ ] 3.3a Source fidelity dev set
+- [x] 3.3a Source fidelity dev set (source-fidelity/scenes-v1, 2026-10-27)
 - [ ] 3.3b Reality checks dev set
 - [ ] 3.3c Brief compliance dev set
 - [ ] 3.3d Product fidelity dev set

@@ -13,6 +13,9 @@ from PIL import Image, ImageEnhance
 
 from . import regions
 
+#: Reality-check defects an edit can plant, and the rule each one breaks.
+REALITY_DEFECTS = {"anatomy": "RE1", "shadow": "RE2", "text": "RE3", "merge": "RE4"}
+
 
 @dataclass
 class DraftLabel:
@@ -37,6 +40,13 @@ def _png(im: Image.Image) -> bytes:
 
 def apply(op: dict[str, Any], source: bytes, generator, seed: int) -> tuple[bytes, DraftLabel]:
     kind = op.get("kind")
+    if kind == "as_is":
+        return source, DraftLabel(
+            expected="pass",
+            failure_type=None,
+            obligation_ids=[],
+            words="the generated image as it is; confirm nothing in it breaks the rules",
+        )
     if kind == "grade":
         warmth = float(op.get("warmth", 0.1))
         im = _load(source)
@@ -88,27 +98,60 @@ def apply(op: dict[str, Any], source: bytes, generator, seed: int) -> tuple[byte
             words=f"the candidate is the central {int(keep * 100)}% of the source; the edges are cropped away",
             region_kind="whole_image",
         )
+    if kind == "restyle":
+        if generator is None:
+            raise ValueError("restyle: the family's generator is needed")
+        prompt = op["prompt"]
+        out = generator.edit(source, prompt, seed)
+        changes = regions.difference_regions(source, out)
+        label = DraftLabel(
+            expected="pass",
+            failure_type=None,
+            obligation_ids=[],
+            words=f"a permitted restyle ({prompt.split('.')[0].strip().lower()}); structure and every protected subject must be unchanged, confirm against the source",
+            notes={"prompt": prompt},
+        )
+        label.notes["changed_area"] = (
+            "whole_image" if changes.whole or changes.primary is None else changes.primary
+        )
+        if changes.secondary:
+            label.notes["secondary_changes"] = changes.secondary
+        return out, label
     if kind == "edit":
         if generator is None:
             raise ValueError("edit: the family's generator is needed")
         prompt = op["prompt"]
         removes = op.get("removes")
         alters = op.get("alters")
+        defect = op.get("defect")
         out = generator.edit(source, prompt, seed)
         changes = regions.difference_regions(source, out)
         box = changes.primary
-        if removes:
-            words = f"the {removes} is gone from the candidate"
-        elif alters:
-            words = f"the {alters} is changed in the candidate"
+        if defect:
+            # A planted reality-check defect: the rule it breaks is the defect's.
+            rule = REALITY_DEFECTS.get(defect)
+            if rule is None:
+                raise ValueError(
+                    f"edit: defect must be one of {sorted(REALITY_DEFECTS)}, got {defect!r}"
+                )
+            words = op.get("words") or f"a planted {defect} defect: {prompt}"
+            failure_type = defect
+            obligations = [rule]
         else:
-            words = f"edited: {prompt}"
+            if removes:
+                words = f"the {removes} is gone from the candidate"
+            elif alters:
+                words = f"the {alters} is changed in the candidate"
+            else:
+                words = f"edited: {prompt}"
+            failure_type = (
+                f"{removes or alters or 'subject'}-changed" if (removes or alters) else "edited"
+            )
+            obligations = ["SF1"]
         label = DraftLabel(
             expected="fail",
-            failure_type=f"{removes or alters or 'subject'}-changed"
-            if (removes or alters)
-            else "edited",
-            obligation_ids=["SF1"],
+            failure_type=failure_type,
+            obligation_ids=obligations,
             words=words,
             notes={"prompt": prompt},
         )

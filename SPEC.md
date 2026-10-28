@@ -1417,7 +1417,8 @@ dejaview eval report --out eval-out/<name>       # regenerate metrics.json and r
 dejaview eval report eval-out/<name>
 dejaview eval gate --matrix matrix.toml --out eval-out/<name> --tool regions --set <sealed set> --stage initial --labels <owner labels>
 dejaview eval gate-table --fixture fixtures/stats/case-1.toml   # the gate table on a synthetic result table
-dejaview eval canary --config dejaview.toml
+dejaview eval canary --config dejaview.toml --set <pinned set> --state canary.toml      # clear | suspect | recommend_disable; never disables
+dejaview eval requalify --config dejaview.toml --set <dev set> --state canary.toml --approve "…"   # records the new baseline
 dejaview check --config dejaview.toml --job job.toml --replay fixtures/adapters/anthropic-messages/first-look
 dejaview check --config dejaview.toml --job job.toml --record recordings/first-look
 dejaview catalog show claude-opus-5-5 [--json]

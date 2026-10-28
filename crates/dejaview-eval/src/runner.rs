@@ -173,7 +173,7 @@ pub(crate) fn cell_config(
     Ok(config)
 }
 
-fn block_on<F: std::future::Future>(f: F) -> Result<F::Output> {
+pub(crate) fn block_on<F: std::future::Future>(f: F) -> Result<F::Output> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

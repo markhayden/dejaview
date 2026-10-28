@@ -178,6 +178,33 @@ digest, ADR reference, initial receipt, outcome with the gates that did not hold
 metrics and the bootstrap (seed, resamples, hypotheses, families, differing families, point and
 interval). Receipts are public material: hashes and counts, no labels.
 
+## Canary and requalification
+
+```
+dejaview eval requalify --config dejaview.toml --set <use-case>/<set> --state canary.toml [--approve "<words>"] [--evalsets-root evalsets] [--out eval-out/canary] [--json]
+dejaview eval canary    --config dejaview.toml --set <use-case>/<set> --state canary.toml [--evalsets-root evalsets] [--out eval-out/canary] [--json]
+```
+
+Drift (SPEC "Drift") is watched by rerunning a pinned set under the configuration as deployed,
+never reading the cache, and comparing every item's verdict (`pass`, `fail`, `unsure`, `error`)
+with the baseline recorded when the configuration was qualified. The state file holds the
+baseline (its id, the owner's words of approval, the set and its seal if sealed, the
+configuration identity, every verdict, the cost) and every canary run against it.
+
+- `requalify` reruns the full set. Without `--approve` it records nothing and shows the would-be
+  baseline and how its verdicts differ from the current one; with the owner's words it writes the
+  new baseline and clears the canary history.
+- `canary` refuses without a baseline, when the configuration identity differs from the
+  baseline's (requalify instead: a canary compares like with like), when the set is not the
+  baseline's, or when a sealed set's seal changed. Otherwise it judges every item and records the
+  run: `clear` when every verdict matches; `suspect` on any deviation; `recommend_disable` when
+  the previous run against the same baseline already deviated. A clear run resets the count.
+  Nothing is ever disabled: the owner decides, and disabling means changing the configuration.
+
+The configuration identity covers what decides an answer: provider profile, model and controls,
+rules base, profile and extra files, enabled tools, decision runs, policy and prompt version.
+Budgets, cache and output settings are left out.
+
 ## Estimating first
 
 ```

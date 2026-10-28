@@ -5,6 +5,7 @@
 pub mod admissions;
 pub mod arms;
 pub mod bootstrap;
+pub mod canary;
 pub mod descriptor;
 pub mod estimate;
 pub mod eval_ledger;
@@ -47,6 +48,10 @@ pub enum Error {
     /// The gate lifecycle: a refused scoring, a receipt or publication that cannot be written.
     #[error("gate: {0}")]
     Gate(String),
+    /// The canary: no baseline, a configuration the baseline does not cover, or state that
+    /// cannot be read or written.
+    #[error("canary: {0}")]
+    Canary(String),
 }
 
 /// Result alias for this crate.

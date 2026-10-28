@@ -335,3 +335,73 @@ fn eval_gate_scores_a_blind_set_writes_the_receipt_and_publishes_the_labels() {
     assert_eq!(v["resumed"], true);
     assert_eq!(v["receipt"]["receipt"]["outcome"], "rejected");
 }
+
+#[test]
+fn eval_requalify_records_a_baseline_and_eval_canary_compares_against_it() {
+    let dir = std::env::temp_dir().join(format!("dejaview-canary-cli-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let state = dir.join("canary.toml");
+    let out = dir.join("out");
+    let run = |command: &str, script: &str, extra: &[&str]| {
+        let mut args = vec![
+            "eval",
+            command,
+            "--config",
+            "fixtures/config/minimal.toml",
+            "--set",
+            "source-fidelity/pairs-v1",
+            "--evalsets-root",
+            "fixtures/evalsets",
+            "--state",
+            state.to_str().unwrap(),
+            "--out",
+            out.to_str().unwrap(),
+            "--provider-script",
+            script,
+        ];
+        args.extend_from_slice(extra);
+        dejaview(&repo_root(), &args)
+    };
+    let o = run("canary", "fixtures/scripts/held.json", &[]);
+    assert_eq!(o.status.code(), Some(64), "no baseline yet");
+    let o = run("requalify", "fixtures/scripts/held.json", &[]);
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    assert!(String::from_utf8_lossy(&o.stdout).contains("not recorded"));
+    assert!(!state.exists());
+    let o = run(
+        "requalify",
+        "fixtures/scripts/held.json",
+        &["--approve", "owner: qualified"],
+    );
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    assert!(String::from_utf8_lossy(&o.stdout).contains("recorded in"));
+    let o = run("canary", "fixtures/scripts/held.json", &[]);
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    assert!(String::from_utf8_lossy(&o.stdout).contains(": clear (0 deviation(s)"));
+    let o = run("canary", "fixtures/scripts/violation.json", &["--json"]);
+    let v: serde_json::Value = serde_json::from_slice(&o.stdout).unwrap();
+    assert_eq!(v["status"], "suspect");
+    assert_eq!(v["deviations"].as_array().unwrap().len(), 2);
+    let o = run("canary", "fixtures/scripts/violation.json", &[]);
+    let text = String::from_utf8_lossy(&o.stdout);
+    assert!(
+        text.contains(": recommend_disable") && text.contains("nothing was disabled"),
+        "{text}"
+    );
+}

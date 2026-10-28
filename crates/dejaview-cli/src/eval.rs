@@ -1,5 +1,6 @@
 //! `dejaview eval`: the matrix runner (3.4b), the estimate (3.4c), the report (3.5a), the gate
-//! lifecycle (3.5b) and the gate table on a statistics fixture (1.15).
+//! lifecycle (3.5b), the canary and requalification (3.7), and the gate table on a statistics
+//! fixture (1.15).
 
 use std::path::{Path, PathBuf};
 
@@ -40,6 +41,176 @@ pub enum EvalCommand {
     Gate(GateArgs),
     /// Apply the gate table to a synthetic result table and print the interval and outcome.
     GateTable(GateTableArgs),
+    /// Rerun the pinned canary set, uncached, under the configuration and compare every verdict
+    /// with the recorded baseline: clear, suspect, or recommend_disable. Never disables.
+    Canary(CanaryArgs),
+    /// Rerun the full set under the configuration and, with --approve, record it as the new
+    /// baseline (clearing the canary history); without it, show what would change.
+    Requalify(CanaryArgs),
+}
+
+#[derive(clap::Args)]
+pub struct CanaryArgs {
+    /// The configuration as deployed.
+    #[arg(long)]
+    config: PathBuf,
+    /// The pinned set (`<use-case>/<set>`).
+    #[arg(long)]
+    set: String,
+    /// The canary state file (the baseline and every run); created by `requalify --approve`.
+    #[arg(long)]
+    state: PathBuf,
+    /// The evalsets root the set lives under.
+    #[arg(long, default_value = "evalsets")]
+    evalsets_root: PathBuf,
+    /// Where the decisions go.
+    #[arg(long, default_value = "eval-out/canary")]
+    out: PathBuf,
+    /// `requalify` only: the owner's words of approval; without them nothing is recorded.
+    #[arg(long)]
+    approve: Option<String>,
+    /// Print JSON instead of the text form.
+    #[arg(long)]
+    json: bool,
+    /// Scripted fake provider, for tests and debugging only.
+    #[cfg(feature = "testkit")]
+    #[arg(long)]
+    provider_script: Option<PathBuf>,
+    /// Scripted envelopes for the fake `fake_regions` tool, for tests and debugging only.
+    #[cfg(feature = "testkit")]
+    #[arg(long)]
+    tool_script: Option<PathBuf>,
+}
+
+struct CliJudge {
+    #[cfg(feature = "testkit")]
+    provider_script: Option<PathBuf>,
+    #[cfg(feature = "testkit")]
+    tool_script: Option<PathBuf>,
+}
+
+impl dejaview_eval::canary::Judge for CliJudge {
+    fn provider(&self, config: &Config) -> dejaview_eval::Result<Box<dyn Provider>> {
+        let mut config = config.clone();
+        let opts = ProviderOptions {
+            #[cfg(feature = "testkit")]
+            provider_script: self.provider_script.as_deref(),
+            ..ProviderOptions::default()
+        };
+        crate::provider_for(&mut config, &opts).map_err(dejaview_eval::Error::Canary)
+    }
+
+    fn tools(&self, config: &Config) -> dejaview_eval::Result<ToolRegistry> {
+        #[cfg(feature = "testkit")]
+        let script = self.tool_script.as_deref();
+        #[cfg(not(feature = "testkit"))]
+        let script = None;
+        crate::tools_for_config(config, script).map_err(dejaview_eval::Error::Canary)
+    }
+}
+
+fn canary_setup(args: &CanaryArgs) -> Result<(Config, dejaview_eval::sets::Set, CliJudge), String> {
+    let config = Config::load(&args.config).map_err(|e| e.to_string())?;
+    let set = dejaview_eval::sets::Set::load(&args.evalsets_root.join(&args.set))
+        .map_err(|e| e.to_string())?;
+    Ok((
+        config,
+        set,
+        CliJudge {
+            #[cfg(feature = "testkit")]
+            provider_script: args.provider_script.clone(),
+            #[cfg(feature = "testkit")]
+            tool_script: args.tool_script.clone(),
+        },
+    ))
+}
+
+fn eval_canary(args: &CanaryArgs) -> i32 {
+    let (config, set, judge) = match canary_setup(args) {
+        Ok(x) => x,
+        Err(e) => {
+            eprintln!("dejaview: {e}");
+            return EXIT_USAGE;
+        }
+    };
+    match dejaview_eval::canary::canary(&args.state, &config, &set, &args.out, &judge, VERSION) {
+        Ok(run) => {
+            if args.json {
+                println!("{}", serde_json::to_string_pretty(&run).unwrap_or_default());
+            } else {
+                println!(
+                    "canary {} against baseline {}: {} ({} deviation(s), ${:.4})",
+                    args.set,
+                    run.baseline,
+                    run.status,
+                    run.deviations.len(),
+                    run.cost_usd
+                );
+                for d in &run.deviations {
+                    println!(
+                        "  {}: baseline {}, observed {}",
+                        d.item, d.baseline, d.observed
+                    );
+                }
+                if run.status == dejaview_eval::canary::Status::RecommendDisable {
+                    println!(
+                        "two consecutive deviations: disabling this configuration is recommended; nothing was disabled, that is the owner's call"
+                    );
+                }
+            }
+            0
+        }
+        Err(e) => {
+            eprintln!("dejaview: {e}");
+            EXIT_USAGE
+        }
+    }
+}
+
+fn eval_requalify(args: &CanaryArgs) -> i32 {
+    let (config, set, judge) = match canary_setup(args) {
+        Ok(x) => x,
+        Err(e) => {
+            eprintln!("dejaview: {e}");
+            return EXIT_USAGE;
+        }
+    };
+    match dejaview_eval::canary::requalify(
+        &args.state,
+        &config,
+        &set,
+        &args.out,
+        &judge,
+        VERSION,
+        args.approve.as_deref(),
+    ) {
+        Ok(q) => {
+            if args.json {
+                println!("{}", serde_json::to_string_pretty(&q).unwrap_or_default());
+            } else {
+                println!(
+                    "requalify {}: baseline {} over {} items, ${:.4}{}",
+                    args.set,
+                    q.baseline.id,
+                    q.baseline.verdicts.len(),
+                    q.baseline.cost_usd,
+                    if q.recorded {
+                        format!(", recorded in {}", args.state.display())
+                    } else {
+                        "; not recorded (pass --approve \"<words>\" to record it)".into()
+                    }
+                );
+                for d in &q.changed {
+                    println!("  {}: was {}, now {}", d.item, d.baseline, d.observed);
+                }
+            }
+            0
+        }
+        Err(e) => {
+            eprintln!("dejaview: {e}");
+            EXIT_USAGE
+        }
+    }
 }
 
 #[derive(clap::Args)]
@@ -485,6 +656,8 @@ pub fn run(args: &EvalArgs) -> i32 {
         EvalCommand::Report(a) => eval_report(a),
         EvalCommand::Gate(a) => eval_gate(a),
         EvalCommand::GateTable(a) => gate_table(a),
+        EvalCommand::Canary(a) => eval_canary(a),
+        EvalCommand::Requalify(a) => eval_requalify(a),
     }
 }
 

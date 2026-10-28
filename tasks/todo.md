@@ -74,7 +74,7 @@ tag.
 - [x] 3.5a Metrics, localisation, report regeneration
 - [x] 3.5b Gate lifecycle (stages, receipts, admissions)
 - [x] 3.6 Static report viewer
-- [ ] 3.7 Canary and requalify
+- [x] 3.7 Canary and requalify
 - [ ] 3.8 Arm A baseline and publication
 - [ ] Checkpoint M3 → tag `m3`
 

@@ -165,6 +165,12 @@ pub struct ToolCalled {
 pub struct ReturnedImage {
     pub frame: String,
     pub artifact: Option<ArtifactRef>,
+    /// The frame the image was cut from, how it sits in it, and its size: what the registry
+    /// recorded, so a report can rebuild the frame tree.
+    pub parent: String,
+    pub mapping: crate::frames::Mapping,
+    pub width: u32,
+    pub height: u32,
 }
 
 /// An executed call's result, ingested.

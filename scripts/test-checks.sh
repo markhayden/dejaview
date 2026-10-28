@@ -62,7 +62,8 @@ for want in "dejaview-core: embeds .*prompts/v1.md" "dejaview-core: embeds .*rul
 done
 
 # offline-smoke: a binary that answers every command but exits 3 instead of 64 on the missing
-# credential must fail, and one that prints no SF1 from `rules show` must fail.
+# credential must fail, one that prints no SF1 from `rules show` must fail, and one whose
+# `report view` serves nothing must fail.
 probe="$(mktemp -d)"
 cat > "$probe/dejaview" <<'STUB'
 #!/usr/bin/env bash
@@ -71,6 +72,12 @@ case "$1" in
   tools) ;;
   rules) echo "${STUB_RULES-SF1 must_hold candidate}" ;;
   check) echo "auth: set ANTHROPIC_API_KEY" >&2; exit "${STUB_CHECK_EXIT-64}" ;;
+  report)
+    # `report view <dir> --port 0`: serve the directory on loopback and print a URL line, as the
+    # binary does; python's server prints its own URL in the same shape.
+    [ "${STUB_VIEW-serve}" = serve ] || exit 0
+    echo '<title>dejaview report</title>' > "$3/index.html"
+    exec python3 -I -u -m http.server --bind 127.0.0.1 --directory "$3" 0 ;;
 esac
 STUB
 chmod +x "$probe/dejaview"
@@ -82,6 +89,9 @@ else echo "FAIL: offline-smoke accepted exit 3 on the missing credential: $out" 
 out="$(STUB_RULES="nothing" scripts/offline-smoke.sh "$probe/dejaview" 2>&1 || true)"
 if grep -q 'did not print the shipped base' <<< "$out"; then pass=$((pass+1));
 else echo "FAIL: offline-smoke accepted a rules show without SF1: $out" >&2; fail=$((fail+1)); fi
+out="$(STUB_VIEW=none scripts/offline-smoke.sh "$probe/dejaview" 2>&1 || true)"
+if grep -q 'printed no URL' <<< "$out"; then pass=$((pass+1));
+else echo "FAIL: offline-smoke accepted a report view that serves nothing: $out" >&2; fail=$((fail+1)); fi
 rm -rf "$probe"
 
 echo "check tests: $pass passed, $fail failed"

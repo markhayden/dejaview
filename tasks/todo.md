@@ -73,7 +73,7 @@ tag.
 - [x] 3.4c Pre-run estimate (2026-10-27)
 - [x] 3.5a Metrics, localisation, report regeneration
 - [x] 3.5b Gate lifecycle (stages, receipts, admissions)
-- [ ] 3.6 Static report viewer
+- [x] 3.6 Static report viewer
 - [ ] 3.7 Canary and requalify
 - [ ] 3.8 Arm A baseline and publication
 - [ ] Checkpoint M3 → tag `m3`

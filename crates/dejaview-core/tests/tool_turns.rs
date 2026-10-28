@@ -404,6 +404,23 @@ fn a_returned_image_becomes_a_crop_frame_the_report_records() {
         sent.keys().collect::<Vec<_>>()
     );
     assert!(o.dir.join("run-1/frames/crop_call_1_0.png").is_file());
+    // The frame tree is in the report, so a viewer can map the crop's locations to raw
+    // coordinates of the candidate.
+    let frames = &r["runs"][0]["frames"];
+    assert_eq!(frames["raw:candidate"]["root"], "candidate");
+    assert!(frames["raw:candidate"]["width"].as_u64().unwrap() > 0);
+    assert!(frames["raw:candidate"].get("parent").is_none());
+    let crop = &frames["crop:call:1:0"];
+    assert_eq!(crop["root"], "candidate");
+    assert_eq!(crop["parent"], "raw:candidate");
+    assert_eq!(
+        crop["mapping"]["bbox"],
+        serde_json::json!([0.0, 0.0, 0.5, 0.5])
+    );
+    assert_eq!(
+        (crop["width"].as_u64(), crop["height"].as_u64()),
+        (Some(32), Some(24))
+    );
 }
 
 #[test]

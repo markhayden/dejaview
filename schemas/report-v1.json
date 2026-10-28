@@ -438,6 +438,53 @@
       ],
       "type": "object"
     },
+    "FrameEntry": {
+      "additionalProperties": false,
+      "description": "A frame of the run's registry: a raw frame of a job image, or a crop a tool returned, with\nhow it sits in its parent, so locations can be mapped to the root image's raw coordinates.",
+      "properties": {
+        "height": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mapping": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Mapping"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parent": {
+          "description": "The parent frame of a derived frame; `None` for a raw frame.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projection": {
+          "$ref": "#/$defs/Projection"
+        },
+        "root": {
+          "description": "The root image's id.",
+          "type": "string"
+        },
+        "width": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "root",
+        "width",
+        "height",
+        "projection"
+      ],
+      "type": "object"
+    },
     "ImageSummary": {
       "additionalProperties": false,
       "properties": {
@@ -704,6 +751,62 @@
         "absent"
       ],
       "type": "string"
+    },
+    "Mapping": {
+      "description": "How a derived frame sits inside its parent.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "The frame covers this normalised box of the parent (may extend past the parent's edges).",
+          "properties": {
+            "bbox": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "maxItems": 4,
+              "minItems": 4,
+              "type": "array"
+            }
+          },
+          "required": [
+            "bbox"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A square perspective view of an equirectangular parent (mapping maths in task 4.2a).",
+          "properties": {
+            "view": {
+              "properties": {
+                "fov": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "pitch": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "yaw": {
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "yaw",
+                "pitch",
+                "fov"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "view"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "MergedObligation": {
       "description": "An obligation after merge, with where it came from.",
@@ -1049,6 +1152,14 @@
             "$ref": "#/$defs/FindingEntry"
           },
           "type": "array"
+        },
+        "frames": {
+          "additionalProperties": {
+            "$ref": "#/$defs/FrameEntry"
+          },
+          "default": {},
+          "description": "The frame registry: raw frames and every crop a tool returned, by frame id.",
+          "type": "object"
         },
         "images": {
           "items": {

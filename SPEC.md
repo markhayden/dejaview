@@ -1454,7 +1454,7 @@ fixtures/
   profiles/<profile>/           recorded conversations per shipped profile, including routing
   images/                       golden images for built-in tools, flat and equirectangular
 evalsets/<use-case>/<set>/      set.toml, labels.toml or labels_sha256, families.toml, seal.toml, items/*/job.toml
-viewer/                         static report viewer
+crates/dejaview-cli/viewer/     static report viewer, embedded in the binary (packaging keeps embedded assets inside their crate)
 docs/
   brief.md                      untracked, the starting brief
   adr/                          one file per decision, dated

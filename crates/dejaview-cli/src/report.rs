@@ -1,5 +1,5 @@
-//! `dejaview report`: rebuild `report.json` from a decision directory's header and journals, or
-//! prune decision directories by age.
+//! `dejaview report`: view a decision directory in the static viewer, rebuild `report.json` from
+//! its header and journals, or prune decision directories by age.
 
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
@@ -18,10 +18,24 @@ pub struct ReportArgs {
 
 #[derive(Subcommand)]
 pub enum ReportCommand {
+    /// Serve a decision directory to the static viewer on loopback and print the URL.
+    View(ViewArgs),
     /// Rebuild `report.json` from the decision header and the run journals, complete or partial.
     Rebuild(RebuildArgs),
     /// Remove decision directories at least this old (`30d`, `12h`, `15m`, `0s`).
     Prune(PruneArgs),
+}
+
+#[derive(clap::Args)]
+pub struct ViewArgs {
+    /// A decision directory (`.../decision-<ms>-<pid>`) holding `report.json`.
+    pub dir: PathBuf,
+    /// The loopback port; 0 picks a free one.
+    #[arg(long, default_value_t = 0)]
+    pub port: u16,
+    /// Open the URL in the system browser.
+    #[arg(long)]
+    pub open: bool,
 }
 
 #[derive(clap::Args)]
@@ -45,8 +59,46 @@ pub struct PruneArgs {
 
 pub fn run(args: &ReportArgs) -> i32 {
     match &args.command {
+        ReportCommand::View(a) => view(a),
         ReportCommand::Rebuild(a) => rebuild(a),
         ReportCommand::Prune(a) => prune(a),
+    }
+}
+
+fn view(args: &ViewArgs) -> i32 {
+    if !args.dir.join(report::REPORT_FILE).is_file() {
+        eprintln!(
+            "dejaview: {} holds no {}; run `dejaview report rebuild` first",
+            args.dir.display(),
+            report::REPORT_FILE
+        );
+        return EXIT_USAGE;
+    }
+    let server = match crate::viewer::Server::bind(&args.dir, args.port) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("dejaview: cannot listen on 127.0.0.1:{}: {e}", args.port);
+            return EXIT_USAGE;
+        }
+    };
+    let url = match server.addr() {
+        Ok(a) => format!("http://127.0.0.1:{}/", a.port()),
+        Err(e) => {
+            eprintln!("dejaview: {e}");
+            return EXIT_USAGE;
+        }
+    };
+    println!("viewing {} at {url} (Ctrl-C to stop)", args.dir.display());
+    let _ = std::io::Write::flush(&mut std::io::stdout());
+    if args.open {
+        crate::viewer::open_in_browser(&url);
+    }
+    match server.serve_forever() {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("dejaview: {e}");
+            dejaview_core::run::EXIT_ERROR
+        }
     }
 }
 

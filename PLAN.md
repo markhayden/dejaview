@@ -999,8 +999,8 @@ the 3.4a reader.
 
 ### Task 3.6: Static report viewer
 
-**Description.** `viewer/` with no build step; `dejaview report view <run-dir>` serves on
-loopback or opens the file; shows images, tool results, checklist, flat locations in raw
+**Description.** `crates/dejaview-cli/viewer/` (embedded; the packaging check keeps assets inside
+their crate) with no build step; `dejaview report view <run-dir>` serves on loopback; shows images, tool results, checklist, flat locations in raw
 coordinates, aggregation rows and decision table; declares supported `report_version`s; no
 requests except to loopback.
 
@@ -1010,7 +1010,7 @@ added to the 2.10a embedded-asset packaging check and the staged-registry smoke 
 
 **Verification.** Browser devtools script; `cargo test -p dejaview --features testkit --test viewer_serve`.
 
-**Dependencies.** 1.10b. **Files.** `viewer/`, `crates/dejaview-cli/src/report.rs`, `docs/viewer.md`.
+**Dependencies.** 1.10b. **Files.** `crates/dejaview-cli/viewer/`, `crates/dejaview-cli/src/{viewer,report}.rs`, `docs/viewer.md`.
 **Size.** M.
 
 ### Task 3.7: Canary and requalify

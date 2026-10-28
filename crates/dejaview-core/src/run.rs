@@ -1461,6 +1461,10 @@ async fn execute_call(
             .map(|i| events::ReturnedImage {
                 frame: i.frame.clone(),
                 artifact: state.images_sent.get(&i.frame).cloned(),
+                parent: i.parent.clone(),
+                mapping: i.mapping.clone(),
+                width: i.width,
+                height: i.height,
             })
             .collect(),
         added: ingest.added.clone(),

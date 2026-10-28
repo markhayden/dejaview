@@ -178,6 +178,23 @@ pub struct RootLocation {
     pub partial: bool,
 }
 
+/// A frame of the run's registry: a raw frame of a job image, or a crop a tool returned, with
+/// how it sits in its parent, so locations can be mapped to the root image's raw coordinates.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FrameEntry {
+    /// The root image's id.
+    pub root: String,
+    /// The parent frame of a derived frame; `None` for a raw frame.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mapping: Option<crate::frames::Mapping>,
+    pub width: u32,
+    pub height: u32,
+    pub projection: crate::job::Projection,
+}
+
 /// One run's report.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -189,6 +206,9 @@ pub struct RunReport {
     /// Every image the model saw, by frame id: the job images as sent and every image a tool
     /// returned.
     pub images_sent: BTreeMap<String, ArtifactRef>,
+    /// The frame registry: raw frames and every crop a tool returned, by frame id.
+    #[serde(default)]
+    pub frames: BTreeMap<String, FrameEntry>,
     pub instances: Vec<InstanceEntry>,
     /// The checklist as it stood at the end (static items plus every evidence item added).
     pub checklist: Checklist,
@@ -305,6 +325,7 @@ impl RunReport {
             terminal: TERMINAL_INCOMPLETE.into(),
             images: Vec::new(),
             images_sent: BTreeMap::new(),
+            frames: BTreeMap::new(),
             instances: Vec::new(),
             checklist: Checklist::default(),
             turns: Vec::new(),
@@ -325,6 +346,19 @@ impl RunReport {
                 Event::Resolved(e) => {
                     r.images = e.images.clone();
                     r.images_sent = e.images_sent.clone();
+                    for img in &e.images {
+                        r.frames.insert(
+                            format!("raw:{}", img.id),
+                            FrameEntry {
+                                root: img.id.clone(),
+                                parent: None,
+                                mapping: None,
+                                width: img.width,
+                                height: img.height,
+                                projection: img.projection,
+                            },
+                        );
+                    }
                     r.instances = e
                         .instances
                         .iter()
@@ -432,6 +466,28 @@ impl RunReport {
                         if let Some(a) = &img.artifact {
                             r.images_sent.insert(img.frame.clone(), a.clone());
                         }
+                        // As the registry does: a box keeps the parent's projection, a view is flat.
+                        let parent = r.frames.get(&img.parent);
+                        let root = parent
+                            .map(|p| p.root.clone())
+                            .unwrap_or_else(|| img.parent.clone());
+                        let projection = match &img.mapping {
+                            crate::frames::Mapping::Bbox(_) => parent
+                                .map(|p| p.projection)
+                                .unwrap_or(crate::job::Projection::Flat),
+                            crate::frames::Mapping::View { .. } => crate::job::Projection::Flat,
+                        };
+                        r.frames.insert(
+                            img.frame.clone(),
+                            FrameEntry {
+                                root,
+                                parent: Some(img.parent.clone()),
+                                mapping: Some(img.mapping.clone()),
+                                width: img.width,
+                                height: img.height,
+                                projection,
+                            },
+                        );
                     }
                 }
                 Event::EvidenceDropped(e) => {

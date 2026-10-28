@@ -5,6 +5,7 @@ mod catalog;
 mod eval;
 mod report;
 mod sets;
+mod viewer;
 
 use std::path::{Path, PathBuf};
 
@@ -42,7 +43,7 @@ enum Command {
     Rules(RulesArgs),
     /// Inspect tools.
     Tools(ToolsArgs),
-    /// Rebuild a report from a decision directory, or prune old decisions.
+    /// View a decision directory in the static viewer, rebuild its report, or prune old decisions.
     Report(report::ReportArgs),
     /// Evaluation: the admission gate on a result table (the runner arrives with M3).
     Eval(eval::EvalArgs),

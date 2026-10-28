@@ -1,0 +1,107 @@
+{
+  "descriptor_version": 1,
+  "harness_version": "0.1.0 (f731caa65)",
+  "matrix_identity": "6a7e0995261d6541310923636e60312e4028017887789c817b43cf7f0bdc9054",
+  "matrix_sha256": "5e695198f94e8a84023093cf069347fa60108d16fc8c479e4e01d6030a18d43b",
+  "config_sha256": "7b52f1858bf12a4714eec6b20206caf0f4ddb6294894dd817733e411373c8035",
+  "prompt_version": "v1",
+  "prompt_sha256": "4c5297e8d5829cafb4be5b9d5763a83bbc9a6c181ed103959c0c412279b05de7",
+  "catalog_version": 1,
+  "catalog_sha256": "1b20a00b1c7f830f306c77b437a7266628a975fd6207e8a1965f62a7b6012da9",
+  "profiles": [
+    "anthropic",
+    "google-ai-studio",
+    "openai"
+  ],
+  "sets": {
+    "brief-compliance/adversarial-v1": {
+      "items": "c94072b00efd8ded5dec8d3e91aa64df3f1059fc1c097321d0effc4fab8509b4",
+      "families": "ec4a8b97d21da2add8b4f0a503578c13588dd06dcfcea1596c5f07f0ce2ae255",
+      "jobs": "6fe45b72a6c7c2a58ab348affd73c0b90c83dee04345f2ce7a6d86eddfba8f07",
+      "images": "2d50f2bd45e92a9d2bede5d2e66962cc83287a40862c32eb568ea3691319fddf",
+      "rules": "750d3b87e53c2a9c136f15456de7046bc18cc9734e328b5783c4f65de47927d9",
+      "labels": "e721382257efbdfa022e9ad4f556c6a764bae094992c858e6994d84796ab8e0e"
+    },
+    "brief-compliance/stills-v1": {
+      "items": "7ca1619fe0d0d14db34a7ccdd6e636c923d960d32eba7883b2a2bb519781d8d5",
+      "families": "642c0b007f0796ea40fea0ded446a2e87612f5492eb7560d3fd79dd93dd52b8b",
+      "jobs": "f54a722778b7c9a6ca410b2a96072a6acaf34f64edf7fb08015ced0739397d8e",
+      "images": "3ef0d6ba7e1c9a2d6376ac3ad01f33117d55f40514fed5879bacf41be7d83bf5",
+      "rules": "750d3b87e53c2a9c136f15456de7046bc18cc9734e328b5783c4f65de47927d9",
+      "labels": "d4a76379ef896f6ab63b622f4efc9e62fa1ed92b5736ef3c3dafcfe7b6829da6"
+    },
+    "product-fidelity/adversarial-v1": {
+      "items": "f920ad3feb9ff4c66f4916a34c2c0faae1c84fccd1d8ce8ec8ef1125ea986316",
+      "families": "a75d5ec28c40877611e1adcaa1d148ff76003f5c3b2acc9c9d7f344d173e10f5",
+      "jobs": "1b00313024a1005fda11c0aba2c97913a49f22d4c1dd9919df32c6437bce10de",
+      "images": "014fd0115c6ac6ac7b404385c484ff21b537509e9c2df59c89da62c34494586d",
+      "rules": "5b27049f09ab135ef60c3d60243fe35745ae5e93a39786e057ced5b52abea9fa",
+      "labels": "34785fea20285d15a6a91e8869ad3f6e2af6504a195e63f39c3459aad50c99f6"
+    },
+    "product-fidelity/packshots-v1": {
+      "items": "69377a0c056bdb8d351efc8e39601eced0914aa59f09123d6b6ad5a38e69c978",
+      "families": "37cc2f5a10eb7b6076fb3fd67aa627119a87614fd9bd8ee5461bde3371bcbb65",
+      "jobs": "1d64acdac5459bad105c636e3afa2df100c21d1bf9a64e0846fa801b12612fc7",
+      "images": "d5f36ef727221e9c5d139a6bbee8f82cdcc615bbf9b3c72c1af9aba75778dd78",
+      "rules": "5b27049f09ab135ef60c3d60243fe35745ae5e93a39786e057ced5b52abea9fa",
+      "labels": "64c249014e6021f469962f7d6b63e13b4413df76b7e53145d5e46c3e4770d3e7"
+    },
+    "reality-checks/adversarial-v1": {
+      "items": "88274f14f032961c1f88c6d0ee87e8f37226a44802b0763c094e51541c4485e9",
+      "families": "30c3da86bd66a98cf7fcef9a7b1a326dac40540b6afcf2f80a5f99b274c5c5e3",
+      "jobs": "73ca025acb34a50463a6563893a0ef888d80a1235ffbfa289d3bba38a068ee15",
+      "images": "246c81fb6c39ac6db5042577b1a075f50354e7ffc0566112ba2f0c5989aa3730",
+      "rules": "6d88a602e144302dd050b252a158ac78cec8a5b3910a2467a47208f2a6a4e5cd",
+      "labels": "12ad8797836057bead075e3ff5018c77450cf625f24f7c39d13de5f586647f3a"
+    },
+    "reality-checks/people-v1": {
+      "items": "a616704b904161a5694d925f070ad799ca3c2527acdea9b589dd4e11c30fba30",
+      "families": "206ab6739d87b9c3b90432328396708b305064ac752d620716a0de0dc77c328d",
+      "jobs": "7d9918925ef42da48d72da3beef2005661572ae5d16f666accd8a2ab15c6c25a",
+      "images": "be6011b90206eac7e3a6e3f9f366fb87a8abc97f85d627ebe2fb81e4ae776123",
+      "rules": "6d88a602e144302dd050b252a158ac78cec8a5b3910a2467a47208f2a6a4e5cd",
+      "labels": "627a5a47ab4735fa1e574451d71a016b46cfe53c8fb9876ede4623922f66feae"
+    },
+    "reference-consistency/adversarial-v1": {
+      "items": "0609010bbf37221c9e236f3764513cf5dc0a5d0908f3fa00da858bc7d861f846",
+      "families": "b25398d67004fd358a28861987840a251154cf18ad137258dc38f68ac892c9db",
+      "jobs": "920adbada6f94aeb583cf53832f05b7881a0c66348d603619f4a907f5d618ab1",
+      "images": "bbd18ef84fd86699bb5dcc82855951022be96cfddb86523349d9bab5041cd857",
+      "rules": "2747c0834f6630a67ff1b5453e285fbfde24369b7d4b85be25e80029559fb051",
+      "labels": "12f7d827903168907d9d43a3d7ba9e91c818333510e15f66d2bf7d53a9b20a8f"
+    },
+    "reference-consistency/pets-v1": {
+      "items": "c86e2f691ef6bc9b49279a4cc3d5150e92d00e1d08b8ed35c62e109261c4d8f8",
+      "families": "7f14b2278d5fcc0eb5540d8f5eaaaac5165301f42c84a7071a7bcedd20cd68e9",
+      "jobs": "e4254ff4fcf18a583330c4927e1797be4bd73acb79d39dc2d629e18a07245ee2",
+      "images": "4ecf8bd27eb3d86920b945806f90dd79bf687b1d76ccf3ec6bf9c384cc590239",
+      "rules": "2747c0834f6630a67ff1b5453e285fbfde24369b7d4b85be25e80029559fb051",
+      "labels": "b0e1f317578f425126702d208c2fb5663fc5c0787ba61e15026d42d7d7cd4818"
+    },
+    "source-fidelity/adversarial-v1": {
+      "items": "bfb185176297078174804a54c051bc16425aa1e0742cf3faa7d606d4e9302e79",
+      "families": "5364895be4fbb75484bd8f048a1b1f6a50632bbdd4d54a39dc022f678d877ac8",
+      "jobs": "3cea793fa7d76551a1054251d6b8ac7b3b80211794c37355c0c2e909fd6417d4",
+      "images": "194b5beb1b6dc508604ccb743952371dc47b3ba21283800d437e788db00a6e3b",
+      "rules": "5c89a8178b5d389648013f543b02f2933be306ff72f7b27de3168ca47288ec56",
+      "labels": "321c1f287e9261c749065bf73fb8859ecc07e3d03052e464f4dcd60fd3c57c01"
+    },
+    "source-fidelity/scenes-v1": {
+      "items": "5e8ec2f9a5f3a93d525b10f63e1483b4574976647201e177371146ad58a7c02a",
+      "families": "8fe6134daa3607417e6c97700fdd1cea16a67e53bcf0015484661fc7569d2beb",
+      "jobs": "7063e11a0beefbfa428f323cf37722e66f0ef1424a3ed6af56dbda4d68c4a3c9",
+      "images": "902379a31dcb168305d33a24cf8883d63f943090ace6e4cbc9cc2bf9c10ca199",
+      "rules": "5c89a8178b5d389648013f543b02f2933be306ff72f7b27de3168ca47288ec56",
+      "labels": "4c197eca6d6037242f7b657c7f824610dd0c09ebed73f64cd98e5a9354438050"
+    }
+  },
+  "tools": {},
+  "selections": {
+    "A@brief-compliance": [],
+    "A@product-fidelity": [],
+    "A@reality-checks": [],
+    "A@reference-consistency": [],
+    "A@source-fidelity": []
+  },
+  "sha256": "ee0930d5efc9593edb3ffcdab40c62ad003e94950bd9cf2d65a3bde3351d1426"
+}

@@ -135,20 +135,35 @@ Per cell, over repetition 1 (SPEC "Metrics"):
   as a pass by the frozen policy, which is the config's `[policy]` as every report records it),
   both over expected fails; false rejects over expected passes; unsure and error rates over all
   items; each with its 95% Wilson interval;
-- localisation over detected failures that have labelled regions: a prediction (a finding with
-  disposition `violation`, mapped to the root image's raw frame) and a label are eligible only when
-  they name the same root image and their `obligation_ids` intersect; a hit is an eligible pair
-  with IoU above 0.3 (polygons by their bounding box), or `whole_image` against `whole_image`, or
-  `absent` against `absent`; pairs are matched one to one greedily by descending IoU; unmatched
-  predictions are spurious; reported as hits over labelled regions and spurious over predictions.
-  A finding whose location did not resolve to a root image matches nothing and counts as spurious;
-  a `view` location has no root geometry and likewise matches nothing;
+- localisation over detected failures that have labelled regions: a prediction is a checklist
+  item dispositioned `violation` with a location (the prompt asks for one on every violation; its
+  obligations are those of the instances the item depends on) or a finding with disposition
+  `violation`, each mapped to the root image's raw frame (the report's `root`, or the location as
+  submitted when it names a raw frame). A prediction and a label are eligible only when they name
+  the same root image and their `obligation_ids` intersect; a hit is an eligible pair with IoU
+  above 0.3 (polygons by their bounding box), or `whole_image` against `whole_image`, or `absent`
+  against `absent`; pairs are matched one to one greedily by descending IoU; unmatched predictions
+  are spurious; reported as hits over labelled regions and spurious over predictions. A location
+  that did not resolve to a root image matches nothing and counts as spurious; a `view` location
+  has no root geometry and likewise matches nothing;
 - cost total and median per item (errors included) and wall time total and median.
 
 Later repetitions never move a headline number; they are reported as the share of (item,
 repetition) pairs whose computed verdict agrees with repetition 1. `fixtures/stats/metrics-1.toml`
 is the hand-computed fixture the tests hold the numbers to, and `fixtures/stats/metrics-1.md` its
 stored rendering.
+
+A run done for the record becomes a results document under `docs/results/<name>/`:
+
+```
+scripts/results-doc.py eval-out/<name> evalsets/matrix/<matrix>.toml docs/results/<name> [--notes notes.md]
+```
+
+writes `README.md` (the cells with their resolved models, hosts, API versions and costs, then the
+report over the development sets, over the adversarial sets and over every set) and copies the
+matrix, the summary (error text withheld; it may quote a provider's response), the metrics and the
+descriptor beside it. `--notes` adds a section on how the run went. `docs/results/findings.md`
+keeps one entry per run: the question, the headline numbers and what changed because of them.
 
 ## The gate
 

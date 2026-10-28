@@ -166,7 +166,7 @@ function header(r) {
 async function locations(run) {
   const out = [];
   for (const item of run.items || []) {
-    if (item.location) out.push({ loc: item.location, cls: item.disposition === 'observed' ? 'observed' : 'item', title: `${item.id}: ${item.disposition} (${item.confidence})` });
+    if (item.location) out.push({ loc: item.location, cls: item.disposition === 'observed' ? 'observed' : 'item', title: `${item.id}: ${item.disposition} (${item.confidence})`, root: item.root });
   }
   for (const f of run.findings || []) {
     out.push({ loc: f.location, cls: f.disposition === 'violation' ? 'finding' : 'observed', title: `finding ${(f.obligation_ids || []).join(',')}: ${f.disposition}`, root: f.root });

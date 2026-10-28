@@ -4,7 +4,11 @@
 ids, hosts and API versions from the decision headers, the cost per cell, and copies of the
 matrix, summary and metrics beside it.
 
-    scripts/results-doc.py <eval dir> <matrix.toml> docs/results/<name> [--bin target/debug/dejaview]
+    scripts/results-doc.py <eval dir> <matrix.toml> docs/results/<name> [--bin target/debug/dejaview] [--notes notes.md]
+
+`--notes` names a Markdown file whose body becomes the document's "Notes" section: how the run
+went (resumes, refused calls, what the ledger counted) and what a reader should know before the
+numbers. It is copied beside the document as `notes.md`.
 """
 
 from __future__ import annotations
@@ -30,6 +34,7 @@ def main() -> None:
     ap.add_argument("out", type=pathlib.Path, help="the results directory to create")
     ap.add_argument("--bin", default="target/debug/dejaview")
     ap.add_argument("--evalsets-root", default=os.environ.get("DEJAVIEW_EVALSETS_ROOT", "evalsets"))
+    ap.add_argument("--notes", type=pathlib.Path, help="a Markdown file for the Notes section")
     a = ap.parse_args()
     summary = json.loads((a.eval_dir / "summary.json").read_text())
     descriptor = json.loads((a.eval_dir / "descriptor.json").read_text())
@@ -76,7 +81,15 @@ def main() -> None:
         f"- Matrix identity `{summary['matrix_identity']}`, descriptor `{summary['descriptor_sha256']}`",
         f"- Harness {descriptor['harness_version']}, prompt {descriptor['prompt_version']}, catalog version {descriptor['catalog_version']}",
         f"- {len(summary['decisions'])} decisions; ${summary['spent_usd']:.4f} of ${summary['cap_usd']:.2f} spent; completed {summary['completed']}, resumed {summary['skipped']}, partial redone {len(summary['partial'])}",
-        f"- Files beside this document: `matrix.toml`, `summary.json`, `metrics.json`, `descriptor.json`",
+        f"- Files beside this document: `matrix.toml`, `summary.json`, `metrics.json`, `descriptor.json`"
+        + (", `notes.md`" if a.notes else ""),
+    ]
+    if a.notes:
+        notes = a.notes.read_text().strip()
+        if a.notes.resolve() != (a.out / "notes.md").resolve():
+            (a.out / "notes.md").write_text(notes + "\n")
+        lines += ["", "## Notes", "", notes]
+    lines += [
         "",
         "## Cells: resolved model, host, API version, cost",
         "",

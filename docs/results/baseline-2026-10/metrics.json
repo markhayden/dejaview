@@ -1,0 +1,501 @@
+{
+  "metrics_version": 1,
+  "policy": {
+    "on_unsure": "review",
+    "on_error": "review"
+  },
+  "cells": [
+    {
+      "cell": "anthropic:claude-opus-5-5/A",
+      "counts": {
+        "items": 110,
+        "expected_fail": 65,
+        "expected_pass": 45,
+        "detected": 61,
+        "missed": 0,
+        "false_rejects": 8,
+        "unsure": 28,
+        "errors": 0
+      },
+      "confusion": {
+        "expected_fail": [
+          0,
+          61,
+          4,
+          0
+        ],
+        "expected_pass": [
+          13,
+          8,
+          24,
+          0
+        ]
+      },
+      "rates": {
+        "missed": {
+          "count": 0,
+          "total": 65,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.05580153132285689
+        },
+        "detected": {
+          "count": 61,
+          "total": 65,
+          "value": 0.9384615384615385,
+          "low": 0.852178481344768,
+          "high": 0.9758109450336497
+        },
+        "false_rejects": {
+          "count": 8,
+          "total": 45,
+          "value": 0.17777777777777778,
+          "low": 0.09294389514104148,
+          "high": 0.3132982462645977
+        },
+        "unsure": {
+          "count": 28,
+          "total": 110,
+          "value": 0.2545454545454545,
+          "low": 0.182381907512531,
+          "high": 0.34327420617929494
+        },
+        "errors": {
+          "count": 0,
+          "total": 110,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.033743935298164184
+        }
+      },
+      "localisation": {
+        "labelled_regions": 61,
+        "hits": 27,
+        "predictions": 232,
+        "spurious": 205
+      },
+      "cost": {
+        "total_usd": 5.935195999999998,
+        "median_usd": 0.050612
+      },
+      "wall": {
+        "total_ms": 1714520,
+        "median_ms": 14974
+      },
+      "repetitions": {
+        "count": 2,
+        "agreement": 0.9363636363636364
+      }
+    },
+    {
+      "cell": "anthropic:claude-sonnet-5-5/A",
+      "counts": {
+        "items": 110,
+        "expected_fail": 65,
+        "expected_pass": 45,
+        "detected": 61,
+        "missed": 0,
+        "false_rejects": 5,
+        "unsure": 23,
+        "errors": 0
+      },
+      "confusion": {
+        "expected_fail": [
+          0,
+          61,
+          4,
+          0
+        ],
+        "expected_pass": [
+          21,
+          5,
+          19,
+          0
+        ]
+      },
+      "rates": {
+        "missed": {
+          "count": 0,
+          "total": 65,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.05580153132285689
+        },
+        "detected": {
+          "count": 61,
+          "total": 65,
+          "value": 0.9384615384615385,
+          "low": 0.852178481344768,
+          "high": 0.9758109450336497
+        },
+        "false_rejects": {
+          "count": 5,
+          "total": 45,
+          "value": 0.1111111111111111,
+          "low": 0.04840471794567186,
+          "high": 0.2349909699576858
+        },
+        "unsure": {
+          "count": 23,
+          "total": 110,
+          "value": 0.20909090909090908,
+          "low": 0.14356370862133006,
+          "high": 0.2942509446430563
+        },
+        "errors": {
+          "count": 0,
+          "total": 110,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.033743935298164184
+        }
+      },
+      "localisation": {
+        "labelled_regions": 61,
+        "hits": 26,
+        "predictions": 228,
+        "spurious": 202
+      },
+      "cost": {
+        "total_usd": 2.9927680000000008,
+        "median_usd": 0.025242
+      },
+      "wall": {
+        "total_ms": 1338020,
+        "median_ms": 11351
+      },
+      "repetitions": {
+        "count": 2,
+        "agreement": 0.9272727272727272
+      }
+    },
+    {
+      "cell": "google-ai-studio:gemini-3.8-flash/A",
+      "counts": {
+        "items": 110,
+        "expected_fail": 65,
+        "expected_pass": 45,
+        "detected": 57,
+        "missed": 3,
+        "false_rejects": 7,
+        "unsure": 9,
+        "errors": 0
+      },
+      "confusion": {
+        "expected_fail": [
+          3,
+          57,
+          5,
+          0
+        ],
+        "expected_pass": [
+          34,
+          7,
+          4,
+          0
+        ]
+      },
+      "rates": {
+        "missed": {
+          "count": 3,
+          "total": 65,
+          "value": 0.046153846153846156,
+          "low": 0.015819840413512566,
+          "high": 0.12713847263338832
+        },
+        "detected": {
+          "count": 57,
+          "total": 65,
+          "value": 0.8769230769230769,
+          "low": 0.7754850591783848,
+          "high": 0.9362953249013077
+        },
+        "false_rejects": {
+          "count": 7,
+          "total": 45,
+          "value": 0.15555555555555556,
+          "low": 0.07745423484758268,
+          "high": 0.2878390887239627
+        },
+        "unsure": {
+          "count": 9,
+          "total": 110,
+          "value": 0.08181818181818182,
+          "low": 0.043640646278655146,
+          "high": 0.1482179177889003
+        },
+        "errors": {
+          "count": 0,
+          "total": 110,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.033743935298164184
+        }
+      },
+      "localisation": {
+        "labelled_regions": 57,
+        "hits": 22,
+        "predictions": 189,
+        "spurious": 167
+      },
+      "cost": {
+        "total_usd": 1.2174802500000006,
+        "median_usd": 0.00950475
+      },
+      "wall": {
+        "total_ms": 2606668,
+        "median_ms": 19966
+      },
+      "repetitions": {
+        "count": 2,
+        "agreement": 0.8545454545454545
+      }
+    },
+    {
+      "cell": "google-ai-studio:gemini-4-argon/A",
+      "counts": {
+        "items": 110,
+        "expected_fail": 65,
+        "expected_pass": 45,
+        "detected": 65,
+        "missed": 0,
+        "false_rejects": 11,
+        "unsure": 2,
+        "errors": 0
+      },
+      "confusion": {
+        "expected_fail": [
+          0,
+          65,
+          0,
+          0
+        ],
+        "expected_pass": [
+          32,
+          11,
+          2,
+          0
+        ]
+      },
+      "rates": {
+        "missed": {
+          "count": 0,
+          "total": 65,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.05580153132285689
+        },
+        "detected": {
+          "count": 65,
+          "total": 65,
+          "value": 1.0,
+          "low": 0.9441984686771432,
+          "high": 1.0
+        },
+        "false_rejects": {
+          "count": 11,
+          "total": 45,
+          "value": 0.24444444444444444,
+          "low": 0.1423547943377172,
+          "high": 0.3867338005702035
+        },
+        "unsure": {
+          "count": 2,
+          "total": 110,
+          "value": 0.01818181818181818,
+          "low": 0.005000354875327899,
+          "high": 0.06388016459381213
+        },
+        "errors": {
+          "count": 0,
+          "total": 110,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.033743935298164184
+        }
+      },
+      "localisation": {
+        "labelled_regions": 65,
+        "hits": 28,
+        "predictions": 230,
+        "spurious": 202
+      },
+      "cost": {
+        "total_usd": 1.9089274000000014,
+        "median_usd": 0.016806
+      },
+      "wall": {
+        "total_ms": 2073853,
+        "median_ms": 16179
+      },
+      "repetitions": {
+        "count": 2,
+        "agreement": 0.9636363636363636
+      }
+    },
+    {
+      "cell": "openai:gpt-6.1-sol/A",
+      "counts": {
+        "items": 110,
+        "expected_fail": 65,
+        "expected_pass": 45,
+        "detected": 63,
+        "missed": 1,
+        "false_rejects": 12,
+        "unsure": 4,
+        "errors": 0
+      },
+      "confusion": {
+        "expected_fail": [
+          1,
+          63,
+          1,
+          0
+        ],
+        "expected_pass": [
+          30,
+          12,
+          3,
+          0
+        ]
+      },
+      "rates": {
+        "missed": {
+          "count": 1,
+          "total": 65,
+          "value": 0.015384615384615385,
+          "low": 0.0027209446020234687,
+          "high": 0.08213284729551473
+        },
+        "detected": {
+          "count": 63,
+          "total": 65,
+          "value": 0.9692307692307692,
+          "low": 0.8945729447642206,
+          "high": 0.9915210027635599
+        },
+        "false_rejects": {
+          "count": 12,
+          "total": 45,
+          "value": 0.26666666666666666,
+          "low": 0.1596490352106652,
+          "high": 0.4103883775313494
+        },
+        "unsure": {
+          "count": 4,
+          "total": 110,
+          "value": 0.03636363636363636,
+          "low": 0.014230310826517947,
+          "high": 0.08978679281359792
+        },
+        "errors": {
+          "count": 0,
+          "total": 110,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.033743935298164184
+        }
+      },
+      "localisation": {
+        "labelled_regions": 63,
+        "hits": 19,
+        "predictions": 227,
+        "spurious": 208
+      },
+      "cost": {
+        "total_usd": 2.1796675000000003,
+        "median_usd": 0.0182878
+      },
+      "wall": {
+        "total_ms": 1413860,
+        "median_ms": 12211
+      },
+      "repetitions": {
+        "count": 2,
+        "agreement": 0.9545454545454546
+      }
+    },
+    {
+      "cell": "openai:gpt-6.1-terra/A",
+      "counts": {
+        "items": 110,
+        "expected_fail": 65,
+        "expected_pass": 45,
+        "detected": 62,
+        "missed": 2,
+        "false_rejects": 10,
+        "unsure": 9,
+        "errors": 0
+      },
+      "confusion": {
+        "expected_fail": [
+          2,
+          62,
+          1,
+          0
+        ],
+        "expected_pass": [
+          27,
+          10,
+          8,
+          0
+        ]
+      },
+      "rates": {
+        "missed": {
+          "count": 2,
+          "total": 65,
+          "value": 0.03076923076923077,
+          "low": 0.008478997236440126,
+          "high": 0.10542705523577942
+        },
+        "detected": {
+          "count": 62,
+          "total": 65,
+          "value": 0.9538461538461539,
+          "low": 0.8728615273666118,
+          "high": 0.9841801595864874
+        },
+        "false_rejects": {
+          "count": 10,
+          "total": 45,
+          "value": 0.2222222222222222,
+          "low": 0.12544685532626396,
+          "high": 0.36269292174756296
+        },
+        "unsure": {
+          "count": 9,
+          "total": 110,
+          "value": 0.08181818181818182,
+          "low": 0.043640646278655146,
+          "high": 0.1482179177889003
+        },
+        "errors": {
+          "count": 0,
+          "total": 110,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.033743935298164184
+        }
+      },
+      "localisation": {
+        "labelled_regions": 62,
+        "hits": 20,
+        "predictions": 230,
+        "spurious": 210
+      },
+      "cost": {
+        "total_usd": 1.10579345,
+        "median_usd": 0.0092055
+      },
+      "wall": {
+        "total_ms": 1259669,
+        "median_ms": 10981
+      },
+      "repetitions": {
+        "count": 2,
+        "agreement": 0.9636363636363636
+      }
+    }
+  ]
+}

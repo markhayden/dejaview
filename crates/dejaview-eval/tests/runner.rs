@@ -283,3 +283,45 @@ fn a_completed_error_is_kept_on_resume() {
             .all(|d| d.error_class == class && d.verdict.is_none())
     );
 }
+
+// ---- added at the M3 baseline: the first live run scored no localisation ---------------------
+
+/// The prompt asks for a location on every checklist item marked `violation`, so those items are
+/// the localisation predictions alongside violation findings. `pair-02` is labelled a whole-image
+/// rotation under SF2 and the scripted submission marks `chk:ob:SF2@candidate` a whole-image
+/// violation: one labelled region, one prediction, one hit. The scripted `pair-01` violation is
+/// a false reject and never a localisation prediction.
+#[test]
+fn checklist_item_violations_are_localisation_predictions() {
+    let dir = tempdir("item-localisation");
+    run(&plan(&dir, "fake-a.toml"), &fake("violation.json"), None).unwrap();
+    let localisation = |dir: &Path| {
+        let m: dejaview_eval::metrics::MatrixMetrics =
+            serde_json::from_str(&std::fs::read_to_string(dir.join("metrics.json")).unwrap())
+                .unwrap();
+        m.cells[0].localisation.clone()
+    };
+    let expected = dejaview_eval::metrics::Localisation {
+        labelled_regions: 1,
+        hits: 1,
+        predictions: 1,
+        spurious: 0,
+    };
+    assert_eq!(localisation(&dir), expected);
+    // A location on a raw frame is already in root coordinates: the frames table names the raw
+    // frame's image, so a report without `root` on its items scores the same.
+    for d in &summary(&dir).decisions {
+        let path = dir.join(&d.dir).join("report.json");
+        let mut report: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        for item in report["runs"][0]["items"].as_array_mut().unwrap() {
+            assert!(
+                item.as_object_mut().unwrap().remove("root").is_some()
+                    || item["location"].is_null()
+            );
+        }
+        std::fs::write(&path, serde_json::to_string(&report).unwrap()).unwrap();
+    }
+    dejaview_eval::summary::regenerate(&dir, &root().join("fixtures/evalsets")).unwrap();
+    assert_eq!(localisation(&dir), expected);
+}

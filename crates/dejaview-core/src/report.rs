@@ -306,7 +306,12 @@ pub struct ItemRow {
     pub confidence: Confidence,
     pub reason: String,
     pub allowed_by: Option<String>,
+    /// As submitted, in the frame the model named.
     pub location: Option<Location>,
+    /// The location mapped to the root image's raw frame; `None` without a location or when it
+    /// did not resolve. Violations carry one, and the localisation scorer reads it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root: Option<RootLocation>,
     pub row: Row,
 }
 

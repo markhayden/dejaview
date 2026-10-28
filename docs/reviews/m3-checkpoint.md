@@ -57,3 +57,15 @@ and what was done:
 | The canary's uncached run and errored items untested. | Added: `cache.status == bypass` in every canary decision; errors are inconclusive; the spend cap refuses. |
 | Arm D with a changed admission record untested. | Added with the descriptor fix. |
 | A real SIGINT through the binary; prompt equivalence on the journaled prompt; the multi-cell matrix; the per-cell envelope mix; a gate interrupted between the receipt and the publication; the seal's image and rules components isolated; one fixture per `sets check` failure mode; an automated devtools check; instruction-like text never altering the prompt. | Recorded in tasks/todo.md as checkpoint follow-ups; the gate's resume path already redoes the publication and admission writes idempotently from the receipt. |
+
+## The baseline run (3.8, 2026-10-28)
+
+The first live run of the matrix tested the harness as much as the models. What it found and
+what was done:
+
+| Finding | Resolution |
+|---|---|
+| The localisation scorer read only free-form findings, while the prompt asks for a location on every checklist item marked `violation` and that is where every model put them; the first scoring reported almost no hits. | `ItemRow` carries `root` like findings do; checklist-item violations are predictions; tests in `report.rs` (core) and `runner.rs` (eval, including the raw-frame fallback for reports without `root`); the baseline re-scored from its saved reports; docs and SPEC updated. |
+| The Anthropic credit balance ran out during the last 17 items; 68 decisions were recorded as `error: provider` and charged at their bound ($18.48 the vendor never billed). | By design (unknown usage charges the bound); the resume redid exactly the 68 after the top-up. Whether a refusal before processing should cost nothing is an owner decision, recorded in tasks/todo.md. |
+| The descriptor written by the first build was unreadable by the review-fixed build (`selections` added, sha over the whole document). | Expected under the no-compatibility rule; the old descriptor was set aside and the resume wrote a fresh one over identical inputs, noted in the results document. |
+| Most `whole_image` labels never match a boxed prediction; one defect under several obligations repeats a region and the extras count as spurious. | Questions about the metric's definition for the owner, recorded in tasks/todo.md; the numbers are published as the rules stand, with the explanation. |

@@ -1532,19 +1532,18 @@ fn finish(
             reason: item.reason.clone(),
             allowed_by: item.allowed_by.clone(),
             location: item.location.clone(),
+            root: item
+                .location
+                .as_ref()
+                .and_then(|l| root_location(&state.registry, l)),
             row,
         });
     }
     let mut finding_rows = Vec::new();
     let mut finding_entries = Vec::new();
     for f in &sub.findings {
-        let mapped = state.registry.to_root(&f.location).ok();
-        let root_image = mapped.as_ref().and_then(|m| {
-            state
-                .registry
-                .get(&m.location.frame)
-                .map(|fr| fr.root().to_string())
-        });
+        let root = root_location(&state.registry, &f.location);
+        let root_image = root.as_ref().map(|r| r.image.clone());
         finding_entries.push(crate::report::FindingEntry {
             obligation_ids: f.obligation_ids.clone(),
             disposition: f.disposition,
@@ -1552,17 +1551,7 @@ fn finish(
             reason: f.reason.clone(),
             allowed_by: f.allowed_by.clone(),
             location: f.location.clone(),
-            root: match (&mapped, &root_image) {
-                (Some(m), Some(image)) => Some(crate::report::RootLocation {
-                    image: image.clone(),
-                    frame: m.location.frame.clone(),
-                    kind: m.location.kind,
-                    bbox: m.location.bbox,
-                    polygon: m.location.polygon.clone(),
-                    partial: m.partial,
-                }),
-                _ => None,
-            },
+            root,
         });
         let d: aggregate::Disposition = f.disposition.into();
         if d == aggregate::Disposition::Observed {
@@ -1589,6 +1578,24 @@ fn finish(
         finding_entries,
     }))?;
     Ok(aggregate::verdict(&rows))
+}
+
+/// A submitted location mapped through the frame registry to the raw frame of its root image, for
+/// the report; `None` when the location does not resolve.
+fn root_location(
+    registry: &Registry,
+    location: &crate::frames::Location,
+) -> Option<crate::report::RootLocation> {
+    let mapped = registry.to_root(location).ok()?;
+    let image = registry.get(&mapped.location.frame)?.root().to_string();
+    Some(crate::report::RootLocation {
+        image,
+        frame: mapped.location.frame,
+        kind: mapped.location.kind,
+        bbox: mapped.location.bbox,
+        polygon: mapped.location.polygon,
+        partial: mapped.partial,
+    })
 }
 
 fn new_decision_dir(out_dir: &Path) -> Result<PathBuf> {

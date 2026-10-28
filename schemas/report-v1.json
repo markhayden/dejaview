@@ -616,10 +616,22 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "As submitted, in the frame the model named."
         },
         "reason": {
           "type": "string"
+        },
+        "root": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RootLocation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The location mapped to the root image's raw frame; `None` without a location or when it\ndid not resolve. Violations carry one, and the localisation scorer reads it."
         },
         "row": {
           "$ref": "#/$defs/Row"

@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::Path;
 
+use dejaview_core::aggregate::Disposition;
 use dejaview_core::config::PolicyConfig;
 use dejaview_core::frames::LocationKind;
 use dejaview_core::submission::FindingDisposition;
@@ -49,9 +50,11 @@ fn computed_of(d: &DecisionResult) -> Computed {
 }
 
 /// The violations the decision submitted, in root coordinates, from the decision's report: the
-/// first run that reached `fail`, or the first run when none did. A finding whose location did
-/// not resolve to a root image keeps the frame it named, so it can match no label and counts as
-/// spurious.
+/// first run that reached `fail`, or the first run when none did. Checklist items marked
+/// `violation` with a location (the prompt asks for one on every violation) and violation
+/// findings are the predictions. An item's obligations are those of the instances its checklist
+/// entry depends on. A location whose root the report does not give keeps the frame it named,
+/// so it can match no label and counts as spurious.
 fn predictions_of(report: &dejaview_core::report::Report) -> Vec<Region> {
     let run = report
         .runs
@@ -61,44 +64,95 @@ fn predictions_of(report: &dejaview_core::report::Report) -> Vec<Region> {
     let Some(run) = run else {
         return Vec::new();
     };
-    run.findings
+    let obligation_of: BTreeMap<&str, &str> = run
+        .instances
+        .iter()
+        .map(|i| (i.id.as_str(), i.instance.obligation_id.as_str()))
+        .collect();
+    let obligations_of_item = |id: &str| -> Vec<String> {
+        let mut ids: Vec<String> = run
+            .checklist
+            .items
+            .iter()
+            .filter(|c| c.id == id)
+            .flat_map(|c| c.instance_ids.iter())
+            .filter_map(|i| obligation_of.get(i.as_str()))
+            .map(|o| o.to_string())
+            .collect();
+        ids.sort_unstable();
+        ids.dedup();
+        ids
+    };
+    let items = run
+        .items
+        .iter()
+        .filter(|i| i.disposition == Disposition::Violation)
+        .filter_map(|i| {
+            let location = i.location.as_ref()?;
+            Some(region(
+                run,
+                location,
+                i.root.as_ref(),
+                obligations_of_item(&i.id),
+            ))
+        });
+    let findings = run
+        .findings
         .iter()
         .filter(|f| f.disposition == FindingDisposition::Violation)
-        .map(|f| {
-            let (image, kind, bbox, polygon) = match &f.root {
-                Some(root) => (
-                    root.image.clone(),
-                    root.kind,
-                    root.bbox,
-                    root.polygon.clone(),
-                ),
-                None => (
-                    f.location.frame.clone(),
-                    f.location.kind,
-                    f.location.bbox,
-                    f.location.polygon.clone(),
-                ),
-            };
-            Region {
-                image,
-                kind: match kind {
-                    LocationKind::Bbox => RegionKind::Bbox,
-                    LocationKind::Polygon => RegionKind::Polygon,
-                    LocationKind::WholeImage => RegionKind::WholeImage,
-                    LocationKind::Absent => RegionKind::Absent,
-                    // A view has no root geometry the labels can carry; it matches nothing.
-                    LocationKind::View => RegionKind::Bbox,
-                },
-                bbox: if kind == LocationKind::View {
-                    None
-                } else {
-                    bbox
-                },
-                polygon,
-                obligation_ids: f.obligation_ids.clone(),
-            }
-        })
-        .collect()
+        .map(|f| region(run, &f.location, f.root.as_ref(), f.obligation_ids.clone()));
+    items.chain(findings).collect()
+}
+
+/// A submitted location as a region of its root image: the report's `root` mapping when it has
+/// one; otherwise, on a raw frame (one without a parent in the report's frames table), the
+/// location as submitted, which is already in root coordinates; otherwise the frame name as the
+/// image, which matches no label.
+fn region(
+    run: &dejaview_core::report::RunReport,
+    location: &dejaview_core::frames::Location,
+    root: Option<&dejaview_core::report::RootLocation>,
+    obligation_ids: Vec<String>,
+) -> Region {
+    let (image, kind, bbox, polygon) = match root {
+        Some(root) => (
+            root.image.clone(),
+            root.kind,
+            root.bbox,
+            root.polygon.clone(),
+        ),
+        None => {
+            let raw = run
+                .frames
+                .get(&location.frame)
+                .filter(|f| f.parent.is_none())
+                .map(|f| f.root.clone());
+            (
+                raw.unwrap_or_else(|| location.frame.clone()),
+                location.kind,
+                location.bbox,
+                location.polygon.clone(),
+            )
+        }
+    };
+    Region {
+        image,
+        kind: match kind {
+            LocationKind::Bbox => RegionKind::Bbox,
+            LocationKind::Polygon => RegionKind::Polygon,
+            LocationKind::WholeImage => RegionKind::WholeImage,
+            LocationKind::Absent => RegionKind::Absent,
+            // A view has no root geometry the labels can carry; it matches nothing.
+            LocationKind::View => RegionKind::Bbox,
+        },
+        bbox: if kind == LocationKind::View {
+            None
+        } else {
+            bbox
+        },
+        polygon,
+        obligation_ids,
+    }
 }
 
 /// The labels of every set that has them, by set id.

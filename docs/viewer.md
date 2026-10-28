@@ -34,7 +34,7 @@ from the server that served it: no fonts, scripts or images from anywhere else.
 
 The viewer declares the `report_version`s it reads (`SUPPORTED_REPORT_VERSIONS` in `viewer.js`,
 currently `[1]`) and refuses others with a message. The version names the shape a reader must
-accept: fields added since (`frames`, `findings`) default when absent, so a current binary reads
+accept: fields added since (`frames`, `findings`, an item's `root`) default when absent, so a current binary reads
 every version 1 report; an older binary refuses a newer report rather than misread it. For a supported report:
 
 - **Decision**: verdict, exit code, use case, provider, tools, decision runs and agreement, the

@@ -1288,8 +1288,10 @@ headline number; other repetitions are reported descriptively as per-item agreem
 - **Detected failures**: expected fail with computed fail; count over expected fails.
 - **False rejects**: expected pass with computed fail; count over expected passes.
 - **Unsure rate** and **error rate**: counts over all items.
-- **Localisation**: for detected failures with labelled regions, a prediction and a label are
-  eligible only when they share the root image and their `obligation_ids` intersect; a hit is an
+- **Localisation**: for detected failures with labelled regions, a prediction is a checklist item
+  dispositioned `violation` with a location (its obligations are its instances') or a violation
+  finding, in root coordinates; a prediction and a label are eligible only when they share the
+  root image and their `obligation_ids` intersect; a hit is an
   eligible pair with IoU above 0.3 in root coordinates, or `whole_image` against a whole-image
   label, or `absent` against an `absent` label on the same image; eligible pairs are matched
   one-to-one greedily by descending IoU; unmatched predictions are spurious; reported as hits over

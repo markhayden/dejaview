@@ -17,10 +17,12 @@ rand_chacha = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
+tokio = { workspace = true }
 toml = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true }
+# Path-only like the core crate's: the testkit is never a published dependency of this crate.
+dejaview-testkit = { path = "../dejaview-testkit" }
 
 [lints]
 workspace = true

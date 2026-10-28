@@ -415,7 +415,31 @@ fn load_job(args: &CheckArgs) -> Result<Job, String> {
 /// The provider for this run: the scripted fake (testkit builds, `--provider-script`), a replay of
 /// a recorded conversation, or the live adapter for the configured profile and model over HTTPS,
 /// optionally recording every exchange. The credential joins the redaction list before any run.
+/// Where a provider's conversation comes from or goes to, beyond the live endpoint.
+#[derive(Default)]
+struct ProviderOptions<'a> {
+    replay: Option<&'a Path>,
+    record: Option<&'a Path>,
+    #[cfg(feature = "testkit")]
+    provider_script: Option<&'a Path>,
+}
+
 fn select_provider(args: &CheckArgs, config: &mut Config) -> Result<Box<dyn Provider>, String> {
+    let opts = ProviderOptions {
+        replay: args.replay.as_deref(),
+        record: args.record.as_deref(),
+        #[cfg(feature = "testkit")]
+        provider_script: args.provider_script.as_deref(),
+    };
+    provider_for(config, &opts)
+}
+
+/// The provider for a config: the catalog's adapter over a live client, a recording or, in a
+/// testkit build, a script. A live credential is added to the config's secrets.
+fn provider_for(
+    config: &mut Config,
+    opts: &ProviderOptions<'_>,
+) -> Result<Box<dyn Provider>, String> {
     use std::sync::Arc;
 
     use dejaview_providers::anthropic::AnthropicProvider;
@@ -424,7 +448,7 @@ fn select_provider(args: &CheckArgs, config: &mut Config) -> Result<Box<dyn Prov
     use dejaview_providers::privacy::credential;
     use dejaview_providers::replay::{Player, Recorder};
     #[cfg(feature = "testkit")]
-    if let Some(path) = &args.provider_script {
+    if let Some(path) = opts.provider_script {
         return dejaview_testkit::ScriptedProvider::from_path(path)
             .map(|p| Box::new(p) as Box<dyn Provider>)
             .map_err(|e| e.to_string());
@@ -449,7 +473,7 @@ fn select_provider(args: &CheckArgs, config: &mut Config) -> Result<Box<dyn Prov
         "openai-responses" => dejaview_providers::openai::OpenAiProvider::volatile(),
         other => return Err(format!("adapter {other} is not implemented")),
     };
-    let (cred, transport): (_, Arc<dyn Transport>) = match &args.replay {
+    let (cred, transport): (_, Arc<dyn Transport>) = match opts.replay {
         Some(dir) => {
             let cred =
                 credential(profile, &|_| Some("replay".into())).map_err(|e| e.to_string())?;
@@ -465,7 +489,7 @@ fn select_provider(args: &CheckArgs, config: &mut Config) -> Result<Box<dyn Prov
             ))
             .map_err(|e| e.to_string())?;
             let base: Arc<dyn Transport> = Arc::new(client);
-            match &args.record {
+            match opts.record {
                 Some(dir) => {
                     let recorder =
                         Recorder::new(base, dir, vec![cred.expose().to_string()], volatile)
@@ -679,12 +703,25 @@ fn tools_list(args: &ToolsListArgs) -> i32 {
 
 /// The tools available to this build, then narrowed to the config's enabled list.
 fn build_tools(args: &CheckArgs, config: &Config) -> Result<ToolRegistry, String> {
+    #[cfg(feature = "testkit")]
+    let script = args.tool_script.as_deref();
+    #[cfg(not(feature = "testkit"))]
+    let script = {
+        let _ = args;
+        None
+    };
+    tools_for_config(config, script)
+}
+
+/// The tool registry for a config: the configured packs, then the built-in (and in a testkit
+/// build the scripted) tools, enabled and ordered as the config says.
+fn tools_for_config(config: &Config, tool_script: Option<&Path>) -> Result<ToolRegistry, String> {
     // Packs first; a built-in or scripted tool of the same name yields to the pack's.
     let mut available: Vec<Box<dyn Tool>> = Vec::new();
     for pack in connect_packs(config)? {
         available.extend(pack.tools());
     }
-    for tool in available_tools(args)? {
+    for tool in available_tools(tool_script)? {
         if !available
             .iter()
             .any(|t| t.manifest().name == tool.manifest().name)
@@ -763,9 +800,9 @@ fn connect_packs(
 }
 
 #[cfg(feature = "testkit")]
-fn available_tools(args: &CheckArgs) -> Result<Vec<Box<dyn Tool>>, String> {
+fn available_tools(tool_script: Option<&Path>) -> Result<Vec<Box<dyn Tool>>, String> {
     let mut out: Vec<Box<dyn Tool>> = Vec::new();
-    match &args.tool_script {
+    match tool_script {
         Some(path) => out.push(Box::new(
             dejaview_testkit::ScriptedTool::fake_regions_from_path(path)
                 .map_err(|e| e.to_string())?,
@@ -778,6 +815,6 @@ fn available_tools(args: &CheckArgs) -> Result<Vec<Box<dyn Tool>>, String> {
 }
 
 #[cfg(not(feature = "testkit"))]
-fn available_tools(_args: &CheckArgs) -> Result<Vec<Box<dyn Tool>>, String> {
+fn available_tools(_tool_script: Option<&Path>) -> Result<Vec<Box<dyn Tool>>, String> {
     Ok(Vec::new())
 }

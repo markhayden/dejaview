@@ -92,7 +92,8 @@ impl<'a> Services<'a> {
 }
 
 /// A cancellation handle: `cancel()` from a signal handler, `cancelled()` awaited by the run.
-#[derive(Debug)]
+/// Clones share the signal.
+#[derive(Debug, Clone)]
 pub struct Cancel {
     tx: tokio::sync::watch::Sender<bool>,
 }

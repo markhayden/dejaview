@@ -336,6 +336,7 @@ version = "0.1.0"
 dependencies = [
  "dejaview-core",
  "dejaview-providers",
+ "dejaview-testkit",
  "dejaview-tools",
  "rand",
  "rand_chacha",

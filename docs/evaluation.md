@@ -65,3 +65,29 @@ receipt = "rcpt-…"               # the gate receipt that produced the record
 Written by `dejaview eval gate`; read by the runner, where arm D includes only the tools whose
 stage is `confirmed`. One record per tool and use case. `fixtures/evalsets/admissions.toml`
 holds the synthetic records the tests use.
+
+## Running a matrix
+
+```
+dejaview eval run --matrix matrix.toml --out eval-out/<name> [--evalsets-root evalsets] [--admissions evalsets/admissions.toml]
+```
+
+The runner takes the writer lock, loads and checks every set, forms each arm's tool selection
+(docs: SPEC "Runner and arms"; `D` reads the admission record), computes the descriptor (writing
+it on a first run, refusing on a resume if anything differs), opens the ledger, then runs every
+decision in a fixed order: set, item, cell, repetition. Each decision gets its own directory,
+`results/<set>/<item>/<profile>_<model>/<arm>/rep-<n>/`, holding the harness's decision directory
+and, once complete, `result.json`. On resume a decision with `result.json` is skipped, and one
+whose directory holds a started attempt but no result is listed as partial and run again in a
+fresh attempt directory; its earlier reservation was charged at its bound by the ledger. The cache
+is never read (`cache.status` is `bypass` in every report). When the ledger refuses a decision's
+envelope, that decision ends with `error: budget` and the runner carries on, so every decision has
+a row. SIGINT or SIGTERM cancels between decisions and inside one; the same command resumes.
+
+`summary.json` lists every decision of the matrix as it stands (set, item, cell, repetition,
+whether it is the decision repetition, verdict, exit code, error class, cost, wall time,
+directory) with what the run did (completed, skipped, partial, cancelled) and the ledger's
+cumulative spend against the cap. Repetition 1 is the decision repetition every gate and headline
+number uses; the others are reported descriptively. Projections (`align` under `visual_only` in
+arms C, D_X and D) are part of the selection the runner hands to the tool factory and are applied
+once the tools arrive in M4.

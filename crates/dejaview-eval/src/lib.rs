@@ -3,12 +3,14 @@
 //! task 1.15, so every later result is reproducible from its recorded seed.
 
 pub mod admissions;
+pub mod arms;
 pub mod bootstrap;
 pub mod descriptor;
 pub mod eval_ledger;
 pub mod fixture;
 pub mod gate_rules;
 pub mod matrix;
+pub mod runner;
 pub mod sets;
 pub mod wilson;
 
@@ -34,6 +36,10 @@ pub enum Error {
     /// The admission record is missing, malformed or inconsistent.
     #[error("admissions: {0}")]
     Admissions(String),
+    /// The matrix runner: an arm that cannot be formed, a config or job that does not resolve, or
+    /// an evaluation directory that cannot be written.
+    #[error("runner: {0}")]
+    Runner(String),
 }
 
 /// Result alias for this crate.

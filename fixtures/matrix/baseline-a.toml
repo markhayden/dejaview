@@ -1,0 +1,19 @@
+# An arm A matrix over two dev sets with two models; used by the descriptor, ledger and runner
+# tests with the fake provider (the profile and model are overridden there).
+[matrix]
+name = "baseline-a"
+config = "examples/source-fidelity.toml"
+sets = ["source-fidelity/pairs-v1"]
+arms = ["A"]
+decision_runs = 1
+repetitions = 1
+spend_cap_usd = 5.0
+
+[[matrix.models]]
+profile = "anthropic"
+model = "claude-haiku-5-5"
+
+[[matrix.models]]
+profile = "google-ai-studio"
+model = "gemini-3.8-flash"
+controls = { thinking_level = "low" }

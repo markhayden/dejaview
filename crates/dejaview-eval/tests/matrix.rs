@@ -1,0 +1,68 @@
+//! Task 3.4a: `matrix.toml` parsing, cells, decisions and the frozen identity.
+#![allow(clippy::unwrap_used)]
+
+use std::path::PathBuf;
+
+use dejaview_eval::matrix::{Arm, Matrix};
+
+fn root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+#[test]
+fn the_fixture_matrix_parses_into_cells_and_an_identity() {
+    let m = Matrix::load(&root().join("fixtures/matrix/baseline-a.toml")).unwrap();
+    assert_eq!(m.matrix.name, "baseline-a");
+    assert_eq!(m.matrix.sets, ["source-fidelity/pairs-v1"]);
+    assert_eq!(m.matrix.arms, [Arm::A]);
+    let cells = m.cells();
+    assert_eq!(cells.len(), 2, "two models times one arm");
+    assert_eq!(cells[0].id(), "anthropic:claude-haiku-5-5/A");
+    assert_eq!(cells[1].id(), "google-ai-studio:gemini-3.8-flash/A");
+    assert_eq!(
+        cells[1]
+            .model
+            .controls
+            .get("thinking_level")
+            .and_then(|v| v.as_str()),
+        Some("low")
+    );
+    assert_eq!(m.decisions(2), 4, "items times cells times repetitions");
+    let id = m.identity();
+    assert_eq!(id.len(), 64);
+    // The identity follows the content, not the file's formatting.
+    let text = std::fs::read_to_string(root().join("fixtures/matrix/baseline-a.toml")).unwrap();
+    let reformatted = text.replace("spend_cap_usd = 5.0", "spend_cap_usd   =  5.0");
+    assert_eq!(Matrix::parse(&reformatted).unwrap().identity(), id);
+    let changed = text.replace("spend_cap_usd = 5.0", "spend_cap_usd = 6.0");
+    assert_ne!(Matrix::parse(&changed).unwrap().identity(), id);
+}
+
+#[test]
+fn arms_parse_from_their_names_and_bad_matrices_are_refused() {
+    assert_eq!(
+        "D_regions".parse::<Arm>().unwrap(),
+        Arm::DX("regions".into())
+    );
+    assert_eq!("D".parse::<Arm>().unwrap(), Arm::D);
+    assert_eq!("C".parse::<Arm>().unwrap(), Arm::C);
+    assert!("B".parse::<Arm>().is_err());
+    let text = std::fs::read_to_string(root().join("fixtures/matrix/baseline-a.toml")).unwrap();
+    for (from, to, message) in [
+        ("arms = [\"A\"]", "arms = []", "arms"),
+        ("decision_runs = 1", "decision_runs = 3", "decision_runs"),
+        ("repetitions = 1", "repetitions = 0", "repetitions"),
+        ("spend_cap_usd = 5.0", "spend_cap_usd = 0", "spend_cap_usd"),
+        ("sets = [\"source-fidelity/pairs-v1\"]", "sets = []", "sets"),
+        (
+            "name = \"baseline-a\"",
+            "name = \"baseline-a\"\nextra = 1",
+            "extra",
+        ),
+    ] {
+        let err = Matrix::parse(&text.replacen(from, to, 1))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains(message), "{from} -> {to}: {err}");
+    }
+}

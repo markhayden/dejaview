@@ -1,0 +1,15 @@
+# Synthetic admission records for tests (3.4a): a provisional tool is excluded from arm D, a
+# confirmed one included. Real records are written by `dejaview eval gate` (3.5b).
+admissions_version = 1
+
+[[admission]]
+tool = "regions"
+use_case = "source-fidelity"
+stage = "provisional"
+receipt = "rcpt-2026-10-27-regions-initial"
+
+[[admission]]
+tool = "classes"
+use_case = "source-fidelity"
+stage = "confirmed"
+receipt = "rcpt-2026-10-27-classes-confirmation"

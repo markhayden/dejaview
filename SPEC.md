@@ -1446,6 +1446,7 @@ scripts/                        repository checks, the credential scanner, publi
 scripts/sets/                   the set-building toolkit (uv project): plans, generators, construction ops, draft labels
 schemas/                        generated JSON Schemas: submission, envelope, manifest, config, report, tools/
 fixtures/
+  matrix/                       matrices the evaluation tests use
   adapters/<adapter>/           recorded conversations per capability combination
   profiles/<profile>/           recorded conversations per shipped profile, including routing
   images/                       golden images for built-in tools, flat and equirectangular
@@ -1457,7 +1458,7 @@ docs/
   reviews/                      verbatim external reviews
   provider-data.md              enforced, attested and unverifiable per profile
   architecture.md               the diagram above, kept current
-  tools.md  rules.md  evalsets.md  viewer.md
+  tools.md  rules.md  evalsets.md  evaluation.md  viewer.md
 SPEC.md  PLAN.md  README.md  LICENSE
 ```
 

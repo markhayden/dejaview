@@ -68,7 +68,7 @@ tag.
 - [x] 3.3c Brief compliance dev set (brief-compliance/stills-v1, 2026-10-27)
 - [x] 3.3d Product fidelity dev set (product-fidelity/packshots-v1, 2026-10-27)
 - [x] 3.3e Adversarial sets (five, one per use case) → tag `m3.1` (2026-10-27)
-- [ ] 3.4a Execution descriptor and durable evaluation ledger
+- [x] 3.4a Execution descriptor and durable evaluation ledger (2026-10-27)
 - [ ] 3.4b Matrix runner, arms and resume
 - [ ] 3.4c Pre-run estimate
 - [ ] 3.5a Metrics, localisation, report regeneration

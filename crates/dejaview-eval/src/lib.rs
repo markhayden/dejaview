@@ -2,9 +2,13 @@
 //! and gates. The statistics contract (`bootstrap`, `wilson`, `gate_rules`) is frozen first, in
 //! task 1.15, so every later result is reproducible from its recorded seed.
 
+pub mod admissions;
 pub mod bootstrap;
+pub mod descriptor;
+pub mod eval_ledger;
 pub mod fixture;
 pub mod gate_rules;
+pub mod matrix;
 pub mod sets;
 pub mod wilson;
 
@@ -18,6 +22,18 @@ pub enum Error {
     /// An evaluation set, its manifest, labels, images or seal is missing or inconsistent.
     #[error("sets: {0}")]
     Sets(String),
+    /// A matrix file is missing, malformed or inconsistent.
+    #[error("matrix: {0}")]
+    Matrix(String),
+    /// The execution descriptor or the writer lock of an evaluation directory.
+    #[error("descriptor: {0}")]
+    Descriptor(String),
+    /// The durable evaluation ledger could not be read or written.
+    #[error("ledger: {0}")]
+    Ledger(String),
+    /// The admission record is missing, malformed or inconsistent.
+    #[error("admissions: {0}")]
+    Admissions(String),
 }
 
 /// Result alias for this crate.

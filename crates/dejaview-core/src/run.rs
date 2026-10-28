@@ -1532,17 +1532,39 @@ fn finish(
         });
     }
     let mut finding_rows = Vec::new();
+    let mut finding_entries = Vec::new();
     for f in &sub.findings {
-        let d: aggregate::Disposition = f.disposition.into();
-        if d == aggregate::Disposition::Observed {
-            continue;
-        }
-        let root = state.registry.to_root(&f.location).ok().and_then(|m| {
+        let mapped = state.registry.to_root(&f.location).ok();
+        let root_image = mapped.as_ref().and_then(|m| {
             state
                 .registry
                 .get(&m.location.frame)
                 .map(|fr| fr.root().to_string())
         });
+        finding_entries.push(crate::report::FindingEntry {
+            obligation_ids: f.obligation_ids.clone(),
+            disposition: f.disposition,
+            confidence: f.confidence,
+            reason: f.reason.clone(),
+            allowed_by: f.allowed_by.clone(),
+            location: f.location.clone(),
+            root: match (&mapped, &root_image) {
+                (Some(m), Some(image)) => Some(crate::report::RootLocation {
+                    image: image.clone(),
+                    frame: m.location.frame.clone(),
+                    kind: m.location.kind,
+                    bbox: m.location.bbox,
+                    polygon: m.location.polygon.clone(),
+                    partial: m.partial,
+                }),
+                _ => None,
+            },
+        });
+        let d: aggregate::Disposition = f.disposition.into();
+        if d == aggregate::Disposition::Observed {
+            continue;
+        }
+        let root = root_image.clone();
         let row = aggregate::strictest(
             state
                 .instances
@@ -1560,6 +1582,7 @@ fn finish(
         items,
         findings: sub.findings.len(),
         finding_rows,
+        finding_entries,
     }))?;
     Ok(aggregate::verdict(&rows))
 }

@@ -145,6 +145,39 @@ pub struct CostSummary {
     pub attempts: u32,
 }
 
+/// A submitted finding in the report.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FindingEntry {
+    pub obligation_ids: Vec<String>,
+    pub disposition: crate::submission::FindingDisposition,
+    pub confidence: crate::aggregate::Confidence,
+    pub reason: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub allowed_by: Option<String>,
+    /// As submitted, in the frame the model named.
+    pub location: crate::frames::Location,
+    /// Mapped to the root image's raw frame; `None` when the location did not resolve.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root: Option<RootLocation>,
+}
+
+/// A location in root coordinates: the raw frame of the root image.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RootLocation {
+    /// The root image's id (`candidate`, `source`, `ref:<label>`).
+    pub image: String,
+    pub frame: String,
+    pub kind: crate::frames::LocationKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bbox: Option<[f64; 4]>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub polygon: Option<Vec<[f64; 2]>>,
+    /// The mapping fell partly outside a parent and was clipped.
+    pub partial: bool,
+}
+
 /// One run's report.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -166,6 +199,10 @@ pub struct RunReport {
     pub items: Vec<ItemRow>,
     /// Aggregation rows of the submission's findings (observed findings produce none).
     pub finding_rows: Vec<Row>,
+    /// Every finding of the submission, with its location as submitted and mapped to the root
+    /// image's raw frame, for localisation scoring and the viewer.
+    #[serde(default)]
+    pub findings: Vec<FindingEntry>,
     pub verdict: Option<Verdict>,
     pub error: Option<ErrorEntry>,
     /// Wall time from the first journal line to the last, in milliseconds.
@@ -275,6 +312,7 @@ impl RunReport {
             repairs: Vec::new(),
             items: Vec::new(),
             finding_rows: Vec::new(),
+            findings: Vec::new(),
             verdict: None,
             error: None,
             wall_ms: match (lines.first(), lines.last()) {
@@ -409,6 +447,7 @@ impl RunReport {
                 Event::Submission(e) => {
                     r.items = e.items.clone();
                     r.finding_rows = e.finding_rows.clone();
+                    r.findings = e.finding_entries.clone();
                 }
                 Event::Verdict(e) => {
                     r.verdict = Some(e.verdict);

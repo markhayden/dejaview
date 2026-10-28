@@ -136,3 +136,31 @@ fn a_tentative_held_on_an_instance_that_matters_is_unsure() {
     assert_eq!(o.exit_code, 2, "{:?}", o.error);
     assert_eq!(r["runs"][0]["items"][0]["row"], "unsure");
 }
+
+/// Task 3.5a: the report carries each non-observed finding with its location as submitted and
+/// mapped to the root image's raw frame, so localisation can be scored from the report alone.
+#[test]
+fn the_report_carries_findings_with_root_locations() {
+    let (_, r, _) = check("finding-root", "minimal.toml", "finding-violation.json");
+    let findings = r["runs"][0]["findings"].as_array().unwrap();
+    assert_eq!(findings.len(), 1);
+    let f = &findings[0];
+    assert_eq!(f["obligation_ids"], serde_json::json!(["SF1"]));
+    assert_eq!(f["disposition"], "violation");
+    assert_eq!(f["confidence"], "confident");
+    assert_eq!(f["location"]["frame"], "raw:candidate");
+    assert_eq!(f["root"]["image"], "candidate");
+    assert_eq!(f["root"]["frame"], "raw:candidate");
+    assert_eq!(f["root"]["kind"], "bbox");
+    assert_eq!(f["root"]["bbox"], f["location"]["bbox"]);
+    assert_eq!(f["root"]["partial"], false);
+    // An observed finding is recorded too, with no aggregation row behind it.
+    let (_, r, _) = check(
+        "finding-root-observed",
+        "minimal.toml",
+        "finding-observed.json",
+    );
+    let findings = r["runs"][0]["findings"].as_array().unwrap();
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0]["disposition"], "observed");
+}

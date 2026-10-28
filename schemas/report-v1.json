@@ -378,6 +378,66 @@
       ],
       "type": "object"
     },
+    "FindingDisposition": {
+      "description": "Dispositions a finding may carry. `held` and `hidden` belong to checklist items only.",
+      "enum": [
+        "violation",
+        "allowed_change",
+        "cant_tell",
+        "observed"
+      ],
+      "type": "string"
+    },
+    "FindingEntry": {
+      "additionalProperties": false,
+      "description": "A submitted finding in the report.",
+      "properties": {
+        "allowed_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "confidence": {
+          "$ref": "#/$defs/Confidence"
+        },
+        "disposition": {
+          "$ref": "#/$defs/FindingDisposition"
+        },
+        "location": {
+          "$ref": "#/$defs/Location",
+          "description": "As submitted, in the frame the model named."
+        },
+        "obligation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "root": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RootLocation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Mapped to the root image's raw frame; `None` when the location did not resolve."
+        }
+      },
+      "required": [
+        "obligation_ids",
+        "disposition",
+        "confidence",
+        "reason",
+        "location"
+      ],
+      "type": "object"
+    },
     "ImageSummary": {
       "additionalProperties": false,
       "properties": {
@@ -852,6 +912,60 @@
       ],
       "type": "string"
     },
+    "RootLocation": {
+      "additionalProperties": false,
+      "description": "A location in root coordinates: the raw frame of the root image.",
+      "properties": {
+        "bbox": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "frame": {
+          "type": "string"
+        },
+        "image": {
+          "description": "The root image's id (`candidate`, `source`, `ref:<label>`).",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/LocationKind"
+        },
+        "partial": {
+          "description": "The mapping fell partly outside a parent and was clipped.",
+          "type": "boolean"
+        },
+        "polygon": {
+          "items": {
+            "items": {
+              "format": "double",
+              "type": "number"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "type": "array"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "image",
+        "frame",
+        "kind",
+        "partial"
+      ],
+      "type": "object"
+    },
     "Row": {
       "description": "One aggregation row. Ordered so that `max` is the strictest.",
       "enum": [
@@ -925,6 +1039,14 @@
           "description": "Aggregation rows of the submission's findings (observed findings produce none).",
           "items": {
             "$ref": "#/$defs/Row"
+          },
+          "type": "array"
+        },
+        "findings": {
+          "default": [],
+          "description": "Every finding of the submission, with its location as submitted and mapped to the root\nimage's raw frame, for localisation scoring and the viewer.",
+          "items": {
+            "$ref": "#/$defs/FindingEntry"
           },
           "type": "array"
         },

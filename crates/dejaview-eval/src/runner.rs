@@ -154,6 +154,9 @@ pub(crate) fn cell_config(
                 .join(", ")
         ),
     ];
+    if let Some(account) = &cell.model.account {
+        overrides.push(format!("privacy.account={account:?}"));
+    }
     if !cell.model.controls.is_empty() {
         let inline: Vec<String> = cell
             .model

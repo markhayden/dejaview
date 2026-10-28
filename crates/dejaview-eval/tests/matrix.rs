@@ -66,3 +66,20 @@ fn arms_parse_from_their_names_and_bad_matrices_are_refused() {
         assert!(err.contains(message), "{from} -> {to}: {err}");
     }
 }
+
+#[test]
+fn a_model_may_carry_the_account_its_cells_consent_with() {
+    let text = std::fs::read_to_string(root().join("fixtures/matrix/baseline-a.toml")).unwrap();
+    let with = text.replace(
+        "controls = { thinking_level = \"low\" }",
+        "controls = { thinking_level = \"low\" }\naccount = \"google:${DEJAVIEW_GOOGLE_ACCOUNT}\"",
+    );
+    let m = Matrix::parse(&with).unwrap();
+    assert_eq!(m.matrix.models[0].account, None);
+    assert_eq!(
+        m.matrix.models[1].account.as_deref(),
+        Some("google:${DEJAVIEW_GOOGLE_ACCOUNT}"),
+        "the reference, never the value"
+    );
+    assert_ne!(m.identity(), Matrix::parse(&text).unwrap().identity());
+}

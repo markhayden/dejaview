@@ -102,3 +102,27 @@ fn a_matrix_over_the_cap_warns_but_can_still_complete() {
     assert_eq!(s.completed, 4);
     assert!(s.decisions.iter().all(|d| d.error_class.is_none()), "{s:?}");
 }
+
+#[test]
+fn a_decision_over_the_per_decision_cap_is_named_and_the_run_refuses_it() {
+    let dir =
+        std::env::temp_dir().join(format!("dejaview-estimate-job-cap-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    // The matrix cap is plenty; the config's per-decision cap is below every envelope.
+    let mut p = plan(&dir, 50.0);
+    p.config_text.push_str("\n[budget]\nspend_cap_usd = 0.01\n");
+    let e = estimate(&p, &Fake).unwrap();
+    assert!(!e.over_cap);
+    assert_eq!(e.over_decision_cap.len(), 4, "{e:?}");
+    assert!(e.decisions.iter().all(|d| d.over_decision_cap));
+    let s = run(&p, &Fake, None).unwrap();
+    assert!(
+        s.decisions
+            .iter()
+            .all(|d| d.error_class.as_deref() == Some("budget")),
+        "{s:?}"
+    );
+    // The same matrix with the cap raised: nothing is flagged.
+    let p = plan(&dir.join("ok"), 50.0);
+    assert!(estimate(&p, &Fake).unwrap().over_decision_cap.is_empty());
+}

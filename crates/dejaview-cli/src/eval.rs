@@ -378,6 +378,14 @@ fn eval_estimate(args: &EstimateArgs) -> i32 {
                 e.envelope_sum_usd - e.cap_usd
             );
         }
+        if !e.over_decision_cap.is_empty() {
+            println!(
+                "warning: {} of {} decisions have an envelope above the config's per-decision cap (budget.spend_cap_usd) and would be refused with error: budget; raise the cap in the matrix's config, for example {}",
+                e.over_decision_cap.len(),
+                e.decisions.len(),
+                e.over_decision_cap[0]
+            );
+        }
     }
     0
 }

@@ -21,6 +21,11 @@ profile = "anthropic"
 model = "claude-haiku-5-5"
 controls = { effort = "low" }              # optional, validated against the catalog by the runner
 
+[[matrix.models]]
+profile = "google-ai-studio"
+model = "gemini-3.8-flash"
+account = "google:${DEJAVIEW_GOOGLE_ACCOUNT}"   # the consent for this profile when the base config's is another vendor's; the reference is hashed, the value expanded at run time and redacted
+
 [matrix.gate]                              # required by `eval gate`; frozen with the identity
 seed = 20261101                            # the bootstrap seed
 resamples = 10000                          # default 10000
@@ -215,5 +220,9 @@ Prints every decision's envelope exactly as the ledger would reserve it (the sam
 planning the run uses), their sum, a cost range from "every decision submits at once" (the first
 request's bound) to "every envelope spent", and the cap. When the sum exceeds the cap it warns
 that completion is not guaranteed and still exits 0: admission is per decision against what is
-left, and settled costs sit far below envelopes, so such a matrix usually completes. The owner
+left, and settled costs sit far below envelopes, so such a matrix usually completes. It also names
+every decision whose envelope exceeds the config's per-decision cap (`budget.spend_cap_usd`),
+which the run would refuse with `error: budget` whatever the matrix cap allows: the matrix's cap
+bounds the total, the config's bounds one decision, and the base config of a matrix must set the
+latter above the largest envelope (`evalsets/matrix/baseline-config.toml` does). The owner
 approves a baseline against this estimate (owner decision 6).

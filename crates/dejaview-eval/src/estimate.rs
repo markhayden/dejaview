@@ -1,7 +1,8 @@
 //! `dejaview eval estimate` (SPEC "Runner and arms"): every decision's envelope as the ledger
 //! would reserve it, their sum, a cost range, and a warning when the sum exceeds the cap. It
 //! never refuses: admission is per decision, and settled costs are usually far below the
-//! envelopes, so a matrix whose envelopes sum past the cap can still complete.
+//! envelopes, so a matrix whose envelopes sum past the cap can still complete. It also names
+//! the decisions whose envelope exceeds the config's per-decision cap, which the run would refuse.
 
 use dejaview_core::run;
 use serde::{Deserialize, Serialize};
@@ -18,6 +19,9 @@ pub struct DecisionEstimate {
     pub envelope_usd: f64,
     /// The bound of the first request alone: what a decision that submits at once costs at most.
     pub first_request_usd: f64,
+    /// The envelope exceeds the config's per-decision cap (`budget.spend_cap_usd`): the decision
+    /// will be refused with `error: budget` whatever the matrix cap allows.
+    pub over_decision_cap: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -31,6 +35,8 @@ pub struct Estimate {
     pub cap_usd: f64,
     /// The envelope sum exceeds the cap: completion is not guaranteed.
     pub over_cap: bool,
+    /// Decisions whose envelope exceeds the per-decision cap, which the run would refuse.
+    pub over_decision_cap: Vec<String>,
 }
 
 pub fn estimate(plan: &Plan, factories: &dyn Factories) -> Result<Estimate> {
@@ -75,6 +81,7 @@ pub fn estimate(plan: &Plan, factories: &dyn Factories) -> Result<Estimate> {
                         ),
                         envelope_usd: envelope.usd,
                         first_request_usd: first * f64::from(m.decision_runs),
+                        over_decision_cap: envelope.usd > config.budget.spend_cap_usd,
                     });
                 }
             }
@@ -82,6 +89,11 @@ pub fn estimate(plan: &Plan, factories: &dyn Factories) -> Result<Estimate> {
     }
     let envelope_sum_usd: f64 = decisions.iter().map(|d| d.envelope_usd).sum();
     let floor_usd: f64 = decisions.iter().map(|d| d.first_request_usd).sum();
+    let over_decision_cap = decisions
+        .iter()
+        .filter(|d| d.over_decision_cap)
+        .map(|d| d.id.clone())
+        .collect();
     Ok(Estimate {
         matrix: m.name.clone(),
         decisions,
@@ -89,5 +101,6 @@ pub fn estimate(plan: &Plan, factories: &dyn Factories) -> Result<Estimate> {
         floor_usd,
         cap_usd: m.spend_cap_usd,
         over_cap: envelope_sum_usd > m.spend_cap_usd,
+        over_decision_cap,
     })
 }

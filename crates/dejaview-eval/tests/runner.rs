@@ -187,3 +187,23 @@ fn prompts_across_arms_differ_only_in_the_tools_section() {
         "everything but the Tools section is identical"
     );
 }
+
+#[test]
+fn a_model_account_in_the_matrix_binds_its_cells() {
+    let dir = tempdir("account");
+    let mut p = plan(&dir, "fake-a.toml");
+    p.matrix_text = p.matrix_text.replace(
+        "model = \"fake-model\"",
+        "model = \"fake-model\"\naccount = \"fake:from-the-matrix\"",
+    );
+    p.matrix = dejaview_eval::matrix::Matrix::parse(&p.matrix_text).unwrap();
+    let s = run(&p, &fake("held.json"), None).unwrap();
+    let report: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(dir.join(&s.decisions[0].dir).join("report.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        report["config"]["privacy"]["account"],
+        "fake:from-the-matrix"
+    );
+}

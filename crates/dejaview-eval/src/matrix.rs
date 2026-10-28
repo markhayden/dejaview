@@ -66,6 +66,12 @@ pub struct ModelSpec {
     pub model: String,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub controls: BTreeMap<String, toml::Value>,
+    /// The `[privacy] account` for this model's cells, when the base config's does not bind to
+    /// its profile (a matrix across vendors). Write it as the config would, with the account id
+    /// from the environment (`google:${DEJAVIEW_GOOGLE_ACCOUNT}`): the reference is what the
+    /// matrix carries and hashes, the value is expanded at run time and redacted like any secret.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
 }
 
 /// An arm (SPEC "Runner and arms"): no tools, the visual-access control, the control plus one

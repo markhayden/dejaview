@@ -6,6 +6,7 @@ pub mod admissions;
 pub mod arms;
 pub mod bootstrap;
 pub mod descriptor;
+pub mod estimate;
 pub mod eval_ledger;
 pub mod fixture;
 pub mod gate_rules;

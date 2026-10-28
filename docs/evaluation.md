@@ -91,3 +91,16 @@ cumulative spend against the cap. Repetition 1 is the decision repetition every 
 number uses; the others are reported descriptively. Projections (`align` under `visual_only` in
 arms C, D_X and D) are part of the selection the runner hands to the tool factory and are applied
 once the tools arrive in M4.
+
+## Estimating first
+
+```
+dejaview eval estimate --matrix matrix.toml [--evalsets-root evalsets] [--json]
+```
+
+Prints every decision's envelope exactly as the ledger would reserve it (the same setup and
+planning the run uses), their sum, a cost range from "every decision submits at once" (the first
+request's bound) to "every envelope spent", and the cap. When the sum exceeds the cap it warns
+that completion is not guaranteed and still exits 0: admission is per decision against what is
+left, and settled costs sit far below envelopes, so such a matrix usually completes. The owner
+approves a baseline against this estimate (owner decision 6).

@@ -291,6 +291,19 @@ pub struct Setup {
     pub images: Vec<CanonicalImage>,
 }
 
+/// The decision envelope a run of this job would reserve (SPEC "Cost ledger"), without running:
+/// the same setup and plan `check` uses, so an estimate equals the ledger's reservation.
+pub fn envelope(
+    config: &Config,
+    job: &Job,
+    job_base: &Path,
+    tools: &ToolRegistry,
+    pricing: &dyn Pricing,
+) -> Result<ledger::Envelope> {
+    let s = setup(config, job, job_base, tools)?;
+    ledger::plan(config, &plan_input(&s.prepared, job, tools), pricing)
+}
+
 /// Resolves the rules and decodes the images once per decision.
 pub fn setup(config: &Config, job: &Job, job_base: &Path, tools: &ToolRegistry) -> Result<Setup> {
     let prepared = resolve_rules(config, job, job_base, tools)?;

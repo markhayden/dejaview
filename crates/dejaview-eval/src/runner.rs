@@ -124,7 +124,12 @@ fn toml_scalar(v: &toml::Value) -> String {
 
 /// The per-cell config: the base config with the provider, tools and rules set for the cell
 /// and the set, and the matrix's decision runs.
-fn cell_config(plan: &Plan, cell: &Cell, set: &Set, selection: &ToolSelection) -> Result<Config> {
+pub(crate) fn cell_config(
+    plan: &Plan,
+    cell: &Cell,
+    set: &Set,
+    selection: &ToolSelection,
+) -> Result<Config> {
     let mut overrides = vec![
         format!("provider.profile={:?}", cell.model.profile),
         format!("provider.model={:?}", cell.model.model),

@@ -70,7 +70,7 @@ tag.
 - [x] 3.3e Adversarial sets (five, one per use case) → tag `m3.1` (2026-10-27)
 - [x] 3.4a Execution descriptor and durable evaluation ledger (2026-10-27)
 - [x] 3.4b Matrix runner, arms and resume (2026-10-27)
-- [ ] 3.4c Pre-run estimate
+- [x] 3.4c Pre-run estimate (2026-10-27)
 - [ ] 3.5a Metrics, localisation, report regeneration
 - [ ] 3.5b Gate lifecycle (stages, receipts, admissions)
 - [ ] 3.6 Static report viewer

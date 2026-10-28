@@ -1,7 +1,7 @@
 //! `dejaview eval`: the matrix runner (3.4b) and the gate on a statistics fixture (1.15); the
 //! estimate, the report and the gate lifecycle arrive with the rest of M3.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::Subcommand;
 use dejaview_core::config::Config;
@@ -27,6 +27,9 @@ pub enum EvalCommand {
     /// Run (or resume) a matrix: every item of its sets through every cell, never reading the
     /// cache, under the evaluation's durable ledger.
     Run(RunArgs),
+    /// Print every decision's envelope, their sum and a cost range for a matrix, and warn when
+    /// the sum exceeds the cap; nothing is sent and nothing is refused.
+    Estimate(EstimateArgs),
     /// Apply the admission gate to a synthetic result table and print the interval and outcome.
     Gate(GateArgs),
 }
@@ -54,6 +57,121 @@ pub struct RunArgs {
     #[cfg(feature = "testkit")]
     #[arg(long)]
     tool_script: Option<PathBuf>,
+}
+
+#[derive(clap::Args)]
+pub struct EstimateArgs {
+    /// The matrix file.
+    #[arg(long)]
+    matrix: PathBuf,
+    /// The evalsets root the matrix's set ids resolve under.
+    #[arg(long, default_value = "evalsets")]
+    evalsets_root: PathBuf,
+    /// The admission record arm D reads; defaults to `<evalsets root>/admissions.toml` when it
+    /// exists.
+    #[arg(long)]
+    admissions: Option<PathBuf>,
+    /// Print JSON instead of the text form.
+    #[arg(long)]
+    json: bool,
+    /// Scripted fake provider, for tests and debugging only.
+    #[cfg(feature = "testkit")]
+    #[arg(long)]
+    provider_script: Option<PathBuf>,
+    /// Scripted envelopes for the fake `fake_regions` tool, for tests and debugging only.
+    #[cfg(feature = "testkit")]
+    #[arg(long)]
+    tool_script: Option<PathBuf>,
+}
+
+/// The plan a matrix file describes, with its config and admission record loaded; `Err` holds
+/// the usage message.
+fn plan_from(
+    matrix_path: &Path,
+    out: &Path,
+    evalsets_root: &Path,
+    admissions: Option<&Path>,
+) -> Result<Plan, String> {
+    let matrix_text = std::fs::read_to_string(matrix_path)
+        .map_err(|e| format!("cannot read {}: {e}", matrix_path.display()))?;
+    let matrix =
+        Matrix::parse(&matrix_text).map_err(|e| format!("{}: {e}", matrix_path.display()))?;
+    let config_text = std::fs::read_to_string(&matrix.matrix.config).map_err(|e| {
+        format!(
+            "cannot read the matrix's config {}: {e}",
+            matrix.matrix.config.display()
+        )
+    })?;
+    let admissions_path = admissions.map(Path::to_path_buf).or_else(|| {
+        let p = evalsets_root.join("admissions.toml");
+        p.exists().then_some(p)
+    });
+    let admissions = match admissions_path.as_deref().map(Admissions::load) {
+        Some(Ok(a)) => Some(a),
+        Some(Err(e)) => return Err(e.to_string()),
+        None => None,
+    };
+    Ok(Plan {
+        eval_dir: out.to_path_buf(),
+        matrix,
+        matrix_text,
+        config_text,
+        evalsets_root: evalsets_root.to_path_buf(),
+        admissions,
+        harness_version: VERSION.to_string(),
+        allow_fake: cfg!(feature = "testkit"),
+    })
+}
+
+fn eval_estimate(args: &EstimateArgs) -> i32 {
+    let plan = match plan_from(
+        &args.matrix,
+        Path::new("."),
+        &args.evalsets_root,
+        args.admissions.as_deref(),
+    ) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("dejaview: {e}");
+            return EXIT_USAGE;
+        }
+    };
+    let factories = CliFactories {
+        #[cfg(feature = "testkit")]
+        provider_script: args.provider_script.clone(),
+        #[cfg(feature = "testkit")]
+        tool_script: args.tool_script.clone(),
+    };
+    let e = match dejaview_eval::estimate::estimate(&plan, &factories) {
+        Ok(e) => e,
+        Err(err) => {
+            eprintln!("dejaview: {err}");
+            return EXIT_USAGE;
+        }
+    };
+    if args.json {
+        println!("{}", serde_json::to_string_pretty(&e).unwrap_or_default());
+    } else {
+        println!(
+            "eval estimate {}: {} decisions",
+            e.matrix,
+            e.decisions.len()
+        );
+        for d in &e.decisions {
+            println!("  {:<70} envelope ${:.4}", d.id, d.envelope_usd);
+        }
+        println!(
+            "envelope sum ${:.4}; cost range ${:.4} (every decision submits at once) to ${:.4} (every envelope spent); cap ${:.2}",
+            e.envelope_sum_usd, e.floor_usd, e.envelope_sum_usd, e.cap_usd
+        );
+        if e.over_cap {
+            println!(
+                "warning: the envelope sum exceeds the cap by ${:.4}; completion is not guaranteed (admission is per decision, against what is left)",
+                e.envelope_sum_usd - e.cap_usd
+            );
+        }
+    }
+    0
 }
 
 /// The binary's providers and tools, per cell.
@@ -89,51 +207,17 @@ impl Factories for CliFactories {
 }
 
 fn eval_run(args: &RunArgs) -> i32 {
-    let matrix_text = match std::fs::read_to_string(&args.matrix) {
-        Ok(t) => t,
+    let plan = match plan_from(
+        &args.matrix,
+        &args.out,
+        &args.evalsets_root,
+        args.admissions.as_deref(),
+    ) {
+        Ok(p) => p,
         Err(e) => {
-            eprintln!("dejaview: cannot read {}: {e}", args.matrix.display());
-            return EXIT_USAGE;
-        }
-    };
-    let matrix = match Matrix::parse(&matrix_text) {
-        Ok(m) => m,
-        Err(e) => {
-            eprintln!("dejaview: {}: {e}", args.matrix.display());
-            return EXIT_USAGE;
-        }
-    };
-    let config_text = match std::fs::read_to_string(&matrix.matrix.config) {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!(
-                "dejaview: cannot read the matrix's config {}: {e}",
-                matrix.matrix.config.display()
-            );
-            return EXIT_USAGE;
-        }
-    };
-    let admissions_path = args.admissions.clone().or_else(|| {
-        let p = args.evalsets_root.join("admissions.toml");
-        p.exists().then_some(p)
-    });
-    let admissions = match admissions_path.as_deref().map(Admissions::load) {
-        Some(Ok(a)) => Some(a),
-        Some(Err(e)) => {
             eprintln!("dejaview: {e}");
             return EXIT_USAGE;
         }
-        None => None,
-    };
-    let plan = Plan {
-        eval_dir: args.out.clone(),
-        matrix,
-        matrix_text,
-        config_text,
-        evalsets_root: args.evalsets_root.clone(),
-        admissions,
-        harness_version: VERSION.to_string(),
-        allow_fake: cfg!(feature = "testkit"),
     };
     let factories = CliFactories {
         #[cfg(feature = "testkit")]
@@ -209,6 +293,7 @@ pub struct GateArgs {
 pub fn run(args: &EvalArgs) -> i32 {
     match &args.command {
         EvalCommand::Run(a) => eval_run(a),
+        EvalCommand::Estimate(a) => eval_estimate(a),
         EvalCommand::Gate(a) => gate(a),
     }
 }

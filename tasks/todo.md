@@ -100,9 +100,9 @@ tag.
 
 ## M5 First ML tool
 - [x] 5.1 Python pack skeleton and MCP server (2026-10-29: `context.py` parses `_dejaview` images and frames and loads pixels by path or inline; `envelope.py` builds envelopes and PNG images and splits them into MCP image blocks; `echo_region` cuts the box from a named frame; a malformed context is a JSON-RPC error; `crates/dejaview-tools/tests/python_pack.rs` drives the real server from the Rust client with an image and an aligned frame, run by `just pack-test` and CI's python job; numpy and Pillow are the pack's dependencies, locked)
-- [ ] 5.3 Segmenter fetch and parity
-- [ ] 5.4a `regions` tool
-- [ ] 5.4b `classes` tool
+- [x] 5.3 Segmenter fetch and parity (2026-10-29: `models.py` ships the record inside the package and `fetch` downloads or copies every file of it with each byte hashed, refusing a mismatch and keeping nothing; `segmenter.py` runs the ONNX export with onnxruntime 1.31 and computes the semantic map; the `segmenter`-marked parity test passes on the four goldens within the recorded tolerance and skips with the fetch command when the artifact is absent; `tools setup` running `fetch` after the sync is part of 5.2)
+- [x] 5.4a `regions` tool (2026-10-29: `regions.py` over two frames in one grid, photometric change (normalised residual and blurred colour difference) and confident class disagreement, components boxed and labelled by majority class each side, scored, nudged by `hints.regions`, capped at twelve, one overlay image; `requires = ["align"]`; the segmenter pads to the 512 square (preprocessing `1-pad`); planted colour blocks on synthetic pairs are all found with IoU above 0.3 across five seeds; every pack manifest passes the three adapters' wire transformations in `crates/dejaview-cli/tests/python_pack_manifests.rs`)
+- [x] 5.4b `classes` tool (2026-10-29: `classes.py` over a box on two frames in one grid: the classes covering it on each side with shares and confidence as measurements, one `class_difference` region when the dominant class differs; three named fixtures under `tests/fixtures/classes/` return exactly their recorded class lists; the manifest passes the three adapters' wire transformations with the rest of the pack)
 - [ ] 5.2 Provisioning bundle for the real pack (after the tools it packages) → tag `m5.1`
 - [ ] 5.5 Sealed blind set for source fidelity
 - [ ] 5.6 Initial gate D_regions versus C

@@ -1,0 +1,20 @@
+{
+ "bbox": [
+  0.37,
+  0.08,
+  0.82,
+  0.42
+ ],
+ "classes": {
+  "before": [
+   "sky"
+  ],
+  "after": [
+   "painting",
+   "wall"
+  ]
+ },
+ "regions": [
+  "sky -> painting"
+ ]
+}

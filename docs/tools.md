@@ -191,8 +191,36 @@ MCP image blocks the client pairs with them by position and media type. This ver
 tool, `echo_region`, the transport proof: it places the given box on the image as a region and
 returns the box cut from the named frame (or the image's raw frame) as its one image.
 `just python-check` lints and tests the pack offline; `just pack-test` also drives the real
-server from the Rust client (`crates/dejaview-tools/tests/python_pack.rs`): an image and an
-aligned frame by path in, a valid envelope with one image block out.
+server from the Rust client (`crates/dejaview-tools/tests/python_pack.rs`: an image and an
+aligned frame by path in, a valid envelope with one image block out) and puts every manifest the
+pack lists through the three adapters' wire transformations beside `submit_verdict`
+(`crates/dejaview-cli/tests/python_pack_manifests.rs`).
+
+**`regions`** (`regions.py`, task 5.4a) is the first real tool: where an aligned pair differs, as
+high-recall pointers. It takes two frames in one grid, `frame` (usually the aligned candidate) and
+`against` (usually `raw:source`), and marks a pixel changed when either of two photometric views
+says so (the locally contrast-normalised luminance residual, which sees texture change through a
+lighting change, and the blurred colour difference, which sees a flat area replaced by another
+flat colour) or when the segmenter gives the two sides different classes and is confident on
+both. Photometric components become boxes first, then class disagreements no box already covers;
+each is labelled by the majority class on each side (`floor -> swimming pool`), scored by how
+strongly it changed, nudged by `hints.regions` (`preserve` classes up by a quarter, `ignore`
+classes halved, never dropped), and the strongest twelve are returned on `frame` with one image,
+the frame with the boxes drawn. Nothing changed is `measured_nothing`. The segmenter sees each
+frame as a 512×512 square: the longer edge resized to 512, the shorter padded with the image's
+mean colour, centred, and the quarter-resolution semantic map read back from the same placement
+(preprocessing `1-pad`, recorded in every envelope's provenance). Its test plants separated
+colour blocks on synthetic scenes and requires every one found with IoU above 0.3 within the cap;
+it needs the fetched segmenter and says so when skipped.
+
+**`classes`** (`classes.py`, task 5.4b) names what the segmenter sees in one box of the same pair,
+before and after: the classes covering the box on each side with their shares (those under five
+per cent folded away, four at most) and the mean confidence there, as measurements
+(`before:floor 0.62`, `after:signboard 0.71`, `confidence_before`, `confidence_after`), plus one
+region of kind `class_difference` on the box when the dominant class differs. It decides nothing;
+the rules do. The two tools share one loaded segmenter per server process. Its test holds three
+named fixtures (small synthetic pairs under `tests/fixtures/classes/`) to the exact class lists
+recorded beside them.
 
 `scripts/build-bundle.sh` (`just bundle`) builds the wheel and assembles
 `tools/python/dist/bundle-<version>/`: the wheel, a provisioning project whose `pyproject.toml`
@@ -213,8 +241,13 @@ with inline dependencies of its own, checks the export against PyTorch on synthe
 generated from a seed, and writes `record.json`; `MODEL.md` records the licences, the procedure
 and versions, the artifact's SHA-256 (the script reproduces it), the preprocessing version, the
 runtime and execution provider, the parity measured and the tolerance the parity test holds, and
-the release URL the owner publishes the artifact and goldens at. Task 5.3's `fetch` downloads
-from it and refuses a hash mismatch.
+the release URL the owner publishes the artifact and goldens at. `dejaview-tools fetch` (task
+5.3) downloads the artifact and goldens from it into `$XDG_CACHE_HOME/dejaview/models/`, hashing
+every byte against the record shipped in the package and keeping nothing that does not match;
+`segmenter.py` loads the artifact with onnxruntime on the CPU and turns its two heads into the
+semantic map, and the `segmenter`-marked parity test holds it to the recorded tolerance on the
+goldens, skipping with the fetch command when they are absent. `dejaview tools setup` runs
+`fetch` after the sync in task 5.2.
 
 `just provisioning-test` builds the bundle and runs the ignored tests in
 `crates/dejaview-tools/tests/provisioning.rs`: a clean-directory install whose executable

@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from . import __version__
+from . import __version__, classes, regions
 from .context import Context
 from .envelope import bbox_location, envelope, invalid_args, png_image
 
@@ -69,7 +69,7 @@ ECHO_REGION = {
     "output_schema": {"type": "object"},
 }
 
-MANIFESTS = [ECHO_REGION]
+MANIFESTS = [ECHO_REGION, regions.MANIFEST, classes.MANIFEST]
 
 
 def _bbox(value: Any) -> list[float] | None:
@@ -128,4 +128,4 @@ def echo_region(args: dict[str, Any], ctx: Context) -> dict[str, Any]:
     )
 
 
-HANDLERS = {"echo_region": echo_region}
+HANDLERS = {"echo_region": echo_region, "regions": regions.regions, "classes": classes.classes}

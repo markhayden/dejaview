@@ -167,7 +167,7 @@ stored rendering.
 A run done for the record becomes a results document under `docs/results/<name>/`:
 
 ```
-scripts/results-doc.py eval-out/<name> evalsets/matrix/<matrix>.toml docs/results/<name> [--notes notes.md]
+scripts/results-doc.py eval-out/<name> evalsets/matrix/<matrix>.toml docs/results/<name> --title "<what the run was>" [--notes notes.md]
 ```
 
 writes `README.md` (the cells with their resolved models, hosts, API versions and costs, then the

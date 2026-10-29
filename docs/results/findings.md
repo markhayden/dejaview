@@ -58,3 +58,65 @@ sends to review.
 **Next.** M4 adds `view`, `align` and the change-map tools. The same matrix under arms B, C and D
 against this baseline is the first paired comparison, and the question becomes whether tools
 earn their cost on the false rejects and on harder items.
+
+## 2026-10-29: arm C, the visual-access control ([arm-c-2026-10](arm-c-2026-10/README.md))
+
+**Question.** When a model can look closer, does it judge better? Arm C gives the model `view`
+(crops and perspective views) and `align` as a picture only, no measurements, and pairs every
+item against the same model under arm A from the same run. Five models (Opus left out: over the
+per-decision cap under arm C and over the standing $25 per vendor with it), one repetition,
+bootstrap seed 20261028.
+
+**Headline, development sets, repetition 1 (100 items in 25 families: 60 expected fail, 40
+expected pass). Detection difference is C minus A with its paired bootstrap interval.**
+
+| Model | Detected A → C | Detection difference | False rejects A → C | Unsure A → C | Median cost A → C |
+|---|---|---|---|---|---|
+| gemini-4-argon | 60 → 60 | 0.000 (0.000 to 0.000) | 12 → 13 | 0 → 0 | $0.017 → $0.025 |
+| gpt-6.1-sol | 58 → 58 | 0.000 (0.000 to 0.000) | 10 → 9 | 1 → 3 | $0.018 → $0.029 |
+| gpt-6.1-terra | 57 → 57 | 0.000 (0.000 to 0.000) | 8 → 9 | 9 → 12 | $0.009 → $0.015 |
+| claude-sonnet-5-5 | 56 → 56 | 0.000 (0.000 to 0.000) | 5 → 4 | 18 → 29 | $0.025 → $0.081 |
+| gemini-3.8-flash | 54 → 56 | 0.033 (-0.048 to 0.115) | 7 → 10 | 4 → 5 | $0.010 → $0.019 |
+
+Detection is out of 60, false rejects out of 40, unsure out of 100. The intervals are 95% paired
+bootstrap over families; a zero interval means no family's detection changed, not certainty.
+
+**What stood out.**
+
+- Looking closer did not change the verdicts. Across the five models, 39 of 500 paired items
+  flipped, and nearly every flip was between `pass` and `unsure` on a clean image. Detection moved
+  for one model (Flash, four gained and two lost) and its interval straddles zero. The sets are
+  still too easy for a visual-access tool to matter: every planted defect is visible in the
+  presented image, so a crop adds nothing the model did not already have.
+- The tools were hard to call, and that is the harness's finding, not the models'. 124 of 196
+  `align` calls were refused because the model passed the frame id the prompt shows
+  (`raw:candidate`) where the tool wants the image id (`candidate`); GPT-6.1 Sol never got one
+  through in 35 tries. Claude Sonnet made 325 `view` calls and none ran: it sent `yaw: 0` without
+  `fov` on a flat frame, was told the three go together, and repeated the same call next turn until
+  its turns ran out. Only 12 of Sonnet's 110 arm C decisions ever saw a tool picture, against 94 to
+  109 for the other models. Sonnet's arm C is therefore arm A plus refused calls: triple the cost,
+  eleven more unsures, the same detection.
+- Cost is where the arms differ. Arm C cost 1.5 to 2 times arm A per item for the four models
+  that used the tools, 3.3 times for Sonnet. Argon and Terra remain the decisive and the cheap
+  choices respectively, as in the baseline.
+- Reliability. Three decisions in 1100 ended in error: Sonnet once sent the submission's `items`
+  as a JSON string and its one repair did not mend it; Gemini Flash returned `HTTP 400` twice,
+  minutes apart, on the two garden-shed adversarial items, once before any tool call. The run
+  cost $28.31, Anthropic $11.69 of it; the pre-run estimate was $1.47 to $5.15 per decision after
+  the planner was fixed, and the observed median was $0.015 to $0.081.
+
+**What changed because of it.**
+
+- The planner. Before the run it priced every stored tool envelope's inline pixels as text and put
+  each arm C decision near $500; it now prices the presentation the model reads, with images as
+  images.
+- The report. Paired flips per model with gained and lost detections, false rejects, the families
+  that differ and the paired bootstrap with its seed, families and hypothesis count are part of
+  `eval report` and the results document.
+- Open, first in line before the next tools run: `align` takes a frame id for a raw image;
+  `view`'s refusal says what to send on a flat frame; a tool-side `invalid_args` is journaled once.
+  Recorded in `tasks/todo.md`.
+
+**Next.** M5 tests the measuring arms, DX (one measurement tool at a time) and D (all of them),
+against this run's arm A. The sets need harder items too: defects a crop or an alignment would
+reveal and the presented image hides, such as small text, fine geometry and subtle edits.

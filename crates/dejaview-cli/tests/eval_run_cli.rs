@@ -94,6 +94,8 @@ fn eval_run_completes_a_fake_matrix_and_resumes_without_redoing_it() {
             out.to_str().unwrap(),
             "fixtures/matrix/fake-a.toml",
             doc.to_str().unwrap(),
+            "--title",
+            "the scripted check",
             "--bin",
             env!("CARGO_BIN_EXE_dejaview"),
         ])
@@ -108,6 +110,7 @@ fn eval_run_completes_a_fake_matrix_and_resumes_without_redoing_it() {
     );
     let readme = std::fs::read_to_string(doc.join("README.md")).unwrap();
     for needle in [
+        "# fake-a: the scripted check",
         "**These are development sets.**",
         "## Development sets",
         "## Adversarial sets",

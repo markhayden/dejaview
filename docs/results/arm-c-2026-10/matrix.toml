@@ -1,0 +1,56 @@
+# Arm C on the development sets (PLAN.md task 4.5): the ten published sets under arms A and C in
+# one matrix, so the paired flips (A against C, repetition 1, matching item and model) are computed
+# within the matrix; the M3 baseline is historical context, never the comparison arm. Arm C is the
+# visual-access control: `view`, and `align` under its `visual_only` projection. One repetition;
+# the bootstrap seed is frozen here for the paired interval the report prints.
+#
+# Five of the baseline's six models: claude-opus-5-5 is left out. In the baseline it cost about
+# five times gpt-6.1-terra per decision for no better detection, its arm C envelope ($10.30) is
+# over the per-decision cap, and with it the Anthropic share would pass the standing $25 per
+# vendor (docs/owner-decisions.md); without it every vendor stays under.
+[matrix]
+name = "arm-c-2026-10"
+config = "evalsets/matrix/baseline-config.toml"
+sets = [
+  "source-fidelity/scenes-v1",
+  "reference-consistency/pets-v1",
+  "reality-checks/people-v1",
+  "brief-compliance/stills-v1",
+  "product-fidelity/packshots-v1",
+  "source-fidelity/adversarial-v1",
+  "reference-consistency/adversarial-v1",
+  "reality-checks/adversarial-v1",
+  "brief-compliance/adversarial-v1",
+  "product-fidelity/adversarial-v1",
+]
+arms = ["A", "C"]
+decision_runs = 1
+repetitions = 1
+spend_cap_usd = 75.0
+
+[matrix.gate]
+seed = 20261028
+
+[[matrix.models]]
+profile = "anthropic"
+model = "claude-sonnet-5-5"
+
+[[matrix.models]]
+profile = "google-ai-studio"
+model = "gemini-3.8-flash"
+account = "google:${DEJAVIEW_GOOGLE_ACCOUNT}"
+
+[[matrix.models]]
+profile = "google-ai-studio"
+model = "gemini-4-argon"
+account = "google:${DEJAVIEW_GOOGLE_ACCOUNT}"
+
+[[matrix.models]]
+profile = "openai"
+model = "gpt-6.1-terra"
+account = "openai:${DEJAVIEW_OPENAI_ACCOUNT}"
+
+[[matrix.models]]
+profile = "openai"
+model = "gpt-6.1-sol"
+account = "openai:${DEJAVIEW_OPENAI_ACCOUNT}"

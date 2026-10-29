@@ -1,12 +1,12 @@
 #!/usr/bin/env -S python3 -I
-"""Writes the results document of a finished evaluation (PLAN.md task 3.8): every metric from
+"""Writes the results document of a finished evaluation (PLAN.md tasks 3.8 and 4.5): every metric from
 `dejaview eval report`, development and adversarial sets reported separately, the resolved model
 ids, hosts and API versions from the decision headers, the cost per cell, and copies of the
 matrix, summary and metrics beside it.
 
-    scripts/results-doc.py <eval dir> <matrix.toml> docs/results/<name> [--bin target/debug/dejaview] [--notes notes.md]
+    scripts/results-doc.py <eval dir> <matrix.toml> docs/results/<name> --title "arm A baseline" [--bin target/debug/dejaview] [--notes notes.md]
 
-`--notes` names a Markdown file whose body becomes the document's "Notes" section: how the run
+`--title` finishes the heading after the matrix name. `--notes` names a Markdown file whose body becomes the document's "Notes" section: how the run
 went (resumes, refused calls, what the ledger counted) and what a reader should know before the
 numbers. It is copied beside the document as `notes.md`.
 """
@@ -32,6 +32,7 @@ def main() -> None:
     ap.add_argument("eval_dir", type=pathlib.Path)
     ap.add_argument("matrix", type=pathlib.Path)
     ap.add_argument("out", type=pathlib.Path, help="the results directory to create")
+    ap.add_argument("--title", required=True, help="what the run was, after the matrix name in the heading")
     ap.add_argument("--bin", default="target/debug/dejaview")
     ap.add_argument("--evalsets-root", default=os.environ.get("DEJAVIEW_EVALSETS_ROOT", "evalsets"))
     ap.add_argument("--notes", type=pathlib.Path, help="a Markdown file for the Notes section")
@@ -69,14 +70,15 @@ def main() -> None:
     shutil.copy(a.eval_dir / "metrics.json", a.out / "metrics.json")
     shutil.copy(a.eval_dir / "descriptor.json", a.out / "descriptor.json")
 
+    repetitions = max(d["repetition"] for d in summary["decisions"])
     lines = [
-        f"# {summary['matrix']}: arm A baseline",
+        f"# {summary['matrix']}: {a.title}",
         "",
         "**These are development sets.** Every item here was built, reviewed and labelled by the",
         "owner, and the sets are public; prompts and tools are tuned against them, so these numbers",
         "describe the harness on material it may have been shaped by, not on a blind set. The",
-        "adversarial sets are reported separately below. Repetition 1 is the headline; repetition 2",
-        "is reported as agreement.",
+        "adversarial sets are reported separately below. Repetition 1 is the headline"
+        + ("; later repetitions are reported as agreement." if repetitions > 1 else "; there is one repetition."),
         "",
         f"- Matrix identity `{summary['matrix_identity']}`, descriptor `{summary['descriptor_sha256']}`",
         f"- Harness {descriptor['harness_version']}, prompt {descriptor['prompt_version']}, catalog version {descriptor['catalog_version']}",

@@ -90,7 +90,7 @@ tag.
 - [x] 4.3c `edge_similarity` and `change_map` → tag `m4.1` (2026-10-28: edge-map correlation and the locally normalised difference map, golden under fixtures/images/change-map)
 - [x] 4.4a Full MCP client, ADR 0015, pagination, concurrency, images (2026-10-28: in-house client kept; multiplexed requests, pagination guards, concurrent tools and serial turns, lease waits for in-flight calls, outputSchema validation, exact blocks, isError truth table, frame chain, concurrent batch dispatch in the run)
 - [x] 4.4b MCP failure modes (2026-10-28: one fake-server test per mode; leases keyed by decision directory; `shared = true` packs connected once per evaluation)
-- [ ] 4.5 Arm C on the dev sets
+- [ ] 4.5 Arm C on the dev sets (started 2026-10-28: `evalsets/matrix/arm-c.toml` drafted, arms A and C, six models, one repetition, bootstrap seed frozen; `eval estimate` shows every arm C envelope far above both caps (sum $338,811, the per-decision cap $10 refuses all 660 C decisions) because the planner prices every possible tool turn with two 1024 px images at bound, so the run cannot start as the caps stand. Before the run: a paired-flips section in `metrics.json`/`report.md` (A against C per model, repetition 1, with the bootstrap interval under the matrix seed), and either tighter arm C budgets (`tool_turns`, `tool_calls`, view's `max_long_edge`) or a less pessimistic envelope for returned images; then the owner's go-ahead on the estimate with prices)
 - [ ] 4.6 Segmenter artifact and MODEL.md
 - [ ] Checkpoint M4 → tag `m4`
 

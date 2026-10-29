@@ -109,7 +109,6 @@ impl dejaview_eval::canary::Judge for CliJudge {
         #[cfg(not(feature = "testkit"))]
         let script = None;
         crate::tools_for_config(config, script, &crate::SharedPacks::default())
-            .map(|(registry, _)| registry)
             .map_err(dejaview_eval::Error::Canary)
     }
 }
@@ -459,10 +458,10 @@ impl Factories for CliFactories {
         let script = self.tool_script.as_deref();
         #[cfg(not(feature = "testkit"))]
         let script = None;
-        let (registry, digests) = crate::tools_for_config(config, script, &self.shared_packs)
+        let registry = crate::tools_for_config(config, script, &self.shared_packs)
             .map_err(dejaview_eval::Error::Runner)?;
         if let Ok(mut held) = self.lock_digests.lock() {
-            *held = digests;
+            *held = registry.lock_digests().clone();
         }
         // The arm's projections (`align` under `visual_only` in the control arms) wrap the tools
         // here, so every envelope the run sees is already projected.

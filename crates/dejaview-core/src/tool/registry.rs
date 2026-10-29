@@ -9,6 +9,10 @@ pub struct ToolRegistry {
     tools: Vec<Arc<dyn Tool>>,
     /// The projection each tool runs under, by name; absent means the full envelope.
     projections: std::collections::BTreeMap<String, String>,
+    /// The lock digest of the installed bundle each pack tool came from, by tool name: part of
+    /// the cache key and the evaluation descriptor. A built-in, or a pack run by `command`, has
+    /// none.
+    lock_digests: std::collections::BTreeMap<String, String>,
 }
 
 impl ToolRegistry {
@@ -70,7 +74,22 @@ impl ToolRegistry {
         Ok(ToolRegistry {
             tools,
             projections: std::collections::BTreeMap::new(),
+            lock_digests: std::collections::BTreeMap::new(),
         })
+    }
+
+    /// Records the lock digest of the installed bundle each named tool came from.
+    pub fn with_lock_digests(
+        mut self,
+        digests: std::collections::BTreeMap<String, String>,
+    ) -> ToolRegistry {
+        self.lock_digests = digests;
+        self
+    }
+
+    /// The lock digests recorded with `with_lock_digests`, by tool name.
+    pub fn lock_digests(&self) -> &std::collections::BTreeMap<String, String> {
+        &self.lock_digests
     }
 
     /// Runs the named tools under the named projections (SPEC "Evaluation projections"): every

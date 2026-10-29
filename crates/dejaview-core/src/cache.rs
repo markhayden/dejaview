@@ -39,6 +39,9 @@ pub struct KeyInput {
     pub checklist: Vec<String>,
     pub system_prompt: String,
     pub tools: Vec<Manifest>,
+    /// The installed bundle's lock digest behind each pack tool: the same manifest served by a
+    /// pack whose dependencies differ is a different tool.
+    pub lock_digests: BTreeMap<String, String>,
     pub versions: BTreeMap<String, u32>,
     pub adapter: String,
     pub profile: String,
@@ -100,6 +103,7 @@ impl KeyInput {
             checklist: prepared.checklist.ids().map(str::to_string).collect(),
             system_prompt: prepared.system_prompt.clone(),
             tools: tools.manifests().cloned().collect(),
+            lock_digests: tools.lock_digests().clone(),
             versions: BTreeMap::from([
                 ("config".to_string(), CONFIG_VERSION),
                 ("manifest".to_string(), MANIFEST_VERSION),

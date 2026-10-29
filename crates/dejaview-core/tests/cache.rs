@@ -174,6 +174,38 @@ fn cache_key_changes_for_every_key_input() {
 }
 
 #[test]
+fn cache_key_changes_with_a_packs_lock_digest() {
+    // The same tools from a pack whose lock pins other dependency versions are other tools: the
+    // lock digest the installed bundle carries is part of the key (SPEC "Python tool pack").
+    let config = config(&[]);
+    let job = Job::load(&root().join("fixtures/jobs/pair.toml")).unwrap();
+    let key_with = |digest: &str| {
+        let tools = ToolRegistry::new(vec![], &[], &[])
+            .unwrap()
+            .with_lock_digests(std::collections::BTreeMap::from([(
+                "regions".to_string(),
+                digest.to_string(),
+            )]));
+        let setup = run::setup(&config, &job, &root(), &tools).unwrap();
+        KeyInput::gather(
+            &config,
+            &job,
+            &setup.images,
+            &setup.prepared,
+            &tools,
+            &dejaview_testkit::ScriptedProvider::from_json("[]").unwrap(),
+            "test",
+        )
+        .key()
+        .unwrap()
+    };
+    let base = key_input(&config).key().unwrap();
+    assert_ne!(key_with("a"), base);
+    assert_ne!(key_with("a"), key_with("b"));
+    assert_eq!(key_with("a"), key_with("a"));
+}
+
+#[test]
 fn cache_key_ignores_credentials_output_and_cache_settings() {
     let base = key_input(&config(&[])).key().unwrap();
     for overrides in [

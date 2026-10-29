@@ -717,17 +717,17 @@ fn build_tools(args: &CheckArgs, config: &Config) -> Result<ToolRegistry, String
         let _ = args;
         None
     };
-    tools_for_config(config, script, &SharedPacks::default()).map(|(registry, _)| registry)
+    tools_for_config(config, script, &SharedPacks::default())
 }
 
 /// The tool registry for a config: the configured packs, then the built-in (and in a testkit
-/// build the scripted) tools, enabled and ordered as the config says; with the lock digest of
-/// the installed pack each enabled pack tool came from (a pack run by `command` has none).
+/// build the scripted) tools, enabled and ordered as the config says; carrying the lock digest
+/// of the installed pack each enabled pack tool came from (a pack run by `command` has none).
 fn tools_for_config(
     config: &Config,
     tool_script: Option<&Path>,
     shared: &SharedPacks,
-) -> Result<(ToolRegistry, std::collections::BTreeMap<String, String>), String> {
+) -> Result<ToolRegistry, String> {
     // Packs first; a built-in or scripted tool of the same name yields to the pack's.
     let mut available: Vec<Box<dyn Tool>> = Vec::new();
     let mut digests = std::collections::BTreeMap::new();
@@ -750,7 +750,7 @@ fn tools_for_config(
     let registry = ToolRegistry::new(available, &config.tools.enabled, &config.tools.order)
         .map_err(|e| e.to_string())?;
     digests.retain(|name, _| config.tools.enabled.contains(name));
-    Ok((registry, digests))
+    Ok(registry.with_lock_digests(digests))
 }
 
 fn tools_setup(args: &ToolsSetupArgs) -> i32 {

@@ -7,7 +7,6 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 repo="$(pwd)"
 version="$(cargo metadata --format-version 1 --no-deps | python3 -I -c 'import json,sys; m=json.load(sys.stdin); print(next(p["version"] for p in m["packages"] if p["name"]=="dejaview"))')"
-cargo package --workspace --locked --allow-dirty
 # The stage is a fresh directory: a caller-named one must not already hold anything (it is wiped
 # at the end), otherwise a scratch directory that is removed on exit.
 if [ -n "${REGISTRY_STAGE_DIR:-}" ]; then
@@ -20,7 +19,16 @@ else
 fi
 trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/crates" "$stage/.cargo"
-for crate in "$repo"/target/package/*-"$version".crate; do tar xzf "$crate" -C "$stage/crates"; done
+# Packaging verifies each tarball by building it against the sibling crates staged in a temporary
+# registry. The extracted sources carry fixed timestamps and are cached by name and version, so
+# with the shared target directory a sibling compiled on an earlier run of the same version is
+# reused as if nothing had changed, and a crate "verifies" against a stale dependency. A target
+# directory of this run's own, and the cached extractions of our crates removed, make the
+# verification see the sources as packaged now.
+rm -rf "$HOME"/.cargo/registry/src/*/dejaview-*-"$version"
+CARGO_TARGET_DIR="$stage/target" cargo package --workspace --locked --allow-dirty
+packages="$stage/target/package"
+for crate in "$packages"/*-"$version".crate; do tar xzf "$crate" -C "$stage/crates"; done
 {
   echo "[patch.crates-io]"
   for dir in "$stage"/crates/*/; do
@@ -35,4 +43,4 @@ for crate in "$repo"/target/package/*-"$version".crate; do tar xzf "$crate" -C "
 } > "$stage/.cargo/config.toml"
 (cd "$stage" && cargo install --path "$stage/crates/dejaview-$version" --root "$stage/root" --locked)
 "$repo/scripts/offline-smoke.sh" "$stage/root/bin/dejaview"
-echo "registry install ok: dejaview $version from $(ls "$repo"/target/package/*.crate | wc -l | tr -d ' ') crates"
+echo "registry install ok: dejaview $version from $(ls "$packages"/*.crate | wc -l | tr -d ' ') crates"

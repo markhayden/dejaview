@@ -106,6 +106,17 @@ jobs:
       - if: steps.pack.outputs.present == 'true'
         name: Build the provisioning test with the network
         run: cargo test -p squint-tools --test provisioning --no-run
+      # The install inside the namespace runs `uv sync --frozen` with no network, so the bundle's
+      # locked dependencies (numpy, Pillow, onnxruntime) must already be in the uv cache: one sync
+      # of a copy of the bundle with the network fills it. A copy, because the bundle itself must
+      # stay exactly the files its bundle.toml lists.
+      - if: steps.pack.outputs.present == 'true'
+        name: Seed the uv cache with the bundle's locked dependencies
+        run: |
+          seed="$(mktemp -d)"
+          cp -R tools/python/dist/bundle-*/. "$seed"
+          (cd "$seed" && uv sync --frozen --no-dev)
+          rm -rf "$seed"
       # act's container cannot create namespaces; there the same install and call run without one.
       # GitHub's runners block unprivileged user namespaces (`unshare -r`), so the network namespace
       # is created with sudo and the test runs inside it as the runner user with its PATH and HOME.

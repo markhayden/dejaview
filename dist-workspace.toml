@@ -18,5 +18,9 @@ pr-run-mode = "upload"
 # The offline smoke on each archive, on its own architecture, as the one publish job; the GitHub
 # release is created at announce, which runs only when that job passed, prereleases included.
 publish-jobs = ["./archive-smoke"]
+# A publish job's permissions replace the defaults, so the smoke job is granted the read access it
+# declares; without it GitHub refuses to start the release (a nested job may not ask for more
+# than its caller grants).
+github-custom-job-permissions = { "archive-smoke" = { contents = "read" } }
 publish-prereleases = true
 github-release = "announce"

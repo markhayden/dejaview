@@ -138,6 +138,7 @@ def test_every_planted_change_is_found_within_the_cap(seed):
     assert all(" -> " in r["label"] or r["label"].endswith("changed") for r in found)
     [image] = env["images"]
     assert image["frame"] == "crop:call:3:0" and image["mapping"] == {"bbox": [0.0, 0.0, 1.0, 1.0]}
+    assert set(env["provenance"]) == {"tool", "version", "duration_ms", "lock_digest"}
     names = {m["name"] for m in env["measurements"]}
     assert names == {"changed_fraction", "photometric_fraction", "class_disagreement", "candidates"}
 

@@ -39,7 +39,7 @@ it.
 |---|---|
 | Artifact | `eomt-large-ade20k-512.onnx`, 1,264,419,839 bytes |
 | SHA-256 | `184ad11695a51bf67f91d2cf474670894ab8b5c98fdcfcd88e9fce1e23491b85` |
-| Input | `pixel_values`, float32 `[batch, 3, 512, 512]`: square only. The processor resizes the shorter edge to 512 and the export fixes both spatial sizes, so the tools pad: the longer edge is resized to 512, the shorter padded to 512 with the image's mean colour, centred, and the semantic map is read back from the same placement (`segmenter.prepare`, preprocessing `1-pad` in every envelope's provenance; task 5.4a) |
+| Input | `pixel_values`, float32 `[batch, 3, 512, 512]`: square only. The processor resizes the shorter edge to 512 and the export fixes both spatial sizes, so the tools pad: the longer edge is resized to 512, the shorter padded to 512 with the image's mean colour, centred, and the semantic map is read back from the same placement (`segmenter.prepare`, preprocessing `1-pad`; task 5.4a) |
 | Outputs | `class_queries_logits` (per query, 150 ADE20K classes plus no-object), `masks_queries_logits` (per query, a mask at a quarter of the input) |
 | Preprocessing version | `1`: the image's shorter edge resized to 512 (bilinear), scaled to `[0, 1]`, normalised with mean `[0.485, 0.456, 0.406]` and std `[0.229, 0.224, 0.225]`; the semantic map is `softmax(class)[..., :-1]` combined with `sigmoid(masks)` and the argmax over classes |
 | Export versions | torch 2.15.0, transformers 5.21.0, onnx 1.23.2, Python 3.13.3, arm64 (macOS); pinned in the script and recorded on every run |

@@ -361,6 +361,5 @@ def regions(args: dict[str, Any], ctx: Context) -> dict[str, Any]:
             "regions", "ok", summary, regions=out_regions, measurements=measurements, images=images
         )
     env["provenance"]["duration_ms"] = int((time.monotonic() - started) * 1000)
-    env["provenance"]["preprocessing_version"] = segmenter.PREPROCESSING_VERSION
     env["provenance"]["version"] = MANIFEST["version"]
     return env

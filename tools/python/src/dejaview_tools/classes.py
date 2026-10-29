@@ -213,6 +213,5 @@ def classes(args: dict[str, Any], ctx: Context) -> dict[str, Any]:
         summary += f" The dominant class is {after} on both sides."
     env = envelope("classes", "ok", summary, regions=regions, measurements=measurements)
     env["provenance"]["duration_ms"] = int((time.monotonic() - started) * 1000)
-    env["provenance"]["preprocessing_version"] = segmenter.PREPROCESSING_VERSION
     env["provenance"]["version"] = MANIFEST["version"]
     return env

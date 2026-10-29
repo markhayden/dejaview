@@ -23,6 +23,8 @@ STD = np.array([0.229, 0.224, 0.225], np.float32)
 # How the tools bring an image of any shape to the square input (`MODEL.md`, preprocessing
 # version 1 plus this): the longer edge is resized to 512 (bilinear), the shorter padded to 512
 # with the image's mean colour, centred; the semantic map is read back from the same placement.
+# Recorded in MODEL.md and the tools' documentation; an envelope's provenance holds only the
+# harness's fixed fields.
 PREPROCESSING_VERSION = "1-pad"
 
 

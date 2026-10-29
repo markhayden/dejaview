@@ -159,6 +159,42 @@ def test_a_malformed_context_is_a_protocol_error_not_an_answer():
     assert response["error"]["code"] == -32602
 
 
+def test_every_envelope_carries_exactly_the_provenance_the_harness_knows():
+    # The harness refuses an envelope with an unknown provenance field, so a pack that annotates
+    # its provenance breaks every call; the shape is fixed.
+    from dejaview_tools.envelope import envelope
+
+    assert set(envelope("x", "ok", "s")["provenance"]) == {
+        "tool",
+        "version",
+        "duration_ms",
+        "lock_digest",
+    }
+    [called] = run(
+        [
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "echo_region",
+                    "arguments": {
+                        "image": "candidate",
+                        "bbox": [0.1, 0.2, 0.3, 0.4],
+                        "_dejaview": context(),
+                    },
+                },
+            }
+        ]
+    )
+    assert set(called["result"]["structuredContent"]["provenance"]) == {
+        "tool",
+        "version",
+        "duration_ms",
+        "lock_digest",
+    }
+
+
 def test_missing_context_and_bad_arguments_are_invalid_args():
     responses = run(
         [

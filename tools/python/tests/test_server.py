@@ -1,7 +1,11 @@
 """The server's protocol and the echo tool, driven in-process."""
 
+import base64
 import io
 import json
+
+import numpy as np
+from PIL import Image
 
 from dejaview_tools import __version__, server, tools
 
@@ -13,15 +17,30 @@ def run(messages):
     return [json.loads(line) for line in out.getvalue().splitlines()]
 
 
-def context(images=("candidate",)):
+def png(width, height, value=128):
+    buf = io.BytesIO()
+    Image.fromarray(np.full((height, width, 3), value, dtype=np.uint8)).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def handle(width, height, **where):
+    return {
+        "media_type": "image/png",
+        "width": width,
+        "height": height,
+        "projection": "flat",
+        **where,
+    }
+
+
+def context(images=("candidate",), frames=None):
     return {
         "run_id": "run-1",
         "call_id": "call:1",
         "images": {
-            i: {"media_type": "image/png", "width": 1, "height": 1, "projection": "flat"}
-            for i in images
+            i: handle(20, 10, base64=base64.b64encode(png(20, 10)).decode("ascii")) for i in images
         },
-        "frames": {},
+        "frames": frames or {},
         "hints": {},
     }
 
@@ -73,6 +92,71 @@ def test_initialize_lists_and_calls():
         "pitch": None,
         "fov": None,
     }
+    # The cut box is this call's one crop: named for the harness, its bytes in the one image
+    # block and not in the envelope, its mapping the pixel box actually cut (x 2..6 of 20,
+    # y 2..4 of 10).
+    [image] = envelope["images"]
+    assert image["frame"] == "crop:call:1:0" and image["parent"] == "raw:candidate"
+    assert image["mapping"] == {"bbox": [0.1, 0.2, 0.3, 0.4]}
+    assert (image["width"], image["height"], image["media_type"]) == (4, 2, "image/png")
+    assert "base64" not in image
+    [block] = called["result"]["content"]
+    assert block["type"] == "image" and block["mimeType"] == "image/png"
+    cut = Image.open(io.BytesIO(base64.b64decode(block["data"])))
+    assert cut.size == (4, 2)
+
+
+def test_the_box_is_cut_from_a_named_frame_and_an_unknown_frame_is_the_models_mistake():
+    aligned = {
+        "root": "candidate",
+        "projection": "flat",
+        "parent": "raw:source",
+        "transform": {"id": "t1", "mapping": {"homography": [1, 0, 0, 0, 1, 0, 0, 0, 1]}},
+        "chain": [],
+        "pixels": handle(40, 20, base64=base64.b64encode(png(40, 20, 7)).decode("ascii")),
+    }
+
+    def call(frame, n):
+        return {
+            "jsonrpc": "2.0",
+            "id": n,
+            "method": "tools/call",
+            "params": {
+                "name": "echo_region",
+                "arguments": {
+                    "image": "candidate",
+                    "bbox": [0.5, 0.5, 1.0, 1.0],
+                    "frame": frame,
+                    "_dejaview": context(frames={"aligned:candidate:t1": aligned}),
+                },
+            },
+        }
+
+    from_frame, unknown = run([call("aligned:candidate:t1", 1), call("crop:call:0:0", 2)])
+    [image] = from_frame["result"]["structuredContent"]["images"]
+    assert image["parent"] == "aligned:candidate:t1"
+    assert (image["width"], image["height"]) == (20, 10)
+    cut = Image.open(io.BytesIO(base64.b64decode(from_frame["result"]["content"][0]["data"])))
+    assert cut.getpixel((0, 0)) == (7, 7, 7)
+    assert unknown["result"]["isError"] is True
+    assert "unknown frame id" in unknown["result"]["structuredContent"]["summary"]
+
+
+def test_a_malformed_context_is_a_protocol_error_not_an_answer():
+    [response] = run(
+        [
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "echo_region",
+                    "arguments": {"image": "candidate", "bbox": [0, 0, 1, 1], "_dejaview": "nope"},
+                },
+            }
+        ]
+    )
+    assert response["error"]["code"] == -32602
 
 
 def test_missing_context_and_bad_arguments_are_invalid_args():

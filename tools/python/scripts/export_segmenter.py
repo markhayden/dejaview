@@ -267,7 +267,10 @@ def main() -> int:
     (a.out / "record.json").write_text(json.dumps(record, indent=2, default=str) + "\n")
     print(f"record: {a.out / 'record.json'}")
     if not parity_ok:
-        print(f"parity outside tolerance {json.dumps(TOLERANCE)}: {json.dumps(worst)}", file=sys.stderr)
+        print(
+            f"parity outside tolerance {json.dumps(TOLERANCE)}: {json.dumps(worst)}",
+            file=sys.stderr,
+        )
         return 1
     return 0
 

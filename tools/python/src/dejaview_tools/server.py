@@ -11,6 +11,8 @@ import sys
 from typing import Any, TextIO
 
 from . import __version__, tools
+from .context import Context, ContextError
+from .envelope import invalid_args, split_images
 
 PROTOCOL_VERSION = "2025-11-25"
 
@@ -79,17 +81,25 @@ class Server:
         if handler is None:
             self.error(request_id, -32602, f"unknown tool {name}")
             return
-        context = arguments.get("_dejaview")
-        if not isinstance(context, dict):
-            envelope = tools.invalid_args(name, "_dejaview is required")
+        if "_dejaview" not in arguments:
+            envelope = invalid_args(name, "_dejaview is required")
         else:
+            try:
+                context = Context.parse(arguments["_dejaview"])
+            except ContextError as e:
+                # The harness's call is malformed: a JSON-RPC error, which it records as a
+                # tool error, never an answer the model could act on.
+                self.error(request_id, -32602, str(e))
+                return
             model_args = {k: v for k, v in arguments.items() if k != "_dejaview"}
             envelope = handler(model_args, context)
+        # The images' bytes travel as content blocks, in the envelope's order (SPEC "Results").
+        structured, blocks = split_images(envelope)
         self.result(
             request_id,
             {
-                "content": [],
-                "structuredContent": envelope,
+                "content": blocks,
+                "structuredContent": structured,
                 "isError": envelope["status"] == "invalid_args",
             },
         )

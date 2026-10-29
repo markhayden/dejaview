@@ -98,6 +98,9 @@ jobs:
         name: The set-building toolkit's offline dry run, checked by the harness
         run: scripts/sets-dry-run.sh
       - if: steps.pack.outputs.present == 'true'
+        name: The Rust client against the real pack (task 5.1)
+        run: cargo test -p dejaview-tools --test python_pack -- --ignored
+      - if: steps.pack.outputs.present == 'true'
         name: Build the provisioning bundle
         run: scripts/build-bundle.sh
       - if: steps.pack.outputs.present == 'true'

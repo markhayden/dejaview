@@ -1,6 +1,7 @@
 //! Built-in deterministic tools, the MCP client, provisioning and evaluation projections.
 
 pub mod align;
+pub mod builtin;
 pub mod mcp;
 pub mod provision;
 

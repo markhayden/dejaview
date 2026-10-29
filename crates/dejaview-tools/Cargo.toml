@@ -21,3 +21,4 @@ workspace = true
 
 [dev-dependencies]
 dejaview-testkit = { workspace = true }
+tokio = { workspace = true }

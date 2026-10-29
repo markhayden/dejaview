@@ -83,7 +83,7 @@ tag.
 ## M4 Built-in tools and MCP client
 - [x] 4.0 Alignment feasibility spike and ADR 0014 (2026-10-28: direct registration on normalised pyramids, within 0.05 px and 0.01° at 2048 px, sphere within 0.03°; `dejaview_tools::align`, failure fixtures under fixtures/images/align)
 - [x] 4.1 Registry in production (2026-10-28: manifest `projections`, `ToolRegistry::with_projections` wrapping tools so envelopes are projected before the run sees them, the projection on the report's tool calls, the Tools section snapshot; `tools list` prints projections; built-in registration lands with the first built-in in 4.2a)
-- [ ] 4.2a `view`, `resize`, equirectangular geometry
+- [x] 4.2a `view`, `resize`, equirectangular geometry (2026-10-28: built-ins registered and listed; perspective views written from first principles, not ported from the prototype (owner decision 11), checked against the stored view and the analytic scene; view frames map to polygon footprints on the panorama, seam cut, pole as a full-width box)
 - [ ] 4.2b Viewer equirectangular overlay
 - [ ] 4.3a `align` flat and `visual_only` (also: run `eval gate` end to end through the binary once arms C and D can run, and look at the gate tests' forty-second fake runs)
 - [ ] 4.3b `align` equirectangular

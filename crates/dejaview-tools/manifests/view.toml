@@ -1,0 +1,66 @@
+# The built-in view tool (SPEC "Transports", task 4.2a).
+[tool]
+name = "view"
+version = "1.0.0"
+purpose = "Shows a region closer: a crop of a flat frame by box, or a square perspective view of a panorama by yaw, pitch and field of view; optionally the same region in a second frame."
+when_to_use = "To inspect a detail, an edge or a seam at more resolution than the whole image gives, or to compare the same region in two frames side by side."
+when_not_to_use = "To judge whole-image properties such as composition or projection; a crop shows less of the picture, not more."
+output_guidance = "Each returned image is a new frame cut from the one you named. Point findings at the frame that shows them best; the harness maps them back."
+cost = { tier = "cheap", seconds = 1.0 }
+frame_args = ["frame", "also"]
+returns = { max_images = 2, max_long_edge = 1024, max_image_bytes = 4_000_000, max_summary_bytes = 2048, max_regions = 0, max_region_label_bytes = 0, max_measurements = 0, max_transforms = 0, max_envelope_bytes = 11_000_000 }
+frames_out = ["crop"]
+
+[tool.model_schema]
+type = "object"
+additionalProperties = false
+required = ["frame"]
+[tool.model_schema.properties.frame]
+type = "string"
+description = "The frame to look into, for example raw:candidate or a crop a tool returned."
+[tool.model_schema.properties.also]
+type = "string"
+description = "A second frame of the same projection to show the same region in, for comparison."
+[tool.model_schema.properties.bbox]
+type = "array"
+items = { type = "number", minimum = 0, maximum = 1 }
+minItems = 4
+maxItems = 4
+description = "[left, top, right, bottom] as fractions of the frame, for a crop. Not with yaw, pitch and fov."
+[tool.model_schema.properties.yaw]
+type = "number"
+minimum = -180
+maximum = 180
+description = "Degrees from the centre column of a panorama, increasing to the right. With pitch and fov."
+[tool.model_schema.properties.pitch]
+type = "number"
+minimum = -90
+maximum = 90
+description = "Degrees above the horizon of a panorama."
+[tool.model_schema.properties.fov]
+type = "number"
+minimum = 10
+maximum = 120
+description = "Horizontal field of view in degrees of the square perspective view."
+
+[tool.input_schema]
+type = "object"
+additionalProperties = false
+required = ["frame", "_dejaview"]
+[tool.input_schema.properties.frame]
+type = "string"
+[tool.input_schema.properties.also]
+type = "string"
+[tool.input_schema.properties.bbox]
+type = "array"
+[tool.input_schema.properties.yaw]
+type = "number"
+[tool.input_schema.properties.pitch]
+type = "number"
+[tool.input_schema.properties.fov]
+type = "number"
+[tool.input_schema.properties._dejaview]
+type = "object"
+
+[tool.output_schema]
+type = "object"

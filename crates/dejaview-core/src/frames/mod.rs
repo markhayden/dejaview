@@ -1,7 +1,10 @@
 //! Frames and locations. A frame is a coordinate space the model or a tool can point into:
 //! `raw:<image>` for a canonical image, `aligned:<image>:<transform>` for a warped image,
 //! `crop:<call>:<n>` for a tool's crop. Every location names a frame and maps deterministically
-//! back to the raw frame of its root image. Equirectangular view mapping arrives in task 4.2a.
+//! back to the raw frame of its root image, through bbox crops and, for `view` crops of a
+//! panorama, the sphere geometry in `sphere`.
+
+pub mod sphere;
 
 use std::collections::BTreeMap;
 
@@ -48,7 +51,7 @@ pub enum LocationKind {
 pub enum Mapping {
     /// The frame covers this normalised box of the parent (may extend past the parent's edges).
     Bbox([f64; 4]),
-    /// A square perspective view of an equirectangular parent (mapping maths in task 4.2a).
+    /// A square perspective view of an equirectangular parent (`sphere::View`).
     View { yaw: f64, pitch: f64, fov: f64 },
 }
 
@@ -308,12 +311,18 @@ impl Registry {
                 Frame::Crop {
                     parent, mapping, ..
                 } => {
-                    let Mapping::Bbox(m) = mapping else {
-                        return Err(Error::Submission(
-                            "view crop mapping arrives in task 4.2a".into(),
-                        ));
+                    let (next, clipped) = match mapping {
+                        Mapping::Bbox(m) => map_through_bbox(&current, m, parent)?,
+                        Mapping::View { yaw, pitch, fov } => sphere::map_through_view(
+                            &current,
+                            &sphere::View {
+                                yaw: *yaw,
+                                pitch: *pitch,
+                                fov: *fov,
+                            },
+                            parent,
+                        )?,
                     };
-                    let (next, clipped) = map_through_bbox(&current, m, parent)?;
                     partial |= clipped;
                     current = next;
                 }
@@ -327,14 +336,24 @@ impl Registry {
             .frames
             .get(frame_id)
             .ok_or_else(|| Error::Submission(format!("unknown frame {frame_id:?}")))?;
-        let Frame::Crop {
-            mapping: Mapping::Bbox(m),
-            ..
-        } = frame
-        else {
-            return Err(Error::Submission(
-                "from_root supports bbox crops in task 1.2".into(),
-            ));
+        let Frame::Crop { mapping, .. } = frame else {
+            return Err(Error::Submission(format!(
+                "{frame_id:?} is not a crop frame"
+            )));
+        };
+        let m = match mapping {
+            Mapping::Bbox(m) => m,
+            Mapping::View { yaw, pitch, fov } => {
+                return sphere::map_into_view(
+                    root_loc,
+                    &sphere::View {
+                        yaw: *yaw,
+                        pitch: *pitch,
+                        fov: *fov,
+                    },
+                    frame_id,
+                );
+            }
         };
         let w = m[2] - m[0];
         let h = m[3] - m[1];

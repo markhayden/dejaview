@@ -41,8 +41,25 @@ touches the filesystem.
 
 ## Transports
 
-**Built-in (in-process Rust).** A `Tool` implementation; arrives with M4. The alignment
-estimators behind `align` are in place (`dejaview_tools::align`, ADR 0014): `align_flat` returns
+**Built-in (in-process Rust).** `Tool` implementations in `crates/dejaview-tools/src/builtin/`,
+manifests embedded from `crates/dejaview-tools/manifests/`, registered ahead of any pack of the
+same name and listed by `dejaview tools list`. Shipped so far:
+
+- `view` (`frame`, optional `also`; either `bbox` or `yaw`, `pitch` and `fov`): a crop of a frame
+  by normalised box, snapped outward to whole pixels (the mapping records the pixels actually cut)
+  and scaled to a 1024 px long edge when larger; or a square perspective view into an
+  equirectangular frame, sized to the panorama's own resolution over the field of view between
+  256 and 1024 px, rendered by inverse-mapping every pixel to the sphere and sampling the panorama
+  across the seam (`dejaview_core::frames::sphere`). `also` repeats the same region in a second
+  frame of the same projection. Boxes under 8 px, angles on a flat frame, both forms at once, or
+  `fov` outside 10 to 120 are `invalid_args`. Returned frames are `crop:<call>:<n>` with the
+  mapping the registry maps locations through: a box on a view frame becomes the polygon of its
+  footprint on the panorama, cut at the seam and flagged when it straddles it, a full-width box
+  when it holds a pole.
+- `resize` (`frame`, `long_edge` 64 to 1024): the frame scaled down with a triangle filter,
+  mapping the whole parent; it never enlarges.
+
+The alignment estimators behind `align` are in place (`dejaview_tools::align`, ADR 0014): `align_flat` returns
 the homography from source to candidate pixel coordinates and `align_sphere` the rotation between
 two equirectangular panoramas, each with `overlap`, `ncc`, `inlier_fraction` and `texture` and
 an outcome of `registered`, `low_texture` or `not_registered`. Direct registration on locally

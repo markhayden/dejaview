@@ -629,18 +629,21 @@ fn check_wire_schemas(
 }
 
 /// The tools this build knows. Built-ins arrive in M4; the fake tool exists behind `testkit`.
+/// The manifests this build knows without a registry: the built-ins and, in a testkit build, the
+/// scripted tool.
 fn known_manifests() -> Vec<dejaview_core::tool::Manifest> {
+    let builtins = dejaview_tools::builtin::manifests();
     #[cfg(feature = "testkit")]
     {
-        vec![
+        let mut known = builtins;
+        known.push(
             dejaview_core::tool::Manifest::from_toml(dejaview_testkit::tool::FAKE_REGIONS_MANIFEST)
                 .expect("fake_regions manifest is valid"),
-        ]
+        );
+        known
     }
     #[cfg(not(feature = "testkit"))]
-    {
-        Vec::new()
-    }
+    builtins
 }
 
 fn tools_list(args: &ToolsListArgs) -> i32 {
@@ -823,7 +826,7 @@ fn connect_packs(config: &Config) -> Result<Vec<ConnectedPack>, String> {
 
 #[cfg(feature = "testkit")]
 fn available_tools(tool_script: Option<&Path>) -> Result<Vec<Box<dyn Tool>>, String> {
-    let mut out: Vec<Box<dyn Tool>> = Vec::new();
+    let mut out: Vec<Box<dyn Tool>> = dejaview_tools::builtin::all();
     match tool_script {
         Some(path) => out.push(Box::new(
             dejaview_testkit::ScriptedTool::fake_regions_from_path(path)
@@ -838,5 +841,5 @@ fn available_tools(tool_script: Option<&Path>) -> Result<Vec<Box<dyn Tool>>, Str
 
 #[cfg(not(feature = "testkit"))]
 fn available_tools(_tool_script: Option<&Path>) -> Result<Vec<Box<dyn Tool>>, String> {
-    Ok(Vec::new())
+    Ok(dejaview_tools::builtin::all())
 }

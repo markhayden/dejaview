@@ -133,6 +133,48 @@ The failure modes have a test each against the fake server: a server dying mid-c
 frame, a response for an unknown id, a late answer after cancellation, reset failure, shutdown
 escalation, and two runs contending for one pack.
 
+## Writing a tool, with `view` as the example
+
+A built-in is a Rust type implementing `dejaview_core::tool::Tool` in
+`crates/dejaview-tools/src/builtin/`, registered in `builtin::all()`. `view`
+(`builtin/view.rs`, manifest `manifests/view.toml`) shows every part:
+
+1. **The manifest** is a TOML file embedded with `include_str!` and parsed once in `new()`. It
+   names the tool, says in plain words what it does, when to use it and when not to, and what its
+   output means; declares the cost tier; lists which arguments take image ids (`image_args`) and
+   frame ids (`frame_args`), so the harness resolves them and injects the pixels; bounds what the
+   tool may return (`returns`); names the frames it makes (`frames_out`) and the projections it
+   supports (`projections`); and gives the model schema (what the provider sees, closed, with a
+   description per argument), the input schema (the model schema plus `_dejaview`) and the output
+   schema (the measurement names and units it may report). `view` takes `frame`, an optional
+   `also`, and either `bbox` or `yaw`, `pitch` and `fov`.
+2. **Arguments** arrive validated against the model schema's required keys and closed shape; the
+   tool still checks types and ranges itself, and answers a mistake with an `invalid_args`
+   envelope (`super::invalid_args`), which the harness returns to the model as a tool error and
+   never counts as an operational failure. `view` refuses both forms at once, angles on a flat
+   frame, a box under eight pixels and `fov` outside 10 to 120 this way.
+3. **Pixels** come through the context: `ctx.frames[id]` is a `FrameHandle` with the frame's
+   projection, parent, mapping, chain to its root and a lossless PNG by path under the run
+   directory (`raster::load` reads it); `ctx.images[id]` likewise for image arguments. Never a
+   path from the model.
+4. **Results** go back as an `Envelope`: a summary the model reads, measurements (named in the
+   output schema), regions (which become checklist evidence of the manifest's `evidence_kind`),
+   images and transforms. A returned image is a new frame: `crop:<call id>:<n>` with its parent
+   and the mapping back into it (`raster::frame` encodes the PNG and names it), or
+   `aligned:<image>:<transform>` after a transform in the same envelope. The harness checks every
+   bound in `returns`, stores the envelope, registers the frames, shows the model the images and
+   maps any location drawn in them back to the root image.
+5. **Tests** live in `crates/dejaview-tools/tests/`: the tool called directly with a context
+   built from synthetic images (`dejaview_testkit::images`), its outputs checked against what the
+   maths says (a crop equals the region it cuts; a perspective view matches the analytic view of
+   the same scene and a stored golden), its refusals checked one by one, and one run through
+   `run::check` with a scripted provider showing the frame in the report and a finding on it
+   mapped back to the root.
+
+An MCP tool is the same contract over stdio: the manifest's fields travel in the tool listing's
+`dejaview` annotation, the context arrives as `_dejaview`, and the envelope comes back as
+`structuredContent` with the images as content blocks.
+
 ## The Python pack and its provisioning bundle
 
 `tools/python/` is a uv project (`dejaview-tools`, no runtime dependencies yet) whose

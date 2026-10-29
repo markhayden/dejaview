@@ -773,21 +773,66 @@ async fn drive(
                     });
                     break;
                 }
+                // A batch whose tools all declare `concurrent = true` starts together and
+                // settles in call order, so evidence keeps the batch's order whatever finishes
+                // first; otherwise the calls run one after another, each seeing the frames the
+                // previous ones made.
+                let together = calls.len() > 1
+                    && calls
+                        .iter()
+                        .all(|c| tools.get(&c.name).is_some_and(|t| t.manifest().concurrent));
                 let mut results: Vec<ContentBlock> = Vec::new();
-                for c in calls {
-                    results.push(
-                        execute_call(
-                            config,
-                            provider,
-                            tools,
-                            prepared,
-                            journal,
-                            state,
-                            c,
-                            services.cancel,
-                        )
-                        .await?,
-                    );
+                if together {
+                    let mut readied = Vec::with_capacity(calls.len());
+                    for c in calls {
+                        readied.push(prepare_call(tools, prepared, journal, state, c)?);
+                    }
+                    let spawned: Vec<_> = readied
+                        .iter()
+                        .map(|p| match p {
+                            PreparedCall::Ready(r) => Some(spawn_tool(r)),
+                            PreparedCall::Rejected(_) => None,
+                        })
+                        .collect();
+                    for (p, rx) in readied.into_iter().zip(spawned) {
+                        match (p, rx) {
+                            (PreparedCall::Rejected(block), _) => results.push(block),
+                            (PreparedCall::Ready(ready), Some(rx)) => {
+                                let outcome = await_tool(
+                                    rx,
+                                    services.cancel,
+                                    &ready.call_id,
+                                    &ready.manifest.name,
+                                )
+                                .await;
+                                results.push(
+                                    settle_call(
+                                        config, provider, prepared, journal, state, *ready, outcome,
+                                    )
+                                    .await?,
+                                );
+                            }
+                            (PreparedCall::Ready(_), None) => {
+                                unreachable!("every ready call was spawned")
+                            }
+                        }
+                    }
+                } else {
+                    for c in calls {
+                        results.push(
+                            execute_call(
+                                config,
+                                provider,
+                                tools,
+                                prepared,
+                                journal,
+                                state,
+                                c,
+                                services.cancel,
+                            )
+                            .await?,
+                        );
+                    }
                 }
                 calls_used += calls.len() as u32;
                 results.push(ContentBlock::Text {
@@ -1182,47 +1227,69 @@ async fn send_turn(
     Ok(response)
 }
 
-/// Validates and executes one tool call, returning the result block for the model. A model-side
-/// mistake is an error result; a tool failure or bound breach is `error: tool`. The call itself
-/// runs on its own thread so a signal lands while a tool works.
-#[allow(clippy::too_many_arguments)]
-async fn execute_call(
-    config: &Config,
-    provider: &dyn Provider,
+/// A call validated and journaled, with the tool and context it runs with.
+struct ReadyCall {
+    call: ToolCall,
+    call_id: String,
+    started: Instant,
+    tool: std::sync::Arc<dyn crate::tool::Tool>,
+    manifest: crate::tool::Manifest,
+    ctx: DejaviewContext,
+}
+
+/// What preparing a model's call came to: a result to answer it with, or a call to run.
+enum PreparedCall {
+    Rejected(ContentBlock),
+    Ready(Box<ReadyCall>),
+}
+
+/// The journal line and the answer for a call refused as the model's mistake.
+fn rejected(
+    journal: &mut Journal,
+    call: &ToolCall,
+    call_id: &str,
+    started: Instant,
+    status: Option<Status>,
+    message: String,
+) -> Result<ContentBlock> {
+    journal.append(&Event::ToolCalled(events::ToolCalled {
+        call_id: Some(call_id.to_string()),
+        provider_call_id: call.id.clone(),
+        tool: call.name.clone(),
+        version: None,
+        arguments: Some(call.arguments.clone()),
+        executed: false,
+        reason: None,
+        invalid_args: Some(message.clone()),
+        status,
+        duration_ms: Some(started.elapsed().as_millis() as u64),
+        projection: None,
+    }))?;
+    Ok(ContentBlock::ToolResult {
+        tool_use_id: call.id.clone(),
+        content: format!("invalid arguments: {message}"),
+        is_error: true,
+        images: vec![],
+    })
+}
+
+/// Validates a model's call, resolves its images and frames into the context and journals its
+/// start. Model-side mistakes become error results, never operational failures.
+fn prepare_call(
     tools: &ToolRegistry,
     prepared: &Prepared,
     journal: &mut Journal,
     state: &mut RunState,
     call: &ToolCall,
-    cancel: Option<&Cancel>,
-) -> Result<ContentBlock> {
+) -> Result<PreparedCall> {
     let call_id = state.next_call_id();
     let started = Instant::now();
-    let mut status: Option<Status> = None;
 
-    // Model-side mistakes become error results, never operational failures.
     macro_rules! reject {
         ($message:expr) => {{
-            let message: String = $message;
-            journal.append(&Event::ToolCalled(events::ToolCalled {
-                call_id: Some(call_id.clone()),
-                provider_call_id: call.id.clone(),
-                tool: call.name.clone(),
-                version: None,
-                arguments: Some(call.arguments.clone()),
-                executed: false,
-                reason: None,
-                invalid_args: Some(message.clone()),
-                status,
-                duration_ms: Some(started.elapsed().as_millis() as u64),
-                projection: None,
-            }))?;
-            return Ok(ContentBlock::ToolResult {
-                tool_use_id: call.id.clone(),
-                content: format!("invalid arguments: {message}"),
-                is_error: true,
-                images: vec![],
-            });
+            return Ok(PreparedCall::Rejected(rejected(
+                journal, call, &call_id, started, None, $message,
+            )?));
         }};
     }
 
@@ -1315,6 +1382,7 @@ async fn execute_call(
                 projection,
                 parent,
                 transform,
+                chain: state.registry.chain(id),
                 pixels: ImageHandle {
                     media_type: media_type.into(),
                     width,
@@ -1343,16 +1411,35 @@ async fn execute_call(
         projection: tools.projection_of(&manifest.name).map(str::to_string),
     }))?;
 
-    // The tool runs on its own thread; the run keeps listening for a cancellation meanwhile.
+    Ok(PreparedCall::Ready(Box::new(ReadyCall {
+        call: call.clone(),
+        call_id,
+        started,
+        tool,
+        manifest,
+        ctx,
+    })))
+}
+
+/// Runs a ready call's tool on its own thread.
+fn spawn_tool(ready: &ReadyCall) -> tokio::sync::oneshot::Receiver<Result<crate::tool::Envelope>> {
     let (tx, rx) = tokio::sync::oneshot::channel();
-    {
-        let tool = std::sync::Arc::clone(&tool);
-        let args = call.arguments.clone();
-        let ctx = ctx.clone();
-        std::thread::spawn(move || {
-            let _ = tx.send(tool.call(&args, &ctx));
-        });
-    }
+    let tool = std::sync::Arc::clone(&ready.tool);
+    let args = ready.call.arguments.clone();
+    let ctx = ready.ctx.clone();
+    std::thread::spawn(move || {
+        let _ = tx.send(tool.call(&args, &ctx));
+    });
+    rx
+}
+
+/// Waits for a tool's result while listening for a cancellation.
+async fn await_tool(
+    rx: tokio::sync::oneshot::Receiver<Result<crate::tool::Envelope>>,
+    cancel: Option<&Cancel>,
+    call_id: &str,
+    tool: &str,
+) -> Result<crate::tool::Envelope> {
     let outcome = match cancel {
         Some(c) => {
             tokio::select! {
@@ -1364,17 +1451,44 @@ async fn execute_call(
         }
         None => rx.await,
     };
-    let mut envelope = outcome
-        .map_err(|_| Error::Tool(format!("{}: the tool's thread died", manifest.name)))??;
+    outcome.map_err(|_| Error::Tool(format!("{tool}: the tool's thread died")))?
+}
+
+/// Takes a tool's result into the run: the envelope stored, checked against its bounds, its
+/// images made frames, its regions evidence, and the presentation the model reads.
+async fn settle_call(
+    config: &Config,
+    provider: &dyn Provider,
+    prepared: &Prepared,
+    journal: &mut Journal,
+    state: &mut RunState,
+    ready: ReadyCall,
+    outcome: Result<crate::tool::Envelope>,
+) -> Result<ContentBlock> {
+    let ReadyCall {
+        call,
+        call_id,
+        started,
+        manifest,
+        ..
+    } = ready;
+    let call = &call;
+    let mut envelope = outcome?;
     let duration_ms = started.elapsed().as_millis() as u64;
     // The structured result in full, before anything is dropped or presented.
     let envelope_ref = state
         .artifacts
         .put_body(&serde_json::to_string(&envelope)?)?;
     if envelope.status == Status::InvalidArgs {
-        status = Some(Status::InvalidArgs);
-        let msg = envelope.summary.clone();
-        reject!(msg);
+        // The tool found the model's arguments wanting: answered as the model's mistake.
+        return rejected(
+            journal,
+            call,
+            &call_id,
+            started,
+            Some(Status::InvalidArgs),
+            envelope.summary.clone(),
+        );
     }
     envelope.check_bounds(&manifest.returns)?;
 
@@ -1513,6 +1627,30 @@ async fn execute_call(
         is_error: false,
         images: envelope.images.iter().map(|i| i.frame.clone()).collect(),
     })
+}
+
+/// Prepares, runs and settles one call: the sequential path. A model-side mistake is an error
+/// result; a tool failure or bound breach is `error: tool`. The call itself runs on its own thread
+/// so a signal lands while a tool works.
+#[allow(clippy::too_many_arguments)]
+async fn execute_call(
+    config: &Config,
+    provider: &dyn Provider,
+    tools: &ToolRegistry,
+    prepared: &Prepared,
+    journal: &mut Journal,
+    state: &mut RunState,
+    call: &ToolCall,
+    cancel: Option<&Cancel>,
+) -> Result<ContentBlock> {
+    match prepare_call(tools, prepared, journal, state, call)? {
+        PreparedCall::Rejected(block) => Ok(block),
+        PreparedCall::Ready(ready) => {
+            let rx = spawn_tool(&ready);
+            let outcome = await_tool(rx, cancel, &ready.call_id, &ready.manifest.name).await;
+            settle_call(config, provider, prepared, journal, state, *ready, outcome).await
+        }
+    }
 }
 
 /// For an image named `aligned:<image>:<transform>`, the image and transform ids once the frame

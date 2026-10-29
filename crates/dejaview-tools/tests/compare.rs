@@ -39,6 +39,7 @@ fn context(dir: &Path, frames: &[(&str, &RgbImage)]) -> DejaviewContext {
                 projection: Projection::Flat,
                 parent: None,
                 transform: None,
+                chain: Vec::new(),
                 pixels: ImageHandle {
                     media_type: "image/png".into(),
                     width: img.width(),

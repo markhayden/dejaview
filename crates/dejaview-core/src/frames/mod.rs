@@ -117,6 +117,18 @@ pub struct AlignedFrame<'a> {
     pub height: u32,
 }
 
+/// One step of a frame's chain to its root: the frame, its parent and how it sits in it (`None`
+/// for a raw frame).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ChainLink {
+    pub frame: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mapping: Option<Mapping>,
+}
+
 /// The registry of frames for one run.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Registry {
@@ -220,6 +232,41 @@ impl Registry {
                 projection,
             },
         );
+    }
+
+    /// The frame and its ancestors down to the raw root, each with how it sits in its parent.
+    pub fn chain(&self, id: &str) -> Vec<ChainLink> {
+        let mut out = Vec::new();
+        let mut current = id.to_string();
+        for _ in 0..64 {
+            let Some(frame) = self.frames.get(&current) else {
+                break;
+            };
+            match frame {
+                Frame::Raw { .. } => {
+                    out.push(ChainLink {
+                        frame: current.clone(),
+                        parent: None,
+                        mapping: None,
+                    });
+                    break;
+                }
+                Frame::Crop {
+                    parent, mapping, ..
+                }
+                | Frame::Aligned {
+                    parent, mapping, ..
+                } => {
+                    out.push(ChainLink {
+                        frame: current.clone(),
+                        parent: Some(parent.clone()),
+                        mapping: Some(mapping.clone()),
+                    });
+                    current = parent.clone();
+                }
+            }
+        }
+        out
     }
 
     pub fn get(&self, id: &str) -> Option<FrameRef<'_>> {
@@ -598,6 +645,33 @@ mod tests {
             [1.0, 0.0],
             [1.0, 1.0]
         ));
+    }
+
+    #[test]
+    fn the_chain_of_a_nested_crop_runs_down_to_the_raw_root() {
+        let mut r = Registry::new();
+        r.add_raw("c", 100, 100, Projection::Flat);
+        r.add_crop(
+            "crop:call:1:0",
+            "raw:c",
+            Mapping::Bbox([0.0, 0.0, 0.5, 0.5]),
+            50,
+            50,
+        );
+        r.add_crop(
+            "crop:call:2:0",
+            "crop:call:1:0",
+            Mapping::Bbox([0.5, 0.5, 1.0, 1.0]),
+            25,
+            25,
+        );
+        let chain = r.chain("crop:call:2:0");
+        let frames: Vec<&str> = chain.iter().map(|l| l.frame.as_str()).collect();
+        assert_eq!(frames, ["crop:call:2:0", "crop:call:1:0", "raw:c"]);
+        assert_eq!(chain[0].parent.as_deref(), Some("crop:call:1:0"));
+        assert_eq!(chain[1].mapping, Some(Mapping::Bbox([0.0, 0.0, 0.5, 0.5])));
+        assert!(chain[2].parent.is_none() && chain[2].mapping.is_none());
+        assert!(r.chain("nope").is_empty());
     }
 
     #[test]

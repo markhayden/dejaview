@@ -1,0 +1,347 @@
+//! Task 4.4a: the full client against the fake server: paginated listing with its guards,
+//! concurrent calls on one process when the manifests allow and turns when they do not, the
+//! frames in the context, exact content blocks, `outputSchema` validation, the `isError` truth
+//! table in full, and a lease that waits for the previous run's calls.
+#![allow(clippy::unwrap_used)]
+
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+use dejaview_core::tool::{Manifest, Status};
+use dejaview_testkit::mcp_server;
+use serde_json::json;
+
+use super::*;
+
+fn envelopes() -> String {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/tool-scripts/regions-3-then-1.json")
+        .display()
+        .to_string()
+}
+
+fn spawn(args: &[&str]) -> Spawn {
+    let mut all: Vec<String> = vec!["--envelopes".into(), envelopes()];
+    all.extend(args.iter().map(|s| s.to_string()));
+    Spawn {
+        command: mcp_server::path(),
+        args: all,
+        declared_env: vec![],
+        cwd: None,
+        extra_env: vec![],
+    }
+}
+
+fn timeouts() -> Timeouts {
+    Timeouts {
+        startup: Duration::from_secs(10),
+        call: Duration::from_secs(5),
+        shutdown_grace: Duration::from_millis(300),
+    }
+}
+
+fn env() -> Vec<(String, String)> {
+    std::env::vars().collect()
+}
+
+fn context(run: &str) -> serde_json::Value {
+    json!({ "run_id": run, "call_id": "call:1", "images": {}, "frames": {}, "hints": {} })
+}
+
+fn probe(pack: &Pack, run: &str) -> Envelope {
+    pack.call(
+        run,
+        None,
+        "probe_state",
+        json!({ "_dejaview": context(run) }),
+    )
+    .unwrap()
+}
+
+fn measurement(e: &Envelope, name: &str) -> u64 {
+    e.measurements
+        .iter()
+        .find(|m| m.name == name)
+        .map(|m| m.value as u64)
+        .unwrap()
+}
+
+#[test]
+fn a_paginated_listing_is_followed_to_the_end() {
+    let pack = Pack::connect("fake", spawn(&["--page-size", "1"]), timeouts(), env()).unwrap();
+    let names: Vec<&str> = pack.manifests().iter().map(|m| m.name.as_str()).collect();
+    assert_eq!(names, ["fake_regions", "probe_state"]);
+}
+
+#[test]
+fn a_listing_that_never_ends_is_refused_as_resolve() {
+    let err = Pack::connect("fake", spawn(&["--loop-cursor"]), timeouts(), env())
+        .err()
+        .unwrap();
+    assert_eq!(err.class(), "resolve", "{err}");
+    assert!(err.to_string().contains("never ends"), "{err}");
+}
+
+#[test]
+fn concurrent_tools_run_together_on_one_process_and_serial_ones_take_turns() {
+    // Two slow scripted calls at once: with `concurrent` manifests both are in flight together.
+    let pack = Pack::connect(
+        "fake",
+        spawn(&["--concurrent", "--slow-call-ms", "400"]),
+        timeouts(),
+        env(),
+    )
+    .unwrap();
+    assert!(pack.manifests().iter().all(|m| m.concurrent));
+    let started = Instant::now();
+    let threads: Vec<_> = (0..2)
+        .map(|_| {
+            let pack = Arc::clone(&pack);
+            std::thread::spawn(move || {
+                pack.call(
+                    "run-1",
+                    None,
+                    "fake_regions",
+                    json!({ "image": "candidate", "_dejaview": context("run-1") }),
+                )
+            })
+        })
+        .collect();
+    for t in threads {
+        assert_eq!(t.join().unwrap().unwrap().status, Status::Ok);
+    }
+    let elapsed = started.elapsed();
+    assert!(
+        elapsed < Duration::from_millis(750),
+        "together, not in turn: {elapsed:?}"
+    );
+    assert_eq!(measurement(&probe(&pack, "run-1"), "max_in_flight"), 2);
+
+    // Without the declaration the same two calls take turns on the one process.
+    let pack = Pack::connect("fake", spawn(&["--slow-call-ms", "300"]), timeouts(), env()).unwrap();
+    assert!(pack.manifests().iter().all(|m| !m.concurrent));
+    let started = Instant::now();
+    let threads: Vec<_> = (0..2)
+        .map(|_| {
+            let pack = Arc::clone(&pack);
+            std::thread::spawn(move || {
+                pack.call(
+                    "run-1",
+                    None,
+                    "fake_regions",
+                    json!({ "image": "candidate", "_dejaview": context("run-1") }),
+                )
+            })
+        })
+        .collect();
+    for t in threads {
+        assert_eq!(t.join().unwrap().unwrap().status, Status::Ok);
+    }
+    assert!(
+        started.elapsed() >= Duration::from_millis(600),
+        "one after the other"
+    );
+    assert_eq!(measurement(&probe(&pack, "run-1"), "max_in_flight"), 1);
+}
+
+#[test]
+fn a_new_run_waits_for_the_previous_runs_calls_before_taking_the_lease() {
+    let pack = Pack::connect(
+        "fake",
+        spawn(&["--concurrent", "--slow-call-ms", "500"]),
+        timeouts(),
+        env(),
+    )
+    .unwrap();
+    let slow = {
+        let pack = Arc::clone(&pack);
+        std::thread::spawn(move || {
+            pack.call(
+                "run-1",
+                None,
+                "fake_regions",
+                json!({ "image": "candidate", "_dejaview": context("run-1") }),
+            )
+        })
+    };
+    std::thread::sleep(Duration::from_millis(100));
+    // run-2 arrives while run-1's call is in flight: it waits, then the server is reset for it.
+    let started = Instant::now();
+    let e = probe(&pack, "run-2");
+    assert!(
+        started.elapsed() >= Duration::from_millis(300),
+        "waited for run-1's call"
+    );
+    assert_eq!(
+        measurement(&e, "calls_since_reset"),
+        1,
+        "a fresh count after the reset"
+    );
+    assert_eq!(
+        slow.join().unwrap().unwrap().status,
+        Status::Ok,
+        "run-1's call completed first"
+    );
+    assert_eq!(pack.restarts(), 0, "reset, not restart");
+    // And a holder that never finishes within the deadline is given up on.
+    let mut t = timeouts();
+    t.startup = Duration::from_millis(300);
+    let pack = Pack::connect(
+        "fake",
+        spawn(&["--concurrent", "--slow-call-ms", "1500"]),
+        t,
+        env(),
+    )
+    .unwrap();
+    let slow = {
+        let pack = Arc::clone(&pack);
+        std::thread::spawn(move || {
+            pack.call(
+                "run-1",
+                None,
+                "fake_regions",
+                json!({ "image": "candidate", "_dejaview": context("run-1") }),
+            )
+        })
+    };
+    std::thread::sleep(Duration::from_millis(100));
+    let err = pack
+        .call(
+            "run-2",
+            None,
+            "probe_state",
+            json!({ "_dejaview": context("run-2") }),
+        )
+        .err()
+        .unwrap();
+    assert!(err.to_string().contains("deadline"), "{err}");
+    let _ = slow.join();
+}
+
+#[test]
+fn a_result_outside_its_output_schema_or_with_a_stray_block_is_a_tool_error() {
+    let pack = Pack::connect("fake", spawn(&["--extra-measurement"]), timeouts(), env()).unwrap();
+    let err = pack
+        .call(
+            "run-1",
+            None,
+            "probe_state",
+            json!({ "_dejaview": context("run-1") }),
+        )
+        .err()
+        .unwrap();
+    assert_eq!(err.class(), "tool");
+    assert!(err.to_string().contains("outputSchema"), "{err}");
+    let pack = Pack::connect("fake", spawn(&["--text-block"]), timeouts(), env()).unwrap();
+    let err = pack
+        .call(
+            "run-1",
+            None,
+            "probe_state",
+            json!({ "_dejaview": context("run-1") }),
+        )
+        .err()
+        .unwrap();
+    assert_eq!(err.class(), "tool");
+    assert!(err.to_string().contains("\"text\" block"), "{err}");
+}
+
+fn envelope_json(status: &str) -> serde_json::Value {
+    json!({
+        "status": status,
+        "summary": "s",
+        "measurements": [],
+        "regions": [],
+        "images": [],
+        "transforms": [],
+        "provenance": { "tool": "t", "version": "1", "duration_ms": 1 },
+    })
+}
+
+fn manifest() -> Manifest {
+    Manifest::from_toml(dejaview_testkit::tool::FAKE_REGIONS_MANIFEST).unwrap()
+}
+
+/// SPEC "Results": every combination of `isError` and envelope status, the JSON-RPC error, and
+/// a block mismatch. The one recoverable form is `isError` with `invalid_args`.
+#[test]
+fn the_is_error_truth_table_is_exhaustive() {
+    let m = manifest();
+    for status in ["ok", "measured_nothing", "not_applicable", "invalid_args"] {
+        for is_error in [false, true] {
+            let result = CallResult {
+                structured: envelope_json(status),
+                content: vec![],
+                is_error,
+            };
+            let outcome = envelope_from(result, &m);
+            match (is_error, status) {
+                (false, _) => assert!(outcome.is_ok(), "isError false, {status}: accepted as is"),
+                (true, "invalid_args") => {
+                    assert_eq!(
+                        outcome.unwrap().status,
+                        Status::InvalidArgs,
+                        "the recoverable form"
+                    )
+                }
+                (true, _) => {
+                    let err = outcome.err().unwrap();
+                    assert_eq!(err.class(), "tool", "isError true, {status}");
+                    assert!(err.to_string().contains("isError"), "{err}");
+                }
+            }
+        }
+    }
+    // A JSON-RPC error never reaches envelope_from: `request` turns it into error: tool.
+    // Block mismatches: a block for no image, an image with no block, a wrong media type, and an
+    // image whose block carries its bytes.
+    let one_image = |media_type: &str| {
+        let mut e = envelope_json("ok");
+        e["images"] = json!([{ "frame": "crop:call:1:0", "parent": "raw:candidate", "mapping": { "bbox": [0.0, 0.0, 0.5, 0.5] }, "media_type": media_type, "width": 2, "height": 2 }]);
+        e
+    };
+    let block = |mime: &str| json!({ "type": "image", "data": "AAAA", "mimeType": mime });
+    assert!(
+        envelope_from(
+            CallResult {
+                structured: envelope_json("ok"),
+                content: vec![block("image/png")],
+                is_error: false
+            },
+            &m
+        )
+        .is_err()
+    );
+    assert!(
+        envelope_from(
+            CallResult {
+                structured: one_image("image/png"),
+                content: vec![],
+                is_error: false
+            },
+            &m
+        )
+        .is_err()
+    );
+    assert!(
+        envelope_from(
+            CallResult {
+                structured: one_image("image/png"),
+                content: vec![block("image/jpeg")],
+                is_error: false
+            },
+            &m
+        )
+        .is_err()
+    );
+    let e = envelope_from(
+        CallResult {
+            structured: one_image("image/png"),
+            content: vec![block("image/png")],
+            is_error: false,
+        },
+        &m,
+    )
+    .unwrap();
+    assert_eq!(e.images[0].base64.as_deref(), Some("AAAA"));
+}

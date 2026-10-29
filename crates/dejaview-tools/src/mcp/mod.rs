@@ -1,19 +1,20 @@
-//! The MCP client (SPEC "Transports", MCP over stdio, revision 2025-11-25) in its minimal form:
-//! the lifecycle contract against a server on stdio. Pagination beyond a cursor loop, concurrent
-//! calls and the `rmcp` decision are tasks 4.4a and 4.4b.
-//!
-//! The client is synchronous, like the `Tool` trait it serves: a reader thread turns stdout lines
-//! into messages on a channel, stderr is captured, and every wait has a deadline. A call that
-//! passes its deadline is cancelled with `notifications/cancelled`, its id tombstoned so a late
-//! answer is ignored, and the process marked unreusable.
+//! The MCP client (SPEC "Transports", MCP over stdio, revision 2025-11-25; ADR 0015 keeps it
+//! in-house). The client is synchronous, like the `Tool` trait it serves, and multiplexed: a
+//! reader thread routes each response to the request waiting for its id, so tools whose manifests
+//! declare `concurrent = true` may have several calls in flight on one process while every wait
+//! keeps its own deadline. A call that passes its deadline is cancelled with
+//! `notifications/cancelled`, its id tombstoned so a late answer is ignored, and the process marked
+//! unreusable. A response for an unknown id, a malformed frame or the end of the stream fails
+//! every pending request and taints the process.
 
 pub mod pack;
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::mpsc::{Receiver, RecvTimeoutError, channel};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, channel};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -25,6 +26,9 @@ pub use pack::{Pack, PackTool};
 
 /// The one revision the first release speaks.
 pub const PROTOCOL_VERSION: &str = "2025-11-25";
+
+/// `tools/list` pages followed before the listing is refused as unbounded.
+pub const MAX_LIST_PAGES: usize = 64;
 
 /// How to start a server.
 #[derive(Debug, Clone)]
@@ -73,20 +77,59 @@ pub enum Reset {
     Unsupported,
 }
 
-enum Incoming {
-    Message(Value),
-    Eof,
+/// What a waiting request receives: the server's message for its id, or why it never will.
+type Delivery = std::result::Result<Value, String>;
+
+/// State the reader thread and every request share.
+struct Shared {
+    pending: Mutex<HashMap<u64, Sender<Delivery>>>,
+    tombstones: Mutex<BTreeSet<u64>>,
+    /// A call timed out or was cancelled, or the stream broke: never reuse this process.
+    tainted: AtomicBool,
+    stderr: Mutex<Vec<String>>,
+}
+
+impl Shared {
+    fn fail_all(&self, why: &str) {
+        if let Ok(mut pending) = self.pending.lock() {
+            for (_, tx) in pending.drain() {
+                let _ = tx.send(Err(why.to_string()));
+            }
+        }
+    }
+
+    fn deliver(&self, message: Value) {
+        let Some(id) = message.get("id").and_then(Value::as_u64) else {
+            return; // a notification or a server request: nothing waits for it
+        };
+        if self
+            .tombstones
+            .lock()
+            .map(|mut t| t.remove(&id))
+            .unwrap_or(false)
+        {
+            return; // a late answer to a cancelled call
+        }
+        let waiting = self.pending.lock().ok().and_then(|mut p| p.remove(&id));
+        match waiting {
+            Some(tx) => {
+                let _ = tx.send(Ok(message));
+            }
+            None => {
+                self.tainted.store(true, Ordering::SeqCst);
+                self.fail_all(&format!("response for unknown id {id}"));
+            }
+        }
+    }
 }
 
 /// One server process, initialised and listed.
 pub struct Client {
-    child: Child,
-    stdin: Option<ChildStdin>,
-    rx: Receiver<Incoming>,
-    stderr: Arc<Mutex<Vec<String>>>,
-    next_id: u64,
-    tombstones: BTreeSet<u64>,
-    tainted: bool,
+    child: Mutex<Child>,
+    pid: u32,
+    stdin: Mutex<Option<ChildStdin>>,
+    shared: Arc<Shared>,
+    next_id: AtomicU64,
     tools: Vec<ListedTool>,
     server_info: Value,
 }
@@ -128,49 +171,50 @@ impl Client {
         let stdin = child.stdin.take().ok_or_else(|| tool_err("no stdin"))?;
         let stdout = child.stdout.take().ok_or_else(|| tool_err("no stdout"))?;
         let stderr_pipe = child.stderr.take().ok_or_else(|| tool_err("no stderr"))?;
+        let pid = child.id();
 
-        let (tx, rx) = channel();
+        let shared = Arc::new(Shared {
+            pending: Mutex::new(HashMap::new()),
+            tombstones: Mutex::new(BTreeSet::new()),
+            tainted: AtomicBool::new(false),
+            stderr: Mutex::new(Vec::new()),
+        });
+        let reader_shared = Arc::clone(&shared);
         std::thread::spawn(move || {
             let reader = BufReader::new(stdout);
             for line in reader.lines() {
                 match line {
                     Ok(l) if l.trim().is_empty() => continue,
                     Ok(l) => match serde_json::from_str::<Value>(&l) {
-                        Ok(v) => {
-                            if tx.send(Incoming::Message(v)).is_err() {
-                                return;
-                            }
-                        }
+                        Ok(v) => reader_shared.deliver(v),
                         Err(_) => {
-                            // A malformed frame ends the conversation: the reader stops and the
-                            // next wait sees end of stream.
-                            let _ = tx.send(Incoming::Eof);
+                            // A malformed frame ends the conversation.
+                            reader_shared.tainted.store(true, Ordering::SeqCst);
+                            reader_shared.fail_all("the server sent a malformed frame");
                             return;
                         }
                     },
                     Err(_) => break,
                 }
             }
-            let _ = tx.send(Incoming::Eof);
+            reader_shared.tainted.store(true, Ordering::SeqCst);
+            reader_shared.fail_all("the server ended the conversation");
         });
-        let stderr = Arc::new(Mutex::new(Vec::new()));
-        let sink = Arc::clone(&stderr);
+        let sink = Arc::clone(&shared);
         std::thread::spawn(move || {
             for line in BufReader::new(stderr_pipe).lines().map_while(|l| l.ok()) {
-                if let Ok(mut v) = sink.lock() {
+                if let Ok(mut v) = sink.stderr.lock() {
                     v.push(line);
                 }
             }
         });
 
         let mut client = Client {
-            child,
-            stdin: Some(stdin),
-            rx,
-            stderr,
-            next_id: 1,
-            tombstones: BTreeSet::new(),
-            tainted: false,
+            child: Mutex::new(child),
+            pid,
+            stdin: Mutex::new(Some(stdin)),
+            shared,
+            next_id: AtomicU64::new(1),
             tools: Vec::new(),
             server_info: Value::Null,
         };
@@ -204,13 +248,17 @@ impl Client {
         }
         self.server_info = result["serverInfo"].clone();
         self.notify("notifications/initialized", json!({}))?;
-        self.list_tools(deadline)
+        self.tools = self.list_tools(deadline)?;
+        Ok(())
     }
 
-    fn list_tools(&mut self, deadline: Instant) -> Result<()> {
+    /// `tools/list` following `nextCursor` until the server stops giving one; a cursor that
+    /// repeats, or more than `MAX_LIST_PAGES` pages, is refused.
+    fn list_tools(&self, deadline: Instant) -> Result<Vec<ListedTool>> {
         let mut tools = Vec::new();
         let mut cursor: Option<String> = None;
-        loop {
+        let mut seen: BTreeSet<String> = BTreeSet::new();
+        for _ in 0..MAX_LIST_PAGES {
             let params = match &cursor {
                 Some(c) => json!({ "cursor": c }),
                 None => json!({}),
@@ -220,12 +268,20 @@ impl Client {
                 tools.push(listed_tool(&t)?);
             }
             match page["nextCursor"].as_str() {
-                Some(c) if !c.is_empty() => cursor = Some(c.to_string()),
-                _ => break,
+                Some(c) if !c.is_empty() => {
+                    if !seen.insert(c.to_string()) {
+                        return Err(resolve_err(format!(
+                            "tools/list repeats the cursor {c:?}; the listing never ends"
+                        )));
+                    }
+                    cursor = Some(c.to_string());
+                }
+                _ => return Ok(tools),
             }
         }
-        self.tools = tools;
-        Ok(())
+        Err(resolve_err(format!(
+            "tools/list ran past {MAX_LIST_PAGES} pages; the listing never ends"
+        )))
     }
 
     pub fn tools(&self) -> &[ListedTool] {
@@ -236,23 +292,39 @@ impl Client {
         self.tools.iter().map(|t| t.manifest.clone()).collect()
     }
 
-    /// Whether a call in this process timed out or was cancelled; such a process is never reused.
+    /// The manifest of a listed tool.
+    pub fn manifest(&self, name: &str) -> Option<&Manifest> {
+        self.tools
+            .iter()
+            .find(|t| t.name == name)
+            .map(|t| &t.manifest)
+    }
+
+    /// Whether a call in this process timed out or was cancelled, or its stream broke; such a
+    /// process is never reused.
     pub fn is_tainted(&self) -> bool {
-        self.tainted
+        self.shared.tainted.load(Ordering::SeqCst)
     }
 
     /// The server's stderr so far (for the journal).
     pub fn stderr_lines(&self) -> Vec<String> {
-        self.stderr.lock().map(|v| v.clone()).unwrap_or_default()
+        self.shared
+            .stderr
+            .lock()
+            .map(|v| v.clone())
+            .unwrap_or_default()
     }
 
     pub fn pid(&self) -> u32 {
-        self.child.id()
+        self.pid
     }
 
-    fn send(&mut self, message: &Value) -> Result<()> {
-        let stdin = self
+    fn send(&self, message: &Value) -> Result<()> {
+        let mut guard = self
             .stdin
+            .lock()
+            .map_err(|_| tool_err("the server's stdin lock is poisoned"))?;
+        let stdin = guard
             .as_mut()
             .ok_or_else(|| tool_err("the server's stdin is closed"))?;
         let mut text = serde_json::to_string(message)?;
@@ -263,62 +335,57 @@ impl Client {
             .map_err(|e| tool_err(format!("cannot write to the server: {e}")))
     }
 
-    fn notify(&mut self, method: &str, params: Value) -> Result<()> {
+    fn notify(&self, method: &str, params: Value) -> Result<()> {
         self.send(&json!({ "jsonrpc": "2.0", "method": method, "params": params }))
     }
 
-    /// Sends a request and waits for its response until `deadline`, skipping tombstoned ids and
-    /// notifications. A timeout cancels the request and taints the process.
-    fn request(&mut self, method: &str, params: Value, deadline: Instant) -> Result<Value> {
-        let id = self.next_id;
-        self.next_id += 1;
-        self.send(&json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params }))?;
-        loop {
-            let remaining = deadline.saturating_duration_since(Instant::now());
-            if remaining.is_zero() {
-                return Err(self.cancel(id, method));
+    /// Sends a request and waits for its response until `deadline`. A timeout cancels the request
+    /// and taints the process; a broken stream or a stray response fails it.
+    fn request(&self, method: &str, params: Value, deadline: Instant) -> Result<Value> {
+        let id = self.next_id.fetch_add(1, Ordering::SeqCst);
+        let (tx, rx): (Sender<Delivery>, Receiver<Delivery>) = channel();
+        self.shared
+            .pending
+            .lock()
+            .map_err(|_| tool_err("pending requests poisoned"))?
+            .insert(id, tx);
+        if let Err(e) =
+            self.send(&json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params }))
+        {
+            if let Ok(mut p) = self.shared.pending.lock() {
+                p.remove(&id);
             }
-            match self.rx.recv_timeout(remaining) {
-                Ok(Incoming::Message(m)) => {
-                    let Some(mid) = m.get("id").and_then(Value::as_u64) else {
-                        continue; // a notification or a server request: not ours to answer here
-                    };
-                    if self.tombstones.remove(&mid) {
-                        continue; // a late answer to a cancelled call
-                    }
-                    if mid != id {
-                        self.tainted = true;
-                        return Err(tool_err(format!(
-                            "response for unknown id {mid} while waiting for {id} ({method})"
-                        )));
-                    }
-                    if let Some(err) = m.get("error") {
-                        return Err(Error::Tool(format!(
-                            "mcp: {method} failed: {} (code {})",
-                            err["message"].as_str().unwrap_or("?"),
-                            err["code"]
-                        )));
-                    }
-                    return Ok(m.get("result").cloned().unwrap_or(Value::Null));
-                }
-                Ok(Incoming::Eof) => {
-                    self.tainted = true;
-                    return Err(tool_err(format!(
-                        "the server ended the conversation during {method}"
+            return Err(e);
+        }
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        match rx.recv_timeout(remaining) {
+            Ok(Ok(m)) => {
+                if let Some(err) = m.get("error") {
+                    return Err(Error::Tool(format!(
+                        "mcp: {method} failed: {} (code {})",
+                        err["message"].as_str().unwrap_or("?"),
+                        err["code"]
                     )));
                 }
-                Err(RecvTimeoutError::Timeout) => return Err(self.cancel(id, method)),
-                Err(RecvTimeoutError::Disconnected) => {
-                    self.tainted = true;
-                    return Err(tool_err(format!("the server died during {method}")));
-                }
+                Ok(m.get("result").cloned().unwrap_or(Value::Null))
+            }
+            Ok(Err(why)) => Err(tool_err(format!("{method} (id {id}): {why}"))),
+            Err(RecvTimeoutError::Timeout) => Err(self.cancel(id, method)),
+            Err(RecvTimeoutError::Disconnected) => {
+                self.shared.tainted.store(true, Ordering::SeqCst);
+                Err(tool_err(format!("the server died during {method}")))
             }
         }
     }
 
-    fn cancel(&mut self, id: u64, method: &str) -> Error {
-        self.tombstones.insert(id);
-        self.tainted = true;
+    fn cancel(&self, id: u64, method: &str) -> Error {
+        if let Ok(mut p) = self.shared.pending.lock() {
+            p.remove(&id);
+        }
+        if let Ok(mut t) = self.shared.tombstones.lock() {
+            t.insert(id);
+        }
+        self.shared.tainted.store(true, Ordering::SeqCst);
         let _ = self.notify(
             "notifications/cancelled",
             json!({ "requestId": id, "reason": "deadline" }),
@@ -326,8 +393,9 @@ impl Client {
         tool_err(format!("{method} (id {id}) timed out; cancelled"))
     }
 
-    /// `tools/call` with the full arguments (model arguments plus `_dejaview`).
-    pub fn call(&mut self, name: &str, arguments: Value, timeout: Duration) -> Result<CallResult> {
+    /// `tools/call` with the full arguments (model arguments plus `_dejaview`). Several calls may
+    /// be in flight at once; each keeps its own deadline.
+    pub fn call(&self, name: &str, arguments: Value, timeout: Duration) -> Result<CallResult> {
         let deadline = Instant::now() + timeout;
         let result = self.request(
             "tools/call",
@@ -345,7 +413,7 @@ impl Client {
     }
 
     /// `dejaview/reset`: the server drops every prior-run task and mutable state before answering.
-    pub fn reset(&mut self, deadline: Instant) -> Result<Reset> {
+    pub fn reset(&self, deadline: Instant) -> Result<Reset> {
         match self.request("dejaview/reset", json!({}), deadline) {
             Ok(_) => Ok(Reset::Acknowledged),
             Err(Error::Tool(m)) if m.contains("(code -32601)") => Ok(Reset::Unsupported),
@@ -354,22 +422,27 @@ impl Client {
     }
 
     /// Close stdin, wait, SIGTERM, wait, SIGKILL.
-    pub fn shutdown(mut self, grace: Duration) {
-        drop(self.stdin.take());
-        if wait_for_exit(&mut self.child, grace) {
+    pub fn shutdown(&self, grace: Duration) {
+        if let Ok(mut s) = self.stdin.lock() {
+            drop(s.take());
+        }
+        let Ok(mut child) = self.child.lock() else {
+            return;
+        };
+        if wait_for_exit(&mut child, grace) {
             return;
         }
         #[cfg(unix)]
         {
             let _ = Command::new("kill")
-                .args(["-TERM", &self.child.id().to_string()])
+                .args(["-TERM", &self.pid.to_string()])
                 .status();
-            if wait_for_exit(&mut self.child, grace) {
+            if wait_for_exit(&mut child, grace) {
                 return;
             }
         }
-        let _ = self.child.kill();
-        let _ = self.child.wait();
+        let _ = child.kill();
+        let _ = child.wait();
     }
 }
 
@@ -418,34 +491,51 @@ fn listed_tool(tool: &Value) -> Result<ListedTool> {
     Ok(ListedTool { name, manifest })
 }
 
-/// A call result to an envelope: `structuredContent` is the envelope; image content blocks carry
-/// the bytes of `images` in order and media type. `isError` with an `invalid_args` envelope is
-/// the one recoverable form; any other error, or a block mismatch, is `error: tool`.
-pub fn envelope_from(result: CallResult, tool: &str) -> Result<Envelope> {
-    let mut envelope: Envelope = serde_json::from_value(result.structured).map_err(|e| {
-        tool_err(format!(
-            "{tool}: structuredContent is not a result envelope: {e}"
-        ))
-    })?;
+/// A call result to an envelope (SPEC "Results"): `structuredContent` is the envelope, validated
+/// against the tool's `outputSchema`; the content blocks are exactly the image blocks of
+/// `images`, in order and media type, and nothing else. `isError` with an `invalid_args` envelope
+/// is the one recoverable form; `isError` with any other status, a block mismatch or a schema
+/// breach is `error: tool`.
+pub fn envelope_from(result: CallResult, manifest: &Manifest) -> Result<Envelope> {
+    let tool = &manifest.name;
+    let mut envelope: Envelope =
+        serde_json::from_value(result.structured.clone()).map_err(|e| {
+            tool_err(format!(
+                "{tool}: structuredContent is not a result envelope: {e}"
+            ))
+        })?;
     if result.is_error && envelope.status != Status::InvalidArgs {
         return Err(tool_err(format!(
             "{tool}: isError with status {:?}: {}",
             envelope.status, envelope.summary
         )));
     }
-    let images: Vec<&Value> = result
-        .content
-        .iter()
-        .filter(|b| b["type"] == "image")
+    let validator = jsonschema::validator_for(&manifest.output_schema)
+        .map_err(|e| tool_err(format!("{tool}: outputSchema is not a valid schema: {e}")))?;
+    let breaches: Vec<String> = validator
+        .iter_errors(&result.structured)
+        .map(|e| format!("{} at {}", e, e.instance_path()))
         .collect();
-    if images.len() != envelope.images.len() {
+    if !breaches.is_empty() {
+        return Err(tool_err(format!(
+            "{tool}: the result does not match its outputSchema: {}",
+            breaches.join("; ")
+        )));
+    }
+    if let Some(stray) = result.content.iter().find(|b| b["type"] != "image") {
+        return Err(tool_err(format!(
+            "{tool}: content holds a {:?} block; only the image blocks of `images` belong there",
+            stray["type"].as_str().unwrap_or("untyped")
+        )));
+    }
+    if result.content.len() != envelope.images.len() {
         return Err(tool_err(format!(
             "{tool}: {} image blocks for {} envelope images",
-            images.len(),
+            result.content.len(),
             envelope.images.len()
         )));
     }
-    for (block, image) in images.iter().zip(envelope.images.iter_mut()) {
+    for (block, image) in result.content.iter().zip(envelope.images.iter_mut()) {
         let mime = block["mimeType"].as_str().unwrap_or("");
         if mime != image.media_type {
             return Err(tool_err(format!(
@@ -463,5 +553,7 @@ pub fn process_environment() -> BTreeMap<String, String> {
     std::env::vars().collect()
 }
 
+#[cfg(test)]
+mod full;
 #[cfg(test)]
 mod minimal;

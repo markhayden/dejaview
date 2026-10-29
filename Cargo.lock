@@ -384,6 +384,7 @@ dependencies = [
  "dejaview-core",
  "dejaview-testkit",
  "image",
+ "jsonschema",
  "serde",
  "serde_json",
  "sha2",

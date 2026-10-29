@@ -105,14 +105,26 @@ within `startup_timeout_s`, one deadline for everything: `dejaview/reset` and it
 is tainted, shutdown and a restart whose tool list must equal the frozen one. A call runs under
 `budget.tool_timeout_s`; past it the client sends `notifications/cancelled`, tombstones the id so
 a late answer is ignored, and marks the process unreusable. Shutdown closes stdin, waits, sends
-SIGTERM, waits, then SIGKILL. `structuredContent` is the envelope; image content blocks must match
-`images` in count and media type; `isError` with an `invalid_args` envelope is the one recoverable
-form.
+SIGTERM, waits, then SIGKILL. `structuredContent` is the envelope, validated against the tool's
+`outputSchema`; the content blocks must be exactly the image blocks of `images`, in order and
+media type, and nothing else; `isError` with an `invalid_args` envelope is the one recoverable
+form (`the_is_error_truth_table_is_exhaustive` enumerates the rest).
+
+The client is multiplexed (ADR 0015): a reader thread routes each response to the request waiting
+for its id, so tools whose manifests declare `concurrent = true` run together on one process while
+the others take turns; a stray id, a malformed frame or the end of the stream fails every pending
+request and taints the process. `tools/list` follows `nextCursor` to the end and refuses a
+repeated cursor or more than 64 pages. A new run's lease waits, within its one deadline, for the
+previous run's in-flight calls before resetting or restarting. The context's `frames` carry each
+named frame's `chain` down to its raw root, so a pack can reproduce any location with no state of
+its own. In the run, a batch of calls whose tools all declare `concurrent = true` is dispatched
+together and settled in call order, so evidence items keep the batch's order whatever finishes
+first.
 
 Configured per pack as `[tools.packs.<name>] command = "..."` (plus `args`, `env`,
 `startup_timeout_s`) for an executable, or `package` and `version` for a provisioned bundle.
-Pagination beyond a cursor loop, concurrent calls, shared leases across an evaluation and the
-`rmcp` decision are M4.
+Shared leases across an evaluation (`shared = true`) are task 4.4b's remaining ground together
+with the failure modes.
 
 ## The Python pack and its provisioning bundle
 

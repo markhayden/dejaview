@@ -1,10 +1,12 @@
 //! A tool pack: one server process serving one run at a time under an exclusive lease. A run
-//! acquires the lease before its first call, within `startup_timeout_s`, which covers resetting the
-//! server (`dejaview/reset`) or, when the server lacks reset, is tainted by a timed-out call, or
-//! fails to reset in time, shutting it down and starting a fresh one whose manifests must equal
-//! the ones frozen at connect.
+//! acquires the lease before its first call, within `startup_timeout_s`, which covers waiting for
+//! the previous lease's calls to finish, resetting the server (`dejaview/reset`) or, when the
+//! server lacks reset, is tainted by a timed-out call, or fails to reset in time, shutting it down
+//! and starting a fresh one whose manifests must equal the ones frozen at connect. Within a lease,
+//! tools that declare `concurrent = true` run in parallel on the one process; the others take
+//! turns.
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::Instant;
 
 use dejaview_core::tool::{DejaviewContext, Envelope, Manifest, Tool, inject_context};
@@ -20,15 +22,21 @@ pub struct Pack {
     environment: Vec<(String, String)>,
     frozen: Vec<Manifest>,
     state: Mutex<State>,
+    /// Signalled when a call completes, for a lease waiting on the previous run's calls.
+    settled: Condvar,
+    /// Held for the whole of a call by a tool that is not `concurrent`.
+    serial: Mutex<()>,
 }
 
 struct State {
-    client: Option<Client>,
+    client: Option<Arc<Client>>,
     /// The run holding the lease.
     run: Option<String>,
     /// A server that has served no run yet needs no reset.
     fresh: bool,
     restarts: u32,
+    /// Calls of the lease holder still running.
+    in_flight: usize,
 }
 
 impl Pack {
@@ -66,11 +74,14 @@ impl Pack {
             environment,
             frozen,
             state: Mutex::new(State {
-                client: Some(client),
+                client: Some(Arc::new(client)),
                 run: None,
                 fresh: true,
                 restarts: 0,
+                in_flight: 0,
             }),
+            settled: Condvar::new(),
+            serial: Mutex::new(()),
         }))
     }
 
@@ -106,7 +117,7 @@ impl Pack {
         self.state
             .lock()
             .ok()
-            .and_then(|s| s.client.as_ref().map(Client::pid))
+            .and_then(|s| s.client.as_ref().map(|c| c.pid()))
     }
 
     /// The current server's stderr so far.
@@ -114,11 +125,12 @@ impl Pack {
         self.state
             .lock()
             .ok()
-            .and_then(|s| s.client.as_ref().map(Client::stderr_lines))
+            .and_then(|s| s.client.as_ref().map(|c| c.stderr_lines()))
             .unwrap_or_default()
     }
 
-    /// Calls a tool for a run, acquiring the lease first.
+    /// Calls a tool for a run, acquiring the lease first. A tool that is not `concurrent` holds
+    /// the pack's serial turn for the whole call.
     pub fn call(
         &self,
         run_id: &str,
@@ -126,44 +138,79 @@ impl Pack {
         tool: &str,
         arguments: serde_json::Value,
     ) -> Result<Envelope> {
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| Error::Tool("mcp: pack state poisoned".into()))?;
-        self.acquire(&mut state, run_id, run_dir)?;
-        let client = state
-            .client
-            .as_mut()
-            .ok_or_else(|| Error::Tool("mcp: no server after acquisition".into()))?;
-        let result = client.call(tool, arguments, self.timeouts.call)?;
-        envelope_from(result, tool)
+        let manifest = self.frozen.iter().find(|m| m.name == tool).ok_or_else(|| {
+            Error::Tool(format!("mcp: pack {:?} has no tool {tool:?}", self.name))
+        })?;
+        let client = {
+            let mut state = self
+                .state
+                .lock()
+                .map_err(|_| Error::Tool("mcp: pack state poisoned".into()))?;
+            let deadline = Instant::now() + self.timeouts.startup;
+            state = self.acquire(state, run_id, run_dir, deadline)?;
+            state.in_flight += 1;
+            Arc::clone(
+                state
+                    .client
+                    .as_ref()
+                    .ok_or_else(|| Error::Tool("mcp: no server after acquisition".into()))?,
+            )
+        };
+        let result = if manifest.concurrent {
+            client.call(tool, arguments, self.timeouts.call)
+        } else {
+            let _turn = self
+                .serial
+                .lock()
+                .map_err(|_| Error::Tool("mcp: pack turn poisoned".into()))?;
+            client.call(tool, arguments, self.timeouts.call)
+        };
+        if let Ok(mut state) = self.state.lock() {
+            state.in_flight = state.in_flight.saturating_sub(1);
+            self.settled.notify_all();
+        }
+        envelope_from(result?, manifest)
     }
 
-    /// The lease: the holder keeps it; a new run resets or restarts the server, all before one
-    /// deadline. A tainted server is never reused.
-    fn acquire(
-        &self,
-        state: &mut State,
+    /// The lease: the holder keeps it; a new run waits for the holder's calls to finish, then
+    /// resets or restarts the server, all before one deadline. A tainted server is never reused.
+    fn acquire<'a>(
+        &'a self,
+        mut state: std::sync::MutexGuard<'a, State>,
         run_id: &str,
         run_dir: Option<&std::path::Path>,
-    ) -> Result<()> {
-        if state.run.as_deref() == Some(run_id)
-            && state.client.as_ref().is_some_and(|c| !c.is_tainted())
-        {
-            return Ok(());
+        deadline: Instant,
+    ) -> Result<std::sync::MutexGuard<'a, State>> {
+        let healthy = |s: &State| s.client.as_ref().is_some_and(|c| !c.is_tainted());
+        if state.run.as_deref() == Some(run_id) && healthy(&state) {
+            return Ok(state);
         }
-        let deadline = Instant::now() + self.timeouts.startup;
-        let reusable = state.client.as_ref().is_some_and(|c| !c.is_tainted());
+        // Another run's calls still running: wait for them, within the one deadline.
+        while state.in_flight > 0 {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Err(Error::Tool(format!(
+                    "mcp: pack {:?}: lease acquisition passed its {:?} deadline waiting for the previous run's calls",
+                    self.name, self.timeouts.startup
+                )));
+            }
+            let (guard, _) = self
+                .settled
+                .wait_timeout(state, remaining)
+                .map_err(|_| Error::Tool("mcp: pack state poisoned".into()))?;
+            state = guard;
+        }
+        let reusable = healthy(&state);
         if reusable && state.fresh {
             state.fresh = false;
             state.run = Some(run_id.to_string());
-            return Ok(());
+            return Ok(state);
         }
-        if reusable && let Some(client) = state.client.as_mut() {
+        if reusable && let Some(client) = state.client.as_ref() {
             match client.reset(deadline) {
                 Ok(Reset::Acknowledged) => {
                     state.run = Some(run_id.to_string());
-                    return Ok(());
+                    return Ok(state);
                 }
                 Ok(Reset::Unsupported) => {}
                 Err(_) => {} // hung or failed: fall through to a restart under the same deadline
@@ -190,11 +237,11 @@ impl Pack {
                 self.name
             )));
         }
-        state.client = Some(client);
+        state.client = Some(Arc::new(client));
         state.run = Some(run_id.to_string());
         state.fresh = false;
         state.restarts += 1;
-        Ok(())
+        Ok(state)
     }
 
     /// Shuts the server down.

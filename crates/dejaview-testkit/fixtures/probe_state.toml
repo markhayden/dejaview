@@ -24,3 +24,10 @@ type = "object"
 
 [tool.output_schema]
 type = "object"
+[tool.output_schema.properties.measurements]
+type = "array"
+[tool.output_schema.properties.measurements.items]
+type = "object"
+[tool.output_schema.properties.measurements.items.properties.name]
+type = "string"
+enum = ["calls_since_reset", "pid", "max_in_flight"]

@@ -1231,6 +1231,9 @@ async fn send_turn(
 /// A call validated and journaled, with the tool and context it runs with.
 struct ReadyCall {
     call: ToolCall,
+    /// The arguments the tool receives: the model's, with an image named by its raw frame
+    /// (`raw:candidate`) replaced by the image id (`candidate`).
+    arguments: serde_json::Value,
     call_id: String,
     started: Instant,
     tool: std::sync::Arc<dyn crate::tool::Tool>,
@@ -1309,13 +1312,20 @@ fn prepare_call(
         run_dir: Some(state.run_dir.clone()),
         ..Default::default()
     };
+    // The prompt introduces each image with its raw frame, and models pass that where a tool
+    // wants the image id; the tool gets the image id either way.
+    let mut arguments = call.arguments.clone();
     for arg in &manifest.image_args {
-        let Some(id) = call.arguments.get(arg).and_then(|v| v.as_str()) else {
+        let Some(given) = call.arguments.get(arg).and_then(|v| v.as_str()) else {
             continue;
         };
+        let id = given.strip_prefix("raw:").unwrap_or(given);
         let Some(img) = state.images.iter().find(|i| i.id == id).cloned() else {
-            reject!(format!("{arg}: unknown image id {id:?}"));
+            reject!(format!("{arg}: unknown image id {given:?}"));
         };
+        if id != given {
+            arguments[arg] = serde_json::Value::String(id.to_string());
+        }
         let path = state.frame_file(&format!("raw:{id}"))?;
         ctx.images.insert(
             id.to_string(),
@@ -1415,6 +1425,7 @@ fn prepare_call(
 
     Ok(PreparedCall::Ready(Box::new(ReadyCall {
         call: call.clone(),
+        arguments,
         call_id,
         started,
         tool,
@@ -1427,7 +1438,7 @@ fn prepare_call(
 fn spawn_tool(ready: &ReadyCall) -> tokio::sync::oneshot::Receiver<Result<crate::tool::Envelope>> {
     let (tx, rx) = tokio::sync::oneshot::channel();
     let tool = std::sync::Arc::clone(&ready.tool);
-    let args = ready.call.arguments.clone();
+    let args = ready.arguments.clone();
     let ctx = ready.ctx.clone();
     std::thread::spawn(move || {
         let _ = tx.send(tool.call(&args, &ctx));
@@ -1489,8 +1500,7 @@ async fn settle_call(
         state.artifacts.put_body(&serde_json::to_string(&stored)?)?
     };
     if envelope.status == Status::InvalidArgs {
-        // The tool found the model's arguments wanting: answered as the model's mistake.
-        // The tool ran and found the arguments wanting.
+        // The tool ran and found the model's arguments wanting: answered as the model's mistake.
         return rejected(
             journal,
             call,

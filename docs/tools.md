@@ -142,7 +142,9 @@ A built-in is a Rust type implementing `dejaview_core::tool::Tool` in
 1. **The manifest** is a TOML file embedded with `include_str!` and parsed once in `new()`. It
    names the tool, says in plain words what it does, when to use it and when not to, and what its
    output means; declares the cost tier; lists which arguments take image ids (`image_args`) and
-   frame ids (`frame_args`), so the harness resolves them and injects the pixels; bounds what the
+   frame ids (`frame_args`), so the harness resolves them and injects the pixels (an image
+   argument also takes the image's raw frame id, `raw:candidate` for `candidate`, since that is
+   how the prompt names the picture); bounds what the
    tool may return (`returns`); names the frames it makes (`frames_out`) and the projections it
    supports (`projections`); and gives the model schema (what the provider sees, closed, with a
    description per argument), the input schema (the model schema plus `_dejaview`) and the output
@@ -177,9 +179,20 @@ An MCP tool is the same contract over stdio: the manifest's fields travel in the
 
 ## The Python pack and its provisioning bundle
 
-`tools/python/` is a uv project (`dejaview-tools`, no runtime dependencies yet) whose
-`dejaview-tools serve` runs the stdio server; this version carries one tool, `echo_region`, a
-transport proof. `just python-check` lints and tests it.
+`tools/python/` is a uv project (`dejaview-tools`, on numpy and Pillow) whose
+`dejaview-tools serve` runs the stdio server. `context.py` parses the `_dejaview` the harness
+injects into every call (the run and call ids, the images named by `image_args` and the frames
+named by `frame_args`, each with lossless pixels by path under the run directory or inline, and
+the rules' hints) and loads pixels as RGB arrays; a malformed context is a JSON-RPC error, which
+the harness records as a tool error, never an answer the model acts on. `envelope.py` builds
+result envelopes and returned images (lossless PNG named `crop:<call id>:<n>` or an aligned frame,
+with its mapping in the parent), and splits the images' bytes out of `structuredContent` into the
+MCP image blocks the client pairs with them by position and media type. This version carries one
+tool, `echo_region`, the transport proof: it places the given box on the image as a region and
+returns the box cut from the named frame (or the image's raw frame) as its one image.
+`just python-check` lints and tests the pack offline; `just pack-test` also drives the real
+server from the Rust client (`crates/dejaview-tools/tests/python_pack.rs`): an image and an
+aligned frame by path in, a valid envelope with one image block out.
 
 `scripts/build-bundle.sh` (`just bundle`) builds the wheel and assembles
 `tools/python/dist/bundle-<version>/`: the wheel, a provisioning project whose `pyproject.toml`

@@ -2,11 +2,11 @@
 [set]
 id = "source-fidelity/blind-v1"
 use_case = "source-fidelity"
-split = "blind"
+split = "heldout"
 licence = "CC-BY-4.0"
 images_repo = "github.com/markhayden/dejaview-evalsets"
 images_rev = "9820cd479c42007e8ec24be90f63e3efae3efebb"
-labels_sha256 = "22c1dfcd126ea8b57e1d80e82c6032a5518f19b13771210a86e0ce66bdbb799e"
+labels = "labels.toml"
 families = "families.toml"
 rules = { base = "source-fidelity", version = 1 }
 

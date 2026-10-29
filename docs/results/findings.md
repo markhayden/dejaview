@@ -120,3 +120,54 @@ bootstrap over families; a zero interval means no family's detection changed, no
 **Next.** M5 tests the measuring arms, DX (one measurement tool at a time) and D (all of them),
 against this run's arm A. The sets need harder items too: defects a crop or an alignment would
 reveal and the presented image hides, such as small text, fine geometry and subtle edits.
+
+## 2026-10-29: the first admission gate, regions on the blind set ([gate-regions-initial-2026-10](gate-regions-initial-2026-10/README.md))
+
+**Question.** Does a change-region finder earn its place? The `regions` tool points at where an
+aligned pair differs (photometric change and segmentation class disagreement, boxed and labelled).
+The initial gate ran arms C and D_regions under gemini-4-argon on `source-fidelity/blind-v1`, a
+sealed set of 20 items in 5 new scene families whose labels the owner held until scoring.
+
+**Headline (receipt `8e0c8307a72475ac`).**
+
+| Arm | Detected failures | Missed | False rejects | Unsure | Errors | Cost | Localisation hits |
+|---|---|---|---|---|---|---|---|
+| C (view, align as a picture) | 10/10 | 0 | 1/10 | 0 | 0 | $0.52 | 9 of 10 |
+| D_regions (C plus regions) | 10/10 | 0 | 0/10 | 0 | 0 | $0.79 | 10 of 10 |
+
+Paired bootstrap of the detected-failure difference: point 0, interval 0 to 0; no family's
+detection differs. **Outcome: rejected.** Admission is unchanged.
+
+**What stood out.**
+
+- The control got everything right. Ten planted failures, ten detected, under the visual-access
+  tools alone. A gate written as "detect more than the control" cannot be passed on a set the
+  control already saturates, and the rule said so plainly: rejected on "detected failures not
+  higher", with the interval and the family count agreeing. This is the gate working as designed,
+  and a lesson about the sets: planted removals of a named subject at this size are easy for
+  this model.
+- The tool's effect showed up where the gate does not score it. The one flip was a false reject
+  taken back: under C the model failed a colour grade; with `regions` reporting what had actually
+  changed, it passed it. Localisation of the detected failures rose from 9 of 10 to 10 of 10,
+  because the model cited the tool's boxes. Both are the kind of gain a tool of this sort should
+  give, and neither is the admission estimand.
+- The model used the tool when offered: 14 of 20 items, 82 evidence items added, at 1.5 times
+  the control's cost. It never called `classes`.
+- The run itself was clean: 40 decisions, $1.32, no errors, no unsure answers.
+
+**What changed because of it.**
+
+- The published summary carries decision directories relative to the evaluation directory
+  whatever the run recorded (the run had started writing absolute paths for the packs it restarts
+  in them).
+- Recorded: the next blind plan gives items opaque ids, since the ids of this one name their
+  constructions.
+- Open, for the owner: the next set needs to be harder for the control before a detection gate
+  can separate tools. Candidates are smaller removals, removals of one subject among many alike,
+  partial changes (a window bricked up rather than a building removed), and changes under a strong
+  restyle, where alignment and a change map should matter most. And a gate that credits a tool
+  for false rejects taken back and for localisation would need an ADR, since the estimand was
+  frozen before the labels were unsealed.
+
+**Next.** M5 closes with its checkpoint. Before the confirmation stage, a harder source-fidelity set
+of at least 50 items in new families, built with the opaque-id plan and the owner's review.

@@ -1,0 +1,57 @@
+[receipt]
+receipt_version = 1
+id = "8e0c8307a72475ac"
+created = "2026-10-29T19:31:35Z"
+stage = "initial"
+tool = "regions"
+use_case = "source-fidelity"
+set = "source-fidelity/blind-v1"
+model = "google-ai-studio:gemini-4-argon"
+items = 20
+matrix_identity = "7f1852fd00c6a30c0f3e39687ee8b7cd09d04fc1dc3758662fd61bccd9b7dc0c"
+descriptor_sha256 = "66b077dd28048f3f125c59470984504a90dc5e4d0a08062def4b5155017bb11e"
+seal_sha256 = "da345482f52b5bb6b8e50fbff5e276ba711db289f8fb4ba635547770e830bcd2"
+labels_sha256 = "22c1dfcd126ea8b57e1d80e82c6032a5518f19b13771210a86e0ce66bdbb799e"
+results_sha256 = "e2fa97c89e540c6324e968cae3c673efc59af94059651bd0d71daf863dc9acdc"
+judging_sha256 = "6425209d0c9f73da3f0326f27884568637bfa0c39941f9be8427994acdfa1abf"
+outcome = "rejected"
+failed = [
+    "detected failures: not higher than C",
+    "detected failures: paired lower bound not above 0",
+    "independent families: 0 differing, fewer than 5",
+]
+
+[receipt.c]
+items = 20
+expected_fail = 10
+expected_pass = 10
+detected = 10
+missed = 0
+false_rejects = 1
+unsure = 0
+errors = 0
+cost_usd = 0.5247966
+
+[receipt.x]
+items = 20
+expected_fail = 10
+expected_pass = 10
+detected = 10
+missed = 0
+false_rejects = 0
+unsure = 0
+errors = 0
+cost_usd = 0.7923905
+
+[receipt.bootstrap]
+seed = 20261030
+resamples = 10000
+hypotheses = 1
+families = 5
+differing_families = 0
+point = 0.0
+lower_percentile = 0.025
+upper_percentile = 0.975
+lower = 0.0
+upper = 0.0
+insufficient_tail = false

@@ -1,0 +1,245 @@
+# Answer labels adjudicated by the owner from the construction record.
+[[label]]
+item = "lighthouse-cove-grade"
+expected = "pass"
+failure_types = []
+words = "a mild colour grade (warmth -0.08); structure and subjects unchanged"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label]]
+item = "lighthouse-cove-no-cottage"
+expected = "fail"
+failure_types = ["cottage-changed"]
+words = "the cottage is gone from the candidate"
+obligation_ids = ["SF1", "RQ2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "cottage-changed"
+obligation_ids = ["SF1", "RQ2"]
+bbox = [0.7324, 0.3896, 1.0, 0.5615]
+
+[[label]]
+item = "lighthouse-cove-crop"
+expected = "fail"
+failure_types = ["cropped"]
+words = "the candidate is the central 80% of the source; the edges are cropped away"
+obligation_ids = ["SF2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "cropped"
+obligation_ids = ["SF2"]
+
+[[label]]
+item = "lighthouse-cove-fog"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (add gentle fog over the sea and a few gulls in the sky); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label]]
+item = "station-platform-autumn"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (add autumn leaves on the platform and a bench under the canopy); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label]]
+item = "station-platform-grade"
+expected = "pass"
+failure_types = []
+words = "a mild colour grade (warmth +0.12); structure and subjects unchanged"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label]]
+item = "station-platform-rotate180"
+expected = "fail"
+failure_types = ["rotated"]
+words = "the candidate is the source rotated by 180 degrees"
+obligation_ids = ["SF2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "rotated"
+obligation_ids = ["SF2"]
+
+[[label]]
+item = "station-platform-no-clock"
+expected = "fail"
+failure_types = ["clock-changed"]
+words = "the clock is gone from the candidate; the generator also changed 1 other area(s), check them"
+obligation_ids = ["SF1", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "clock-changed"
+obligation_ids = ["SF1", "RQ1"]
+bbox = [0.5977, 0.1592, 0.7578, 0.416]
+
+[[label]]
+item = "bakery-front-grade"
+expected = "pass"
+failure_types = []
+words = "a mild colour grade (warmth -0.07); structure and subjects unchanged"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label]]
+item = "bakery-front-snow"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (change the season to winter with light snow on the awning and pavement); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label]]
+item = "bakery-front-no-awning"
+expected = "fail"
+failure_types = ["awning-changed"]
+words = "the awning is gone from the candidate"
+obligation_ids = ["SF1", "RQ1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "awning-changed"
+obligation_ids = ["SF1", "RQ1"]
+bbox = [0.3271, 0.0625, 1.0, 0.5234]
+
+[[label]]
+item = "bakery-front-rotate90"
+expected = "fail"
+failure_types = ["rotated"]
+words = "the candidate is the source rotated by 90 degrees"
+obligation_ids = ["SF2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "rotated"
+obligation_ids = ["SF2"]
+
+[[label]]
+item = "canal-footbridge-crop"
+expected = "fail"
+failure_types = ["cropped"]
+words = "the candidate is the central 70% of the source; the edges are cropped away"
+obligation_ids = ["SF2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "cropped"
+obligation_ids = ["SF2"]
+
+[[label]]
+item = "canal-footbridge-afternoon"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (change the light to late afternoon sun from the left with long shadows); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label]]
+item = "canal-footbridge-no-boat"
+expected = "fail"
+failure_types = ["narrowboat-changed"]
+words = "the narrowboat is gone from the candidate"
+obligation_ids = ["SF1", "RQ3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "narrowboat-changed"
+obligation_ids = ["SF1", "RQ3"]
+bbox = [0.5791, 0.4219, 1.0, 0.6953]
+
+[[label]]
+item = "canal-footbridge-grade"
+expected = "pass"
+failure_types = []
+words = "a mild colour grade (warmth -0.03); structure and subjects unchanged"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label]]
+item = "greenhouse-interior-rotate180"
+expected = "fail"
+failure_types = ["rotated"]
+words = "the candidate is the source rotated by 180 degrees"
+obligation_ids = ["SF2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "rotated"
+obligation_ids = ["SF2"]
+
+[[label]]
+item = "greenhouse-interior-no-bench"
+expected = "fail"
+failure_types = ["bench-changed"]
+words = "the bench is gone from the candidate"
+obligation_ids = ["SF1", "RQ3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "bench-changed"
+obligation_ids = ["SF1", "RQ3"]
+bbox = [0.7197, 0.5859, 0.9609, 0.8115]
+
+[[label]]
+item = "greenhouse-interior-grade"
+expected = "pass"
+failure_types = []
+words = "a mild colour grade (warmth +0.05); structure and subjects unchanged"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"
+
+[[label]]
+item = "greenhouse-interior-baskets"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (add hanging baskets of flowers from the iron ribs); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-29"

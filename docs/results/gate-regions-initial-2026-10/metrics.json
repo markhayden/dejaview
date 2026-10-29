@@ -1,0 +1,205 @@
+{
+  "metrics_version": 1,
+  "policy": {
+    "on_unsure": "review",
+    "on_error": "review"
+  },
+  "cells": [
+    {
+      "cell": "google-ai-studio:gemini-4-argon/C",
+      "counts": {
+        "items": 20,
+        "expected_fail": 10,
+        "expected_pass": 10,
+        "detected": 10,
+        "missed": 0,
+        "false_rejects": 1,
+        "unsure": 0,
+        "errors": 0
+      },
+      "confusion": {
+        "expected_fail": [
+          0,
+          10,
+          0,
+          0
+        ],
+        "expected_pass": [
+          9,
+          1,
+          0,
+          0
+        ]
+      },
+      "rates": {
+        "missed": {
+          "count": 0,
+          "total": 10,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.2775327998628892
+        },
+        "detected": {
+          "count": 10,
+          "total": 10,
+          "value": 1.0,
+          "low": 0.7224672001371107,
+          "high": 0.9999999999999999
+        },
+        "false_rejects": {
+          "count": 1,
+          "total": 10,
+          "value": 0.1,
+          "low": 0.017876213095072896,
+          "high": 0.4041500267952385
+        },
+        "unsure": {
+          "count": 0,
+          "total": 20,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.16112515805281938
+        },
+        "errors": {
+          "count": 0,
+          "total": 20,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.16112515805281938
+        }
+      },
+      "localisation": {
+        "labelled_regions": 10,
+        "hits": 9,
+        "predictions": 29,
+        "spurious": 20
+      },
+      "cost": {
+        "total_usd": 0.5247966,
+        "median_usd": 0.02586715
+      },
+      "wall": {
+        "total_ms": 782178,
+        "median_ms": 35520
+      },
+      "repetitions": {
+        "count": 1
+      }
+    },
+    {
+      "cell": "google-ai-studio:gemini-4-argon/D_regions",
+      "counts": {
+        "items": 20,
+        "expected_fail": 10,
+        "expected_pass": 10,
+        "detected": 10,
+        "missed": 0,
+        "false_rejects": 0,
+        "unsure": 0,
+        "errors": 0
+      },
+      "confusion": {
+        "expected_fail": [
+          0,
+          10,
+          0,
+          0
+        ],
+        "expected_pass": [
+          10,
+          0,
+          0,
+          0
+        ]
+      },
+      "rates": {
+        "missed": {
+          "count": 0,
+          "total": 10,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.2775327998628892
+        },
+        "detected": {
+          "count": 10,
+          "total": 10,
+          "value": 1.0,
+          "low": 0.7224672001371107,
+          "high": 0.9999999999999999
+        },
+        "false_rejects": {
+          "count": 0,
+          "total": 10,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.2775327998628892
+        },
+        "unsure": {
+          "count": 0,
+          "total": 20,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.16112515805281938
+        },
+        "errors": {
+          "count": 0,
+          "total": 20,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.16112515805281938
+        }
+      },
+      "localisation": {
+        "labelled_regions": 10,
+        "hits": 10,
+        "predictions": 40,
+        "spurious": 30
+      },
+      "cost": {
+        "total_usd": 0.7923905000000002,
+        "median_usd": 0.03684655
+      },
+      "wall": {
+        "total_ms": 1170828,
+        "median_ms": 54342
+      },
+      "repetitions": {
+        "count": 1
+      }
+    }
+  ],
+  "paired": [
+    {
+      "model": "google-ai-studio:gemini-4-argon",
+      "control": "google-ai-studio:gemini-4-argon/C",
+      "treatment": "google-ai-studio:gemini-4-argon/D_regions",
+      "items": 20,
+      "detected_gained": 0,
+      "detected_lost": 0,
+      "false_rejects_gained": 0,
+      "false_rejects_lost": 1,
+      "differing_families": 0,
+      "flips": [
+        {
+          "set": "source-fidelity/blind-v1",
+          "item": "greenhouse-interior-grade",
+          "expected": "pass",
+          "from": "fail",
+          "to": "pass"
+        }
+      ],
+      "bootstrap": {
+        "seed": 20261030,
+        "resamples": 10000,
+        "hypotheses": 1,
+        "families": 5,
+        "lower_percentile": 0.025,
+        "upper_percentile": 0.975,
+        "point": 0.0,
+        "lower": 0.0,
+        "upper": 0.0,
+        "insufficient_tail": false
+      }
+    }
+  ]
+}

@@ -16,7 +16,7 @@
 //! registered rather than given a transform.
 
 mod flat;
-mod gray;
+pub(crate) mod gray;
 mod linalg;
 mod sphere;
 

@@ -87,7 +87,7 @@ tag.
 - [x] 4.2b Viewer equirectangular overlay (2026-10-28: `geometry.js` mirrors `frames::sphere`; view crops and `view` locations drawn as footprints on the panorama; held to the Rust reference on stored footprints under node rather than by a rendered-pixel compare, which needs a browser)
 - [x] 4.3a `align` flat and `visual_only` (2026-10-28; still to do from this line: run `eval gate` end to end through the binary now that arms C and D can run, and look at the gate tests' forty-second fake runs)
 - [x] 4.3b `align` equirectangular (2026-10-28, with 4.3a: rotation on the sphere, warped panorama, the same envelope; aligned frames carry the rotation and map back through its inverse)
-- [ ] 4.3c `edge_similarity` and `change_map` → tag `m4.1`
+- [x] 4.3c `edge_similarity` and `change_map` → tag `m4.1` (2026-10-28: edge-map correlation and the locally normalised difference map, golden under fixtures/images/change-map)
 - [ ] 4.4a Full MCP client, ADR 0015, pagination, concurrency, images
 - [ ] 4.4b MCP failure modes
 - [ ] 4.5 Arm C on the dev sets

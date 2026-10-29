@@ -70,6 +70,16 @@ same name and listed by `dejaview tools list`. Shipped so far:
   `alignment_failure` region over the image, the evidence SF2 binds to; a textureless pair is
   `not_applicable` with no region. It declares the `visual_only` projection the control arms run
   it under.
+- `edge_similarity` (`frame`, `against`, two frames in one grid such as `raw:source` and
+  `aligned:candidate:t1`): the normalised cross-correlation of the two frames' edge-strength maps
+  (gradient magnitude of the blurred luminance at a working size of 768 px), 1 for the same
+  structure, 0 when either frame has no edges; with the weaker frame's mean edge energy. It
+  survives a tone change and drops for a different scene. Requires `align`.
+- `change_map` (`frame`, `against`): a grey map in `frame`'s grid of the absolute difference of
+  the two frames' locally contrast-normalised luminances, saturating at three units, returned as
+  `crop:<call>:0` over the whole frame with `changed_fraction`, the share of pixels differing by
+  more than one unit. Bright where structure changed, dark under a uniform tone or colour change.
+  Requires `align`.
 
 The alignment estimators behind `align` are in place (`dejaview_tools::align`, ADR 0014): `align_flat` returns
 the homography from source to candidate pixel coordinates and `align_sphere` the rotation between

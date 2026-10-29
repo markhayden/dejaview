@@ -2,6 +2,7 @@
 //! hands them (SPEC "Transports"). Each one's manifest is embedded from `manifests/`.
 
 pub mod align;
+pub mod compare;
 mod raster;
 pub mod resize;
 pub mod view;
@@ -15,6 +16,8 @@ pub fn all() -> Vec<Box<dyn Tool>> {
         Box::new(view::View::new()),
         Box::new(resize::Resize::new()),
         Box::new(align::Align::new()),
+        Box::new(compare::EdgeSimilarity::new()),
+        Box::new(compare::ChangeMap::new()),
     ]
 }
 

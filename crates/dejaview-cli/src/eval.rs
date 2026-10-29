@@ -108,7 +108,7 @@ impl dejaview_eval::canary::Judge for CliJudge {
         let script = self.tool_script.as_deref();
         #[cfg(not(feature = "testkit"))]
         let script = None;
-        crate::tools_for_config(config, script)
+        crate::tools_for_config(config, script, &crate::SharedPacks::default())
             .map(|(registry, _)| registry)
             .map_err(dejaview_eval::Error::Canary)
     }
@@ -385,6 +385,7 @@ fn eval_estimate(args: &EstimateArgs) -> i32 {
         #[cfg(feature = "testkit")]
         tool_script: args.tool_script.clone(),
         lock_digests: Default::default(),
+        shared_packs: Default::default(),
     };
     let e = match dejaview_eval::estimate::estimate(&plan, &factories) {
         Ok(e) => e,
@@ -434,6 +435,8 @@ struct CliFactories {
     #[cfg(feature = "testkit")]
     tool_script: Option<PathBuf>,
     lock_digests: std::sync::Mutex<std::collections::BTreeMap<String, String>>,
+    /// Packs configured `shared = true`, one process for the whole evaluation.
+    shared_packs: crate::SharedPacks,
 }
 
 impl Factories for CliFactories {
@@ -449,19 +452,23 @@ impl Factories for CliFactories {
 
     fn tools(
         &self,
-        _selection: &ToolSelection,
+        selection: &ToolSelection,
         config: &Config,
     ) -> dejaview_eval::Result<ToolRegistry> {
         #[cfg(feature = "testkit")]
         let script = self.tool_script.as_deref();
         #[cfg(not(feature = "testkit"))]
         let script = None;
-        let (registry, digests) =
-            crate::tools_for_config(config, script).map_err(dejaview_eval::Error::Runner)?;
+        let (registry, digests) = crate::tools_for_config(config, script, &self.shared_packs)
+            .map_err(dejaview_eval::Error::Runner)?;
         if let Ok(mut held) = self.lock_digests.lock() {
             *held = digests;
         }
-        Ok(registry)
+        // The arm's projections (`align` under `visual_only` in the control arms) wrap the tools
+        // here, so every envelope the run sees is already projected.
+        registry
+            .with_projections(&selection.projections)
+            .map_err(|e| dejaview_eval::Error::Runner(e.to_string()))
     }
 
     fn lock_digests(&self, _config: &Config) -> std::collections::BTreeMap<String, String> {
@@ -491,6 +498,7 @@ fn eval_run(args: &RunArgs) -> i32 {
         #[cfg(feature = "testkit")]
         tool_script: args.tool_script.clone(),
         lock_digests: Default::default(),
+        shared_packs: Default::default(),
     };
     // Signals cancel between decisions and inside one; the runtime that listens stays alive for
     // the whole run while every decision runs on its own.

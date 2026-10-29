@@ -1,7 +1,11 @@
 //! Frames and locations. A frame is a coordinate space the model or a tool can point into:
 //! `raw:<image>` for a canonical image, `aligned:<image>:<transform>` for a warped image,
 //! `crop:<call>:<n>` for a tool's crop. Every location names a frame and maps deterministically
-//! back to the raw frame of its root image. Equirectangular view mapping arrives in task 4.2a.
+//! back to the raw frame of its root image, through bbox crops and, for `view` crops of a
+//! panorama, the sphere geometry in `sphere`.
+
+pub mod aligned;
+pub mod sphere;
 
 use std::collections::BTreeMap;
 
@@ -48,8 +52,15 @@ pub enum LocationKind {
 pub enum Mapping {
     /// The frame covers this normalised box of the parent (may extend past the parent's edges).
     Bbox([f64; 4]),
-    /// A square perspective view of an equirectangular parent (mapping maths in task 4.2a).
+    /// A square perspective view of an equirectangular parent (`sphere::View`).
     View { yaw: f64, pitch: f64, fov: f64 },
+    /// An aligned frame of a flat image: the row-major 3×3 homography taking the image's
+    /// normalised coordinates to the parent's. The frame shares the parent's grid; a location on
+    /// it maps back to the image through the inverse.
+    Homography(Vec<f64>),
+    /// An aligned frame of an equirectangular image: the row-major rotation taking the image's
+    /// directions to the parent's.
+    Rotation(Vec<f64>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -61,10 +72,14 @@ pub enum Frame {
         height: u32,
         projection: Projection,
     },
+    /// `image` warped into `parent`'s frame by a transform: the pixels are the image's, the
+    /// coordinates the parent's, so the root is the image and locations map back through the
+    /// inverse of `mapping` (a `Homography` or a `Rotation`).
     Aligned {
         image: String,
         transform_id: String,
         parent: String,
+        mapping: Mapping,
         width: u32,
         height: u32,
         projection: Projection,
@@ -86,6 +101,32 @@ impl Frame {
             | Frame::Crop { projection, .. } => *projection,
         }
     }
+}
+
+/// What an aligned frame is made of, for [`Registry::add_aligned`].
+#[derive(Debug, Clone)]
+pub struct AlignedFrame<'a> {
+    /// The image whose pixels the frame shows.
+    pub image: &'a str,
+    pub transform_id: &'a str,
+    /// The frame whose grid it shares.
+    pub parent: &'a str,
+    /// `Mapping::Homography` or `Mapping::Rotation`, image to parent.
+    pub mapping: Mapping,
+    pub width: u32,
+    pub height: u32,
+}
+
+/// One step of a frame's chain to its root: the frame, its parent and how it sits in it (`None`
+/// for a raw frame).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ChainLink {
+    pub frame: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mapping: Option<Mapping>,
 }
 
 /// The registry of frames for one run.
@@ -145,12 +186,21 @@ impl Registry {
 
     pub fn add_crop(&mut self, id: &str, parent: &str, mapping: Mapping, width: u32, height: u32) {
         let projection = match &mapping {
-            Mapping::Bbox(_) => self
+            // A box of a panorama is a flat picture unless it is the whole frame (a resize).
+            Mapping::Bbox(b) if *b == [0.0, 0.0, 1.0, 1.0] => self
                 .frames
                 .get(parent)
                 .map(Frame::projection)
                 .unwrap_or_default(),
+            Mapping::Bbox(_) => Projection::Flat,
             Mapping::View { .. } => Projection::Flat,
+            // Not a crop mapping; the registry keeps the parent's projection and `to_root`
+            // refuses the frame.
+            Mapping::Homography(_) | Mapping::Rotation(_) => self
+                .frames
+                .get(parent)
+                .map(Frame::projection)
+                .unwrap_or_default(),
         };
         self.frames.insert(
             id.to_string(),
@@ -162,6 +212,63 @@ impl Registry {
                 projection,
             },
         );
+    }
+
+    /// Registers an aligned frame (SPEC `aligned:<image>:<transform>`): `image` warped into
+    /// `parent` by the transform; the frame takes the parent's projection.
+    pub fn add_aligned(&mut self, id: &str, aligned: AlignedFrame<'_>) {
+        let projection = self
+            .frames
+            .get(aligned.parent)
+            .map(Frame::projection)
+            .unwrap_or_default();
+        self.frames.insert(
+            id.to_string(),
+            Frame::Aligned {
+                image: aligned.image.to_string(),
+                transform_id: aligned.transform_id.to_string(),
+                parent: aligned.parent.to_string(),
+                mapping: aligned.mapping,
+                width: aligned.width,
+                height: aligned.height,
+                projection,
+            },
+        );
+    }
+
+    /// The frame and its ancestors down to the raw root, each with how it sits in its parent.
+    pub fn chain(&self, id: &str) -> Vec<ChainLink> {
+        let mut out = Vec::new();
+        let mut current = id.to_string();
+        for _ in 0..64 {
+            let Some(frame) = self.frames.get(&current) else {
+                break;
+            };
+            match frame {
+                Frame::Raw { .. } => {
+                    out.push(ChainLink {
+                        frame: current.clone(),
+                        parent: None,
+                        mapping: None,
+                    });
+                    break;
+                }
+                Frame::Crop {
+                    parent, mapping, ..
+                }
+                | Frame::Aligned {
+                    parent, mapping, ..
+                } => {
+                    out.push(ChainLink {
+                        frame: current.clone(),
+                        parent: Some(parent.clone()),
+                        mapping: Some(mapping.clone()),
+                    });
+                    current = parent.clone();
+                }
+            }
+        }
+        out
     }
 
     pub fn get(&self, id: &str) -> Option<FrameRef<'_>> {
@@ -179,13 +286,11 @@ impl Registry {
         let mut current = frame;
         loop {
             match current {
-                Frame::Raw { image, .. } => return image,
-                Frame::Aligned { parent, .. } | Frame::Crop { parent, .. } => {
-                    match self.frames.get(parent) {
-                        Some(p) => current = p,
-                        None => return parent,
-                    }
-                }
+                Frame::Raw { image, .. } | Frame::Aligned { image, .. } => return image,
+                Frame::Crop { parent, .. } => match self.frames.get(parent) {
+                    Some(p) => current = p,
+                    None => return parent,
+                },
             }
         }
     }
@@ -221,11 +326,6 @@ impl Registry {
                 null("polygon", loc.polygon.is_some())?;
                 no_view()?;
                 validate_bbox(&b)?;
-                if projection == Projection::Equirectangular && b[0] <= 0.0 && b[2] >= 1.0 {
-                    return Err(Error::Submission(
-                        "bbox straddles the seam of an equirectangular frame".into(),
-                    ));
-                }
             }
             LocationKind::Polygon => {
                 let p = loc
@@ -235,15 +335,6 @@ impl Registry {
                 null("bbox", loc.bbox.is_some())?;
                 no_view()?;
                 validate_polygon(p)?;
-                if projection == Projection::Equirectangular {
-                    let min_x = p.iter().map(|v| v[0]).fold(f64::INFINITY, f64::min);
-                    let max_x = p.iter().map(|v| v[0]).fold(f64::NEG_INFINITY, f64::max);
-                    if min_x <= 0.0 && max_x >= 1.0 {
-                        return Err(Error::Submission(
-                            "polygon crosses the seam of an equirectangular frame".into(),
-                        ));
-                    }
-                }
             }
             LocationKind::View => {
                 null("bbox", loc.bbox.is_some())?;
@@ -288,6 +379,27 @@ impl Registry {
         self.validate(loc)?;
         let mut current = loc.clone();
         let mut partial = false;
+        // A view location names a view into its panorama: its root geometry is that view's
+        // footprint on the frame it sits on.
+        if current.kind == LocationKind::View {
+            let view = sphere::View {
+                yaw: current.yaw.unwrap_or(0.0),
+                pitch: current.pitch.unwrap_or(0.0),
+                fov: current.fov.unwrap_or(90.0),
+            };
+            let whole = Location {
+                frame: current.frame.clone(),
+                kind: LocationKind::WholeImage,
+                bbox: None,
+                polygon: None,
+                yaw: None,
+                pitch: None,
+                fov: None,
+            };
+            let (mapped, clipped) = sphere::map_through_view(&whole, &view, &current.frame)?;
+            current = mapped;
+            partial |= clipped;
+        }
         loop {
             let frame = self
                 .frames
@@ -300,20 +412,47 @@ impl Registry {
                         partial,
                     });
                 }
-                Frame::Aligned { parent, .. } => {
-                    // Aligned frames share their parent's coordinates for locations; the warp is
-                    // applied to pixels, not to normalised coordinates (task 4.3a refines this).
-                    current.frame = parent.clone();
+                Frame::Aligned { image, mapping, .. } => {
+                    // The frame's coordinates are the parent's; the pixels are the image's, so
+                    // the location goes back through the inverse transform to the image's raw
+                    // frame.
+                    let raw = format!("raw:{image}");
+                    let (next, clipped) = match mapping {
+                        Mapping::Homography(h) => {
+                            aligned::map_through_homography(&current, h, &raw)?
+                        }
+                        Mapping::Rotation(r) => aligned::map_through_rotation(&current, r, &raw)?,
+                        Mapping::Bbox(_) | Mapping::View { .. } => {
+                            return Err(Error::Submission(format!(
+                                "aligned frame {:?} carries a crop mapping",
+                                current.frame
+                            )));
+                        }
+                    };
+                    partial |= clipped;
+                    current = next;
                 }
                 Frame::Crop {
                     parent, mapping, ..
                 } => {
-                    let Mapping::Bbox(m) = mapping else {
-                        return Err(Error::Submission(
-                            "view crop mapping arrives in task 4.2a".into(),
-                        ));
+                    let (next, clipped) = match mapping {
+                        Mapping::Homography(_) | Mapping::Rotation(_) => {
+                            return Err(Error::Submission(format!(
+                                "crop frame {:?} carries a transform mapping",
+                                current.frame
+                            )));
+                        }
+                        Mapping::Bbox(m) => map_through_bbox(&current, m, parent)?,
+                        Mapping::View { yaw, pitch, fov } => sphere::map_through_view(
+                            &current,
+                            &sphere::View {
+                                yaw: *yaw,
+                                pitch: *pitch,
+                                fov: *fov,
+                            },
+                            parent,
+                        )?,
                     };
-                    let (next, clipped) = map_through_bbox(&current, m, parent)?;
                     partial |= clipped;
                     current = next;
                 }
@@ -327,14 +466,27 @@ impl Registry {
             .frames
             .get(frame_id)
             .ok_or_else(|| Error::Submission(format!("unknown frame {frame_id:?}")))?;
-        let Frame::Crop {
-            mapping: Mapping::Bbox(m),
-            ..
-        } = frame
-        else {
-            return Err(Error::Submission(
-                "from_root supports bbox crops in task 1.2".into(),
-            ));
+        let mapping = match frame {
+            Frame::Crop { mapping, .. } | Frame::Aligned { mapping, .. } => mapping,
+            Frame::Raw { .. } => {
+                return Err(Error::Submission(format!("{frame_id:?} is a raw frame")));
+            }
+        };
+        let m = match mapping {
+            Mapping::Bbox(m) => m,
+            Mapping::Homography(h) => return aligned::map_into_homography(root_loc, h, frame_id),
+            Mapping::Rotation(r) => return aligned::map_into_rotation(root_loc, r, frame_id),
+            Mapping::View { yaw, pitch, fov } => {
+                return sphere::map_into_view(
+                    root_loc,
+                    &sphere::View {
+                        yaw: *yaw,
+                        pitch: *pitch,
+                        fov: *fov,
+                    },
+                    frame_id,
+                );
+            }
         };
         let w = m[2] - m[0];
         let h = m[3] - m[1];
@@ -440,6 +592,18 @@ fn map_through_bbox(loc: &Location, m: &[f64; 4], parent: &str) -> Result<(Locat
     let mut out = loc.clone();
     out.frame = parent.to_string();
     let mut clipped = false;
+    if loc.kind == LocationKind::WholeImage {
+        // The whole crop is its box on the parent, clipped to it.
+        let c = [
+            m[0].clamp(0.0, 1.0),
+            m[1].clamp(0.0, 1.0),
+            m[2].clamp(0.0, 1.0),
+            m[3].clamp(0.0, 1.0),
+        ];
+        out.kind = LocationKind::Bbox;
+        out.bbox = Some(c);
+        return Ok((out, c != *m));
+    }
     if let Some(b) = loc.bbox {
         let [x0, y0] = fwd(b[0], b[1]);
         let [x1, y1] = fwd(b[2], b[3]);
@@ -502,6 +666,93 @@ mod tests {
             [1.0, 0.0],
             [1.0, 1.0]
         ));
+    }
+
+    #[test]
+    fn the_chain_of_a_nested_crop_runs_down_to_the_raw_root() {
+        let mut r = Registry::new();
+        r.add_raw("c", 100, 100, Projection::Flat);
+        r.add_crop(
+            "crop:call:1:0",
+            "raw:c",
+            Mapping::Bbox([0.0, 0.0, 0.5, 0.5]),
+            50,
+            50,
+        );
+        r.add_crop(
+            "crop:call:2:0",
+            "crop:call:1:0",
+            Mapping::Bbox([0.5, 0.5, 1.0, 1.0]),
+            25,
+            25,
+        );
+        let chain = r.chain("crop:call:2:0");
+        let frames: Vec<&str> = chain.iter().map(|l| l.frame.as_str()).collect();
+        assert_eq!(frames, ["crop:call:2:0", "crop:call:1:0", "raw:c"]);
+        assert_eq!(chain[0].parent.as_deref(), Some("crop:call:1:0"));
+        assert_eq!(chain[1].mapping, Some(Mapping::Bbox([0.0, 0.0, 0.5, 0.5])));
+        assert!(chain[2].parent.is_none() && chain[2].mapping.is_none());
+        assert!(r.chain("nope").is_empty());
+    }
+
+    #[test]
+    fn a_box_of_a_panorama_is_flat_but_its_full_frame_keeps_the_projection() {
+        let mut r = Registry::new();
+        r.add_raw("p", 1024, 512, Projection::Equirectangular);
+        r.add_crop(
+            "crop:call:1:0",
+            "raw:p",
+            Mapping::Bbox([0.0, 0.25, 0.25, 0.75]),
+            256,
+            256,
+        );
+        r.add_crop(
+            "crop:call:2:0",
+            "raw:p",
+            Mapping::Bbox([0.0, 0.0, 1.0, 1.0]),
+            512,
+            256,
+        );
+        assert_eq!(
+            r.get("crop:call:1:0").unwrap().projection(),
+            Projection::Flat
+        );
+        assert_eq!(
+            r.get("crop:call:2:0").unwrap().projection(),
+            Projection::Equirectangular
+        );
+        let view = Location {
+            frame: "crop:call:1:0".into(),
+            kind: LocationKind::View,
+            bbox: None,
+            polygon: None,
+            yaw: Some(0.0),
+            pitch: Some(0.0),
+            fov: Some(60.0),
+        };
+        assert!(
+            r.validate(&view).is_err(),
+            "a quarter of a panorama is no sphere"
+        );
+        // A view location on the panorama itself maps to its footprint.
+        let on_pano = Location {
+            frame: "raw:p".into(),
+            ..view
+        };
+        let m = r.to_root(&on_pano).unwrap();
+        assert_eq!(m.kind, LocationKind::Polygon, "{m:?}");
+        // The whole of a crop maps to its box on the parent.
+        let whole = Location {
+            frame: "crop:call:1:0".into(),
+            kind: LocationKind::WholeImage,
+            bbox: None,
+            polygon: None,
+            yaw: None,
+            pitch: None,
+            fov: None,
+        };
+        let m = r.to_root(&whole).unwrap();
+        assert_eq!(m.bbox(), Some([0.0, 0.25, 0.25, 0.75]));
     }
 
     #[test]

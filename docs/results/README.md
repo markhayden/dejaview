@@ -9,3 +9,5 @@ and the summary JSON, plus `notes.md` on how the run went. Development-set resul
   out and what changed because of it.
 - [baseline-2026-10](baseline-2026-10/README.md): the arm A baseline (task 3.8), six models, no
   tools, ten development sets, 2026-10-28.
+- [arm-c-2026-10](arm-c-2026-10/README.md): arms A and C paired (task 4.5), five models, `view`
+  and `align` as pictures, ten development sets, 2026-10-28.

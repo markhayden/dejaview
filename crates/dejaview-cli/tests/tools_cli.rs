@@ -77,3 +77,24 @@ fn tools_list_refuses_a_provisioned_pack_that_is_not_installed() {
         "{err}"
     );
 }
+
+#[test]
+fn tools_list_shows_the_built_ins() {
+    let o = Command::new(env!("CARGO_BIN_EXE_dejaview"))
+        .current_dir(repo_root())
+        .args(["tools", "list", "--config", "fixtures/config/view.toml"])
+        .output()
+        .unwrap();
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    let out = String::from_utf8_lossy(&o.stdout);
+    assert!(
+        out.contains("view v1.0.0 (Cheap") && out.contains("resize v1.0.0 (Cheap"),
+        "{out}"
+    );
+    assert!(out.contains("perspective view"), "{out}");
+}

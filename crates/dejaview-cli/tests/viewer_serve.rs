@@ -114,6 +114,11 @@ fn report_view_serves_the_viewer_the_report_and_only_the_run_artifacts() {
         js.contains("is not supported by this viewer"),
         "the refusal branch for other versions"
     );
+    let (status, head, geometry) = get(&url, "/geometry.js");
+    assert_eq!(status, 200);
+    assert!(head.contains("text/javascript"), "{head}");
+    let geometry = String::from_utf8_lossy(&geometry).to_string();
+    assert!(geometry.contains("dejaviewGeometry"));
     let (status, _, css) = get(&url, "/viewer.css");
     assert_eq!(status, 200);
     // Nothing in the page reaches off the server that served it: no absolute URL anywhere but
@@ -123,6 +128,7 @@ fn report_view_serves_the_viewer_the_report_and_only_the_run_artifacts() {
     for (name, text) in [
         ("index.html", &page),
         ("viewer.js", &js),
+        ("geometry.js", &geometry),
         ("viewer.css", &css),
     ] {
         for (i, _) in text.match_indices("http") {

@@ -11,6 +11,7 @@ image_args = ["image"]
 evidence_kind = "change_region"
 returns = { max_images = 1, max_long_edge = 1024, max_image_bytes = 2_000_000, max_summary_bytes = 2048, max_regions = 30, max_region_label_bytes = 120, max_measurements = 8, max_transforms = 0, max_envelope_bytes = 65_536 }
 frames_out = ["crop"]
+projections = ["visual_only"]
 
 [tool.model_schema]
 type = "object"

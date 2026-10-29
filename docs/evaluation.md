@@ -149,18 +149,30 @@ Per cell, over repetition 1 (SPEC "Metrics"):
 - cost total and median per item (errors included) and wall time total and median.
 
 Later repetitions never move a headline number; they are reported as the share of (item,
-repetition) pairs whose computed verdict agrees with repetition 1. `fixtures/stats/metrics-1.toml`
+repetition) pairs whose computed verdict agrees with repetition 1.
+
+**Paired comparisons** (SPEC "Metrics", "Paired arm comparisons report the items that flipped each
+way and the bootstrap interval"). For every model whose cells allow it, the report pairs arm A
+against C and C against each D arm, on the items both scored in repetition 1: how many flipped,
+the detected failures gained and lost (expected-fail items the treatment detected and the
+control did not, and the reverse), the false rejects gained and lost, the families whose
+detection differs, and every flipped item with its verdict under each arm. When the matrix
+declares `[matrix.gate] seed` (and `resamples`), the summary carries them and the report adds the
+paired bootstrap of the detected-failure difference, treatment minus control, under that seed, so
+it reproduces; without a seed the flips are reported and no interval is claimed. `metrics.json`
+holds the same under `paired`. `fixtures/stats/metrics-1.toml`
 is the hand-computed fixture the tests hold the numbers to, and `fixtures/stats/metrics-1.md` its
 stored rendering.
 
 A run done for the record becomes a results document under `docs/results/<name>/`:
 
 ```
-scripts/results-doc.py eval-out/<name> evalsets/matrix/<matrix>.toml docs/results/<name> [--notes notes.md]
+scripts/results-doc.py eval-out/<name> evalsets/matrix/<matrix>.toml docs/results/<name> --title "<what the run was>" [--notes notes.md]
 ```
 
 writes `README.md` (the cells with their resolved models, hosts, API versions and costs, then the
-report over the development sets, over the adversarial sets and over every set) and copies the
+report over the development sets, over the adversarial sets and over every set, paired sections
+included) and copies the
 matrix, the summary (error text withheld; it may quote a provider's response), the metrics and the
 descriptor beside it. `--notes` adds a section on how the run went. `docs/results/findings.md`
 keeps one entry per run: the question, the headline numbers and what changed because of them.

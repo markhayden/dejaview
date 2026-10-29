@@ -288,6 +288,10 @@ pub struct ToolCallEntry {
     pub dropped: Vec<String>,
     /// The structured result in full; `None` when the call was not executed.
     pub envelope: Option<ArtifactRef>,
+    /// The evaluation projection the tool ran under (SPEC "Evaluation projections"), if any: the
+    /// envelope stored is the projected one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projection: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -441,6 +445,10 @@ impl RunReport {
                             if e.version.is_some() {
                                 c.version = e.version.clone();
                             }
+                            if e.projection.is_some() {
+                                c.projection = e.projection.clone();
+                            }
+                            c.executed = e.executed;
                         }
                         None => r.tool_calls.push(ToolCallEntry {
                             id,
@@ -456,6 +464,7 @@ impl RunReport {
                             added_items: Vec::new(),
                             dropped: Vec::new(),
                             envelope: None,
+                            projection: e.projection.clone(),
                         }),
                     }
                 }
@@ -471,13 +480,14 @@ impl RunReport {
                         if let Some(a) = &img.artifact {
                             r.images_sent.insert(img.frame.clone(), a.clone());
                         }
-                        // As the registry does: a box keeps the parent's projection, a view is flat.
+                        // As the registry does: a box keeps the parent's projection, a view is
+                        // flat; the root is the image the pixels came from.
                         let parent = r.frames.get(&img.parent);
-                        let root = parent
-                            .map(|p| p.root.clone())
-                            .unwrap_or_else(|| img.parent.clone());
+                        let root = img.root.clone();
                         let projection = match &img.mapping {
-                            crate::frames::Mapping::Bbox(_) => parent
+                            crate::frames::Mapping::Bbox(_)
+                            | crate::frames::Mapping::Homography(_)
+                            | crate::frames::Mapping::Rotation(_) => parent
                                 .map(|p| p.projection)
                                 .unwrap_or(crate::job::Projection::Flat),
                             crate::frames::Mapping::View { .. } => crate::job::Projection::Flat,

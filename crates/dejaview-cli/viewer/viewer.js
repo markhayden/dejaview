@@ -77,19 +77,37 @@ function artifactLink(run, ref, text) {
 
 // ---- locations and frames --------------------------------------------------------------------
 
-/// Maps a location to the raw frame of its root image through the frame tree. Returns
-/// { frame, kind, bbox, polygon, partial } or null when a mapping is not a box (views arrive
-/// with equirectangular support) or the frame is unknown.
+/// Maps a location to the raw frame of its root image through the frame tree: bbox crops by their
+/// box, view crops by the sphere geometry (`geometry.js`), and a `view` location by the footprint
+/// of the view it names on its own panorama. Returns { frame, kind, bbox, polygon, partial } or
+/// null when the frame is unknown or a mapping is missing.
 function toRoot(frames, loc) {
+  const geometry = globalThis.dejaviewGeometry;
   let frame = loc.frame;
   let kind = loc.kind;
   let bbox = loc.bbox ? [...loc.bbox] : null;
   let polygon = loc.polygon ? loc.polygon.map(p => [...p]) : null;
-  if (kind === 'view') return null;
+  let partial = false;
+  if (kind === 'view') {
+    if (!geometry) return null;
+    const fp = geometry.mapThroughView({ kind: 'whole_image' }, { yaw: loc.yaw, pitch: loc.pitch, fov: loc.fov });
+    kind = fp.kind; bbox = fp.bbox || null; polygon = fp.polygon || null; partial = fp.clipped;
+  }
   let guard = 0;
   while (frames[frame] && frames[frame].parent) {
     if (++guard > 64) return null;
     const f = frames[frame];
+    if (f.mapping && (f.mapping.view || f.mapping.homography || f.mapping.rotation)) {
+      if (!geometry) return null;
+      // A view crop maps into its parent; an aligned frame maps back to its own image's raw frame.
+      const fp = f.mapping.view ? geometry.mapThroughView({ kind, bbox, polygon }, f.mapping.view)
+        : f.mapping.homography ? geometry.mapThroughHomography({ kind, bbox, polygon }, f.mapping.homography)
+        : geometry.mapThroughRotation({ kind, bbox, polygon }, f.mapping.rotation);
+      if (!fp) return null;
+      kind = fp.kind; bbox = fp.bbox || null; polygon = fp.polygon || null; partial = partial || fp.clipped;
+      frame = f.mapping.view ? f.parent : `raw:${f.root}`;
+      continue;
+    }
     if (!f.mapping || !f.mapping.bbox) return null;
     const [x0, y0, x1, y1] = f.mapping.bbox;
     const w = x1 - x0, h = y1 - y0;
@@ -100,7 +118,6 @@ function toRoot(frames, loc) {
     frame = f.parent;
   }
   if (!frames[frame]) return null;
-  let partial = false;
   const clip = v => { const c = Math.min(1, Math.max(0, v)); if (c !== v) partial = true; return c; };
   if (bbox) bbox = bbox.map(clip);
   if (polygon) polygon = polygon.map(([x, y]) => [clip(x), clip(y)]);
@@ -206,21 +223,22 @@ function imagesSection(run, locs) {
     svg.dataset.frame = frameId;
     const isRaw = frameId.startsWith('raw:');
     for (const { loc, cls, title } of locs) {
-      if (loc.frame === frameId) draw(svg, { kind: loc.kind, bbox: loc.bbox, polygon: loc.polygon, partial: false }, cls, `${title} (as submitted)`);
-      if (isRaw && loc.frame !== frameId) {
+      if (loc.frame === frameId && loc.kind !== 'view') draw(svg, { kind: loc.kind, bbox: loc.bbox, polygon: loc.polygon, partial: false }, cls, `${title} (as submitted)`);
+      if (isRaw && (loc.frame !== frameId || loc.kind === 'view')) {
         const mapped = toRoot(frames, loc);
-        if (mapped && mapped.frame === frameId) draw(svg, mapped, cls, `${title} (from ${loc.frame})`);
+        if (mapped && mapped.frame === frameId) draw(svg, mapped, cls, loc.kind === 'view' ? `${title} (view footprint)` : `${title} (from ${loc.frame})`);
       }
     }
     const img = el('img', { src: artifactUrl(run.run, ref), alt: frameId });
     const stage = el('div', { class: 'stage' }, img, svg);
     const dims = frame ? `${frame.width}×${frame.height} ${frame.projection}` : '';
-    const parent = frame && frame.parent ? ` ⊂ ${frame.parent} ${frame.mapping && frame.mapping.bbox ? `[${frame.mapping.bbox.map(v => v.toFixed(3)).join(', ')}]` : ''}` : '';
+    const mappingText = m => (m && m.bbox ? `[${m.bbox.map(v => v.toFixed(3)).join(', ')}]` : m && m.view ? `view yaw ${m.view.yaw}° pitch ${m.view.pitch}° fov ${m.view.fov}°` : m && m.homography ? 'aligned by homography' : m && m.rotation ? 'aligned by rotation' : '');
+    const parent = frame && frame.parent ? ` ⊂ ${frame.parent} ${mappingText(frame.mapping)}` : '';
     grid.append(el('figure', null, stage, el('figcaption', null, el('b', { text: frameId }), ` ${dims}${parent}`, ref.truncated ? el('span', { class: 'warn', text: ' truncated' }) : null)));
   }
   sec.append(grid);
   const unmapped = locs.filter(l => !toRoot(frames, l.loc) && l.loc.kind !== 'absent').map(l => `${l.title} in ${l.loc.frame} (${l.loc.kind})`);
-  if (unmapped.length) sec.append(el('p', { class: 'warn', text: `not drawn in raw coordinates (view mappings arrive with equirectangular support): ${unmapped.join('; ')}` }));
+  if (unmapped.length) sec.append(el('p', { class: 'warn', text: `not drawn in raw coordinates (unknown frame or mapping): ${unmapped.join('; ')}` }));
   return sec;
 }
 

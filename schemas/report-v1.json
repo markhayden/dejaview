@@ -788,7 +788,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "A square perspective view of an equirectangular parent (mapping maths in task 4.2a).",
+          "description": "A square perspective view of an equirectangular parent (`sphere::View`).",
           "properties": {
             "view": {
               "properties": {
@@ -815,6 +815,40 @@
           },
           "required": [
             "view"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An aligned frame of a flat image: the row-major 3×3 homography taking the image's\nnormalised coordinates to the parent's. The frame shares the parent's grid; a location on\nit maps back to the image through the inverse.",
+          "properties": {
+            "homography": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "homography"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An aligned frame of an equirectangular image: the row-major rotation taking the image's\ndirections to the parent's.",
+          "properties": {
+            "rotation": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "rotation"
           ],
           "type": "object"
         }
@@ -1333,6 +1367,13 @@
           "type": "string"
         },
         "invalid_args": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projection": {
+          "description": "The evaluation projection the tool ran under (SPEC \"Evaluation projections\"), if any: the\nenvelope stored is the projected one.",
           "type": [
             "string",
             "null"

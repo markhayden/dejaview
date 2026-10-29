@@ -1,0 +1,13 @@
+
+Tools. Use them to look closer before deciding; every call is logged. Refer to images and frames by their ids.
+- fake_regions (Cheap, about 0s): Test double: returns scripted change regions for an image.
+  When to use: Only in tests.
+  When not to use: Anywhere real.
+  Output: Each region is a pointer, not a verdict.
+- regions (Expensive, about 25s): Finds regions that changed between an aligned pair, with high recall.
+  When to use: After align succeeds on a source and candidate, before judging structure.
+  When not to use: Without a source image, or on a pair align could not register.
+  Output: Each region is a pointer, not a verdict. Inspect regions with view before deciding.
+  Prerequisites: `against` must be an aligned frame of the source relative to `image`.
+  Requires: align
+  Pairs with: view, classes

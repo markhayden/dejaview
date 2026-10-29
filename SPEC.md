@@ -252,7 +252,8 @@ registry per run:
 - `raw:<image-id>` for each job image, the canonical image.
 - `aligned:<image-id>:<transform-id>` for an image warped into another image's frame by `align`,
   with the transform stored (homography for flat, rotation on the sphere for equirectangular) and
-  the lossless warped pixels.
+  the lossless warped pixels. Its coordinates are the other image's; its root is the image whose
+  pixels it shows, and a location on it maps back to that image through the inverse transform.
 - `crop:<call-id>:<n>` for each image a tool returned, with its parent frame and the mapping back
   to it (bbox or yaw/pitch/fov).
 
@@ -260,8 +261,8 @@ Every frame has a root image id and a projection. A **location** is a tagged rec
 
 | `kind` | requires non-null | allowed on |
 |---|---|---|
-| `bbox` | `frame`, `bbox = [x0, y0, x1, y1]` normalised, `x0 < x1`, `y0 < y1` | any frame; on equirectangular frames the box may not straddle the seam at yaw ±180° |
-| `polygon` | `frame`, `polygon` of 3 to 64 normalised vertices, simple | any frame; on equirectangular frames it may not cross the seam (a tool that needs to emits two) |
+| `bbox` | `frame`, `bbox = [x0, y0, x1, y1]` normalised, `x0 < x1`, `y0 < y1` | any frame; a normalised box cannot wrap round the seam of an equirectangular frame, and one spanning the full width is the full circle |
+| `polygon` | `frame`, `polygon` of 3 to 64 normalised vertices, simple | any frame; on equirectangular frames a polygon cannot wrap round the seam (a tool that needs both sides emits two; the registry cuts a view's footprint that crosses it to the side holding the region's centre and marks it clipped) |
 | `view` | `frame`, `yaw` in `[-180, 180)`, `pitch` in `[-90, 90]`, `fov` in `[10, 120]` | equirectangular frames only |
 | `whole_image` | `frame` | any frame; a global defect such as a wrong projection or a broken render |
 | `absent` | `frame` (the image in which the thing is missing) | any frame |
@@ -1066,12 +1067,14 @@ tool definitions. The rendered text is deterministic and hashed into the cache k
 
 ### Evaluation projections
 
-A tool may declare named **projections** of its envelope for evaluation arms. `align` declares
-`visual_only`: `images` and `transforms` with `params` kept, `quality` removed, `measurements`
-and `regions` empty, `summary` replaced by the fixed text "Alignment computed." or "Alignment
-not available.", `status` mapped to `ok` or `not_applicable`. The projection is applied by the
-harness before anything reaches the model or the checklist, so arms that use it get identical
-visual artifacts and no diagnostic evidence or evidence items.
+A tool may declare named **projections** of its envelope for evaluation arms (manifest
+`projections`). `align` declares `visual_only`: `images` and `transforms` with `params` kept,
+`quality` removed, `measurements` and `regions` empty, `summary` replaced by the fixed text
+"Result computed; its measurements are withheld." or "Result not available.", `status` mapped to
+`ok` or `not_applicable` (`invalid_args` stays: it answers the model's own mistake). The
+projection is applied by the harness before anything reaches the model or the checklist, so arms
+that use it get identical visual artifacts and no diagnostic evidence or evidence items; the
+report records the projection on every call that ran under one.
 
 ### Transports
 

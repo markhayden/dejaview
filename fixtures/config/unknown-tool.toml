@@ -4,7 +4,7 @@ profile = "fake"
 model = "fake-model"
 
 [tools]
-enabled = ["view"]
+enabled = ["no_such_tool"]
 
 [privacy]
 cloud_calls = true

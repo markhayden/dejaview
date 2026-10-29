@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 
 const INDEX_HTML: &str = include_str!("../viewer/index.html");
 const VIEWER_JS: &str = include_str!("../viewer/viewer.js");
+const GEOMETRY_JS: &str = include_str!("../viewer/geometry.js");
 const VIEWER_CSS: &str = include_str!("../viewer/viewer.css");
 
 /// The largest request head the server reads.
@@ -136,6 +137,7 @@ fn route(dir: &Path, path: &str) -> Response {
     match path {
         "/" | "/index.html" => Response::text(200, "text/html; charset=utf-8", INDEX_HTML),
         "/viewer.js" => Response::text(200, "text/javascript; charset=utf-8", VIEWER_JS),
+        "/geometry.js" => Response::text(200, "text/javascript; charset=utf-8", GEOMETRY_JS),
         "/viewer.css" => Response::text(200, "text/css; charset=utf-8", VIEWER_CSS),
         "/report.json" => match std::fs::read(dir.join("report.json")) {
             Ok(body) => Response {

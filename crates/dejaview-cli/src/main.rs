@@ -629,18 +629,21 @@ fn check_wire_schemas(
 }
 
 /// The tools this build knows. Built-ins arrive in M4; the fake tool exists behind `testkit`.
+/// The manifests this build knows without a registry: the built-ins and, in a testkit build, the
+/// scripted tool.
 fn known_manifests() -> Vec<dejaview_core::tool::Manifest> {
+    let builtins = dejaview_tools::builtin::manifests();
     #[cfg(feature = "testkit")]
     {
-        vec![
+        let mut known = builtins;
+        known.push(
             dejaview_core::tool::Manifest::from_toml(dejaview_testkit::tool::FAKE_REGIONS_MANIFEST)
                 .expect("fake_regions manifest is valid"),
-        ]
+        );
+        known
     }
     #[cfg(not(feature = "testkit"))]
-    {
-        Vec::new()
-    }
+    builtins
 }
 
 fn tools_list(args: &ToolsListArgs) -> i32 {
@@ -652,7 +655,7 @@ fn tools_list(args: &ToolsListArgs) -> i32 {
         }
     };
     let mut known = known_manifests();
-    let packs = match connect_packs(&config) {
+    let packs = match connect_packs(&config, &SharedPacks::default()) {
         Ok(p) => p,
         Err(message) => {
             eprintln!("dejaview: {message}");
@@ -694,6 +697,9 @@ fn tools_list(args: &ToolsListArgs) -> i32 {
         if !m.requires.is_empty() {
             println!("  requires: {}", m.requires.join(", "));
         }
+        if !m.projections.is_empty() {
+            println!("  projections: {}", m.projections.join(", "));
+        }
         println!(
             "  model schema: {}",
             serde_json::to_string(&m.model_schema).unwrap_or_default()
@@ -711,7 +717,7 @@ fn build_tools(args: &CheckArgs, config: &Config) -> Result<ToolRegistry, String
         let _ = args;
         None
     };
-    tools_for_config(config, script).map(|(registry, _)| registry)
+    tools_for_config(config, script, &SharedPacks::default()).map(|(registry, _)| registry)
 }
 
 /// The tool registry for a config: the configured packs, then the built-in (and in a testkit
@@ -720,11 +726,12 @@ fn build_tools(args: &CheckArgs, config: &Config) -> Result<ToolRegistry, String
 fn tools_for_config(
     config: &Config,
     tool_script: Option<&Path>,
+    shared: &SharedPacks,
 ) -> Result<(ToolRegistry, std::collections::BTreeMap<String, String>), String> {
     // Packs first; a built-in or scripted tool of the same name yields to the pack's.
     let mut available: Vec<Box<dyn Tool>> = Vec::new();
     let mut digests = std::collections::BTreeMap::new();
-    for (pack, lock_digest) in connect_packs(config)? {
+    for (pack, lock_digest) in connect_packs(config, shared)? {
         for tool in pack.tools() {
             if let Some(d) = &lock_digest {
                 digests.insert(tool.manifest().name.clone(), d.clone());
@@ -778,14 +785,26 @@ fn tools_setup(args: &ToolsSetupArgs) -> i32 {
 /// Connects every pack the config names: by `command`, or by `package` and `version` from an
 /// installed bundle.
 /// A connected pack and, when it came from an installed bundle, that bundle's lock digest.
-type ConnectedPack = (std::sync::Arc<dejaview_tools::mcp::Pack>, Option<String>);
+pub(crate) type ConnectedPack = (std::sync::Arc<dejaview_tools::mcp::Pack>, Option<String>);
 
-fn connect_packs(config: &Config) -> Result<Vec<ConnectedPack>, String> {
+/// Packs configured `shared = true`, connected once and reused across the decisions of an
+/// evaluation under their leases (SPEC "Lifetime and leases"); keyed by pack name.
+#[derive(Default)]
+pub(crate) struct SharedPacks(std::sync::Mutex<std::collections::BTreeMap<String, ConnectedPack>>);
+
+fn connect_packs(config: &Config, shared: &SharedPacks) -> Result<Vec<ConnectedPack>, String> {
     use dejaview_tools::mcp::{Pack, Spawn, Timeouts};
     use dejaview_tools::provision::{Installed, data_home};
     use std::time::Duration;
     let mut packs = Vec::new();
     for (name, pack) in &config.tools.packs {
+        if pack.shared
+            && let Ok(held) = shared.0.lock()
+            && let Some(connected) = held.get(name)
+        {
+            packs.push((std::sync::Arc::clone(&connected.0), connected.1.clone()));
+            continue;
+        }
         let (spawn, lock_digest) = match (&pack.command, &pack.package, &pack.version) {
             (Some(command), _, _) => (
                 Spawn {
@@ -810,17 +829,26 @@ fn connect_packs(config: &Config) -> Result<Vec<ConnectedPack>, String> {
             call: Duration::from_secs(config.budget.tool_timeout_s),
             shutdown_grace: Duration::from_secs(5),
         };
-        packs.push((
+        let connected = (
             Pack::connect(name, spawn, timeouts, std::env::vars()).map_err(|e| e.to_string())?,
             lock_digest,
-        ));
+        );
+        if pack.shared
+            && let Ok(mut held) = shared.0.lock()
+        {
+            held.insert(
+                name.clone(),
+                (std::sync::Arc::clone(&connected.0), connected.1.clone()),
+            );
+        }
+        packs.push(connected);
     }
     Ok(packs)
 }
 
 #[cfg(feature = "testkit")]
 fn available_tools(tool_script: Option<&Path>) -> Result<Vec<Box<dyn Tool>>, String> {
-    let mut out: Vec<Box<dyn Tool>> = Vec::new();
+    let mut out: Vec<Box<dyn Tool>> = dejaview_tools::builtin::all();
     match tool_script {
         Some(path) => out.push(Box::new(
             dejaview_testkit::ScriptedTool::fake_regions_from_path(path)
@@ -835,5 +863,5 @@ fn available_tools(tool_script: Option<&Path>) -> Result<Vec<Box<dyn Tool>>, Str
 
 #[cfg(not(feature = "testkit"))]
 fn available_tools(_tool_script: Option<&Path>) -> Result<Vec<Box<dyn Tool>>, String> {
-    Ok(Vec::new())
+    Ok(dejaview_tools::builtin::all())
 }

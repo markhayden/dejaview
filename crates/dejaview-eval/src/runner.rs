@@ -98,6 +98,10 @@ pub struct Summary {
     /// The ledger's cumulative spend across every run of this evaluation.
     pub spent_usd: f64,
     pub cap_usd: f64,
+    /// The paired bootstrap's seed and resamples when the matrix froze them (`[matrix.gate]`),
+    /// so the report's paired intervals reproduce.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bootstrap: Option<crate::metrics::BootstrapSpec>,
 }
 
 fn io(path: &Path, e: std::io::Error) -> Error {
@@ -278,6 +282,11 @@ pub fn run(plan: &Plan, factories: &dyn Factories, cancel: Option<&Cancel>) -> R
         budget_exhausted: false,
         spent_usd: 0.0,
         cap_usd: m.spend_cap_usd,
+        bootstrap: m.gate.as_ref().map(|g| crate::metrics::BootstrapSpec {
+            seed: g.seed,
+            resamples: g.resamples,
+            hypotheses: plan.matrix.hypotheses(),
+        }),
     };
     'outer: for set in &sets {
         let set_id = set.manifest.set.id.clone();

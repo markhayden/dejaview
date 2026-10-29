@@ -1,0 +1,14 @@
+# The fake provider with the built-in view and resize tools enabled (tests only).
+[provider]
+profile = "fake"
+model = "fake-model"
+
+[tools]
+enabled = ["view", "resize"]
+
+[privacy]
+cloud_calls = true
+account = "fake:test"
+
+[output]
+dir = "./dejaview-out"

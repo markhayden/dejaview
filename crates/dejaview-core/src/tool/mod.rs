@@ -4,6 +4,7 @@
 
 pub mod envelope;
 pub mod manifest;
+pub mod projection;
 pub mod registry;
 
 use std::collections::BTreeMap;
@@ -12,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 pub use envelope::{Envelope, Status};
 pub use manifest::{Bounds, CostTier, Manifest};
+pub use projection::Projected;
 pub use registry::ToolRegistry;
 
 use crate::Result;
@@ -47,7 +49,8 @@ pub struct ImageHandle {
     pub base64: Option<String>,
 }
 
-/// A derived frame delivered to a tool: its root, parent, transform and lossless pixels.
+/// A derived frame delivered to a tool: its root, parent, transform, the chain of frames down to
+/// the root, and lossless pixels.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FrameHandle {
     pub root: String,
@@ -55,6 +58,10 @@ pub struct FrameHandle {
     pub parent: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transform: Option<serde_json::Value>,
+    /// The frame and each ancestor with how it sits in its parent, ending at the raw root, so a
+    /// pack can reproduce any location without state of its own.
+    #[serde(default)]
+    pub chain: Vec<crate::frames::ChainLink>,
     pub pixels: ImageHandle,
 }
 

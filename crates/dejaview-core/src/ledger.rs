@@ -78,7 +78,8 @@ pub struct PlanInput {
     pub first_look_bytes: u64,
     pub checklist_bytes: u64,
     pub job_images: u64,
-    /// The largest envelope a tool may return, and the most images; zero without tools.
+    /// The most text one tool result can put before the model (`Bounds::presented_bytes`), and
+    /// the most images; zero without tools.
     pub tool_envelope_bytes: u64,
     pub tool_images: u64,
 }

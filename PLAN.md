@@ -1122,7 +1122,7 @@ one image and no regions.
 **Acceptance.** Identical images give 1.0 within 1e-6; blank versus textured gives below 0.05;
 the change map for a fixture pair equals the stored golden image within 1 grey level.
 
-**Dependencies.** 4.3a. **Files.** `crates/dejaview-tools/src/builtin/{edge,change_map}.rs`.
+**Dependencies.** 4.3a. **Files.** `crates/dejaview-tools/src/builtin/compare.rs`.
 **Size.** S. Tag `m4.1`.
 
 ### Task 4.4a: Full MCP client: ADR 0015, pagination, concurrency, images

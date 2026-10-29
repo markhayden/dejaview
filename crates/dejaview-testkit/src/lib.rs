@@ -2,6 +2,7 @@
 //! evaluation sets, and the fake MCP server (the `dejaview-testkit-mcp` binary, located by `mcp_server::path`). A normal dependency
 //! of the `dejaview` binary only behind its `testkit` feature.
 
+pub mod images;
 pub mod mcp_server;
 pub mod provider;
 pub mod sets;

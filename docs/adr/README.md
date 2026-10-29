@@ -18,4 +18,6 @@ decision's shape without reversing it. Format: Context, Decision, Alternatives, 
 | 0010 | Final turn without editing provider history | accepted 2026-10-25 |
 | 0011 | Obligation instances and evidence binding by kind | accepted 2026-10-25 |
 | 0013 | Public set generation: three generators mixed by family, defects by construction, CC-BY-4.0 | accepted 2026-10-27 |
+| 0014 | Alignment by direct registration on locally normalised pyramids | accepted 2026-10-28 |
+| 0015 | The MCP client stays in-house | accepted 2026-10-28 |
 | 0016 | Random numbers for the statistics contract: pinned ChaCha20, canonical order | accepted 2026-10-26 |

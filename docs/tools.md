@@ -15,7 +15,10 @@ defaults to the current version and is validated. `fixtures/tools/regions.toml` 
 ## Envelope
 
 Every result is an envelope (`schemas/envelope-v1.json`): status, a one-paragraph summary,
-measurements, regions, images, transforms and provenance. Regions become checklist evidence items
+measurements, regions, images, transforms and provenance. The model reads a presentation of it
+(summary, measurements, regions with their checklist ids, the images' frame lines) and receives
+the images as images; the envelope planner prices that presentation (`Bounds::presented_bytes`,
+from the manifest's text bounds) plus the images, not the stored envelope with its inline pixels. Regions become checklist evidence items
 by evidence kind; images become crop frames; `invalid_args` is answered to the model as a tool
 error; anything else out of bounds is `error: tool`.
 
@@ -148,6 +151,15 @@ pins `dejaview-tools==<version>` by path to that wheel, its `uv.lock`, `MODEL.md
 `version` is then launched as `<dir>/.venv/bin/dejaview-tools serve` with `UV_OFFLINE=1`,
 `UV_PYTHON_DOWNLOADS=never` and the lock digest in `DEJAVIEW_LOCK_DIGEST`, which the pack echoes
 in every envelope's provenance. Downloading a published bundle by name arrives with M5.
+
+**The segmenter artifact** (task 4.6, `tools/python/MODEL.md`). `scripts/export_segmenter.py`
+exports `tue-mps/ade20k_semantic_eomt_large_512` (EoMT-L on DINOv2, MIT weights and code) to ONNX
+with inline dependencies of its own, checks the export against PyTorch on synthetic scenes
+generated from a seed, and writes `record.json`; `MODEL.md` records the licences, the procedure
+and versions, the artifact's SHA-256 (the script reproduces it), the preprocessing version, the
+runtime and execution provider, the parity measured and the tolerance the parity test holds, and
+the release URL the owner publishes the artifact and goldens at. Task 5.3's `fetch` downloads
+from it and refuses a hash mismatch.
 
 `just provisioning-test` builds the bundle and runs the ignored tests in
 `crates/dejaview-tools/tests/provisioning.rs`: a clean-directory install whose executable

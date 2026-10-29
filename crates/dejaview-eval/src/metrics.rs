@@ -67,6 +67,9 @@ impl Region {
 pub struct ItemRow {
     pub set: String,
     pub item: String,
+    /// The item's family in its set, for the paired bootstrap; empty when unknown.
+    #[serde(default)]
+    pub family: String,
     pub cell: String,
     pub repetition: u32,
     pub expected: Expected,
@@ -204,21 +207,95 @@ pub struct CellMetrics {
     pub repetitions: Repetitions,
 }
 
-/// The metrics of a matrix: one entry per cell, in cell id order.
+/// One item whose computed verdict differs between the two arms of a paired comparison.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Flip {
+    pub set: String,
+    pub item: String,
+    pub expected: Expected,
+    pub from: Computed,
+    pub to: Computed,
+}
+
+/// The seed and resample count of the paired bootstrap, frozen in the matrix (`[matrix.gate]`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BootstrapSpec {
+    pub seed: u64,
+    pub resamples: usize,
+}
+
+/// The paired bootstrap interval on the detected-failure difference (SPEC "Gates"), treatment
+/// minus control, over expected-fail items.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PairedBootstrap {
+    pub seed: u64,
+    pub resamples: usize,
+    pub point: f64,
+    pub lower: f64,
+    pub upper: f64,
+    pub insufficient_tail: bool,
+}
+
+/// Two arms of one model compared on the items both scored (repetition 1): the items that
+/// flipped each way and, when the matrix froze a seed, the bootstrap interval.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PairedMetrics {
+    /// `profile:model`.
+    pub model: String,
+    /// The control cell (arm A against C, arm C against a D arm).
+    pub control: String,
+    pub treatment: String,
+    /// Items scored under both cells.
+    pub items: usize,
+    /// Expected-fail items the treatment detected and the control did not, and the reverse.
+    pub detected_gained: usize,
+    pub detected_lost: usize,
+    /// Expected-pass items the treatment failed and the control did not, and the reverse.
+    pub false_rejects_gained: usize,
+    pub false_rejects_lost: usize,
+    /// Families with an expected-fail item whose detection differs between the arms.
+    pub differing_families: usize,
+    pub flips: Vec<Flip>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bootstrap: Option<PairedBootstrap>,
+    /// Why the bootstrap could not run, when a seed was frozen.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bootstrap_note: Option<String>,
+}
+
+/// The metrics of a matrix: one entry per cell, in cell id order, and the paired comparisons the
+/// cells allow.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MatrixMetrics {
     pub metrics_version: u32,
     pub policy: Policy,
     pub cells: Vec<CellMetrics>,
+    #[serde(default)]
+    pub paired: Vec<PairedMetrics>,
 }
 
-/// Metrics for every cell present in `rows`, under the frozen `policy`.
+/// Metrics for every cell present in `rows`, under the frozen `policy`, with paired flips and no
+/// bootstrap interval.
 pub fn compute(rows: &[ItemRow], policy: &Policy) -> MatrixMetrics {
+    compute_with(rows, policy, None)
+}
+
+/// [`compute`], with the paired bootstrap under `bootstrap` when given.
+pub fn compute_with(
+    rows: &[ItemRow],
+    policy: &Policy,
+    bootstrap: Option<BootstrapSpec>,
+) -> MatrixMetrics {
     let mut by_cell: BTreeMap<&str, Vec<&ItemRow>> = BTreeMap::new();
     for r in rows {
         by_cell.entry(r.cell.as_str()).or_default().push(r);
     }
+    let paired = paired_metrics(&by_cell, bootstrap);
     MatrixMetrics {
         metrics_version: 1,
         policy: *policy,
@@ -226,7 +303,136 @@ pub fn compute(rows: &[ItemRow], policy: &Policy) -> MatrixMetrics {
             .into_iter()
             .map(|(cell, rows)| cell_metrics(cell, &rows, policy))
             .collect(),
+        paired,
     }
+}
+
+/// Splits a cell id `profile:model/arm` into the model and the arm.
+fn split_cell(cell: &str) -> Option<(&str, &str)> {
+    cell.rsplit_once('/')
+}
+
+/// Every control/treatment pair the cells allow: A against C, and C against each D arm, per
+/// model.
+fn pairs(by_cell: &BTreeMap<&str, Vec<&ItemRow>>) -> Vec<(String, String, String)> {
+    let mut arms: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for cell in by_cell.keys() {
+        if let Some((model, arm)) = split_cell(cell) {
+            arms.entry(model).or_default().push(arm);
+        }
+    }
+    let mut out = Vec::new();
+    for (model, arms) in arms {
+        let has = |a: &str| arms.contains(&a);
+        if has("A") && has("C") {
+            out.push((
+                model.to_string(),
+                format!("{model}/A"),
+                format!("{model}/C"),
+            ));
+        }
+        if has("C") {
+            for arm in arms.iter().filter(|a| a.starts_with('D')) {
+                out.push((
+                    model.to_string(),
+                    format!("{model}/C"),
+                    format!("{model}/{arm}"),
+                ));
+            }
+        }
+    }
+    out
+}
+
+fn paired_metrics(
+    by_cell: &BTreeMap<&str, Vec<&ItemRow>>,
+    bootstrap: Option<BootstrapSpec>,
+) -> Vec<PairedMetrics> {
+    let headline = |cell: &str| -> BTreeMap<(String, String), &ItemRow> {
+        by_cell
+            .get(cell)
+            .map(|rows| {
+                rows.iter()
+                    .filter(|r| r.repetition == 1)
+                    .map(|r| ((r.set.clone(), r.item.clone()), *r))
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    pairs(by_cell)
+        .into_iter()
+        .map(|(model, control, treatment)| {
+            let c_rows = headline(&control);
+            let x_rows = headline(&treatment);
+            let mut p = PairedMetrics {
+                model,
+                control,
+                treatment,
+                items: 0,
+                detected_gained: 0,
+                detected_lost: 0,
+                false_rejects_gained: 0,
+                false_rejects_lost: 0,
+                differing_families: 0,
+                flips: Vec::new(),
+                bootstrap: None,
+                bootstrap_note: None,
+            };
+            let mut paired_items = Vec::new();
+            for (key, c) in &c_rows {
+                let Some(x) = x_rows.get(key) else { continue };
+                p.items += 1;
+                let (c_fail, x_fail) = (c.computed == Computed::Fail, x.computed == Computed::Fail);
+                match (c.expected, c_fail, x_fail) {
+                    (Expected::Fail, false, true) => p.detected_gained += 1,
+                    (Expected::Fail, true, false) => p.detected_lost += 1,
+                    (Expected::Pass, false, true) => p.false_rejects_gained += 1,
+                    (Expected::Pass, true, false) => p.false_rejects_lost += 1,
+                    _ => {}
+                }
+                if c.computed != x.computed {
+                    p.flips.push(Flip {
+                        set: key.0.clone(),
+                        item: key.1.clone(),
+                        expected: c.expected,
+                        from: c.computed,
+                        to: x.computed,
+                    });
+                }
+                paired_items.push(crate::bootstrap::PairedItem {
+                    family: format!("{}/{}", key.0, c.family),
+                    id: format!("{}/{}", key.0, key.1),
+                    expected_fail: c.expected == Expected::Fail,
+                    detected_c: c_fail,
+                    detected_x: x_fail,
+                });
+            }
+            p.differing_families = crate::bootstrap::canonical_families(&paired_items)
+                .map(|f| f.iter().filter(|f| f.differs()).count())
+                .unwrap_or(0);
+            if let Some(spec) = bootstrap {
+                match crate::bootstrap::paired_bootstrap(
+                    &paired_items,
+                    spec.seed,
+                    spec.resamples,
+                    1,
+                ) {
+                    Ok(b) => {
+                        p.bootstrap = Some(PairedBootstrap {
+                            seed: b.seed,
+                            resamples: b.resamples,
+                            point: b.point,
+                            lower: b.lower,
+                            upper: b.upper,
+                            insufficient_tail: b.insufficient_tail,
+                        });
+                    }
+                    Err(e) => p.bootstrap_note = Some(e.to_string()),
+                }
+            }
+            p
+        })
+        .collect()
 }
 
 fn column(c: Computed) -> usize {

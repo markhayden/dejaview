@@ -43,6 +43,28 @@ pub struct Bounds {
     pub max_envelope_bytes: u64,
 }
 
+/// Bytes the presentation of one result adds per region, measurement and image beyond their own
+/// text: ids, locations, scores and framing.
+const PRESENTED_REGION_BYTES: u64 = 260;
+const PRESENTED_MEASUREMENT_BYTES: u64 = 120;
+const PRESENTED_IMAGE_BYTES: u64 = 200;
+const PRESENTED_FRAMING_BYTES: u64 = 120;
+
+impl Bounds {
+    /// The most text one result can put before the model: the presentation carries the summary,
+    /// the measurements, the regions with their checklist ids and the images' frame lines, never
+    /// the image bytes (those travel as images and are priced as such) nor the transforms. The
+    /// envelope planner prices this, not `max_envelope_bytes`, which bounds the stored envelope
+    /// with its inline pixels.
+    pub fn presented_bytes(&self) -> u64 {
+        PRESENTED_FRAMING_BYTES
+            + self.max_summary_bytes
+            + u64::from(self.max_regions) * (self.max_region_label_bytes + PRESENTED_REGION_BYTES)
+            + u64::from(self.max_measurements) * PRESENTED_MEASUREMENT_BYTES
+            + u64::from(self.max_images) * PRESENTED_IMAGE_BYTES
+    }
+}
+
 /// A tool's self-description. `model_schema` is what the provider receives; `input_schema` is
 /// `model_schema` plus the required `_dejaview` context; `output_schema` names the measurements
 /// the tool may return (the envelope shape itself is fixed).
@@ -289,5 +311,22 @@ mod tests {
     fn image_args_must_be_schema_properties() {
         let t = text().replace("image_args = [\"image\"]", "image_args = [\"picture\"]");
         assert!(matches!(Manifest::from_toml(&t), Err(Error::Tool(m)) if m.contains("picture")));
+    }
+
+    #[test]
+    fn the_presented_bound_is_text_the_model_reads_not_the_stored_envelope() {
+        let m = Manifest::from_toml(&crate::fixture("tools/regions.toml")).expect("manifest");
+        let b = &m.returns;
+        let presented = b.presented_bytes();
+        assert_eq!(
+            presented,
+            120 + 2048 + 12 * (120 + 260) + 8 * 120 + 200,
+            "summary, twelve regions with labels, eight measurements, one image"
+        );
+        assert!(
+            presented < b.max_envelope_bytes / 5,
+            "{presented} vs {}",
+            b.max_envelope_bytes
+        );
     }
 }

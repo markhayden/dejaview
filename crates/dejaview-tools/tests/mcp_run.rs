@@ -41,7 +41,6 @@ fn script() -> serde_json::Value {
                     { "id": "chk:ob:SF1@candidate", "disposition": "held", "confidence": "confident", "reason": "scripted", "allowed_by": null, "location": null, "evidence": ["call:1", "call:2"] },
                     { "id": "chk:ob:SF2@candidate", "disposition": "held", "confidence": "confident", "reason": "scripted", "allowed_by": null, "location": null, "evidence": [] },
                     { "id": "chk:ev:1:0", "disposition": "held", "confidence": "confident", "reason": "scripted", "allowed_by": null, "location": null, "evidence": [] },
-                    { "id": "chk:ev:1:1", "disposition": "held", "confidence": "confident", "reason": "scripted", "allowed_by": null, "location": null, "evidence": [] },
                     { "id": "chk:ev:2:0", "disposition": "held", "confidence": "confident", "reason": "scripted", "allowed_by": null, "location": null, "evidence": [] }
                 ],
                 "findings": [],
@@ -56,8 +55,10 @@ fn batch_through_the_run(flags: &[&str], tag: &str) -> (Duration, serde_json::Va
     let out = tempdir(tag);
     let mut args: Vec<String> = vec![
         "--envelopes".into(),
+        // One region per envelope, so the evidence items are the same whichever call the server
+        // happens to serve first.
         root()
-            .join("fixtures/tool-scripts/regions-3-then-1.json")
+            .join("fixtures/tool-scripts/regions-1-then-1.json")
             .display()
             .to_string(),
         "--slow-call-ms".into(),
@@ -124,9 +125,8 @@ fn a_batch_of_concurrent_pack_tools_runs_together_and_settles_in_call_order() {
         (calls[0]["id"].as_str(), calls[1]["id"].as_str()),
         (Some("call:1"), Some("call:2"))
     );
-    // Two regions of the first scripted envelope on the candidate (its region on the source has
-    // no instance to bind to), one of the second, in call order.
-    assert_eq!(calls[0]["added_items"].as_array().unwrap().len(), 2);
+    // One region from each scripted envelope, in call order.
+    assert_eq!(calls[0]["added_items"].as_array().unwrap().len(), 1);
     assert_eq!(calls[1]["added_items"].as_array().unwrap().len(), 1);
     let items: Vec<&str> = report["runs"][0]["checklist"]["items"]
         .as_array()
@@ -135,7 +135,7 @@ fn a_batch_of_concurrent_pack_tools_runs_together_and_settles_in_call_order() {
         .filter_map(|i| i["id"].as_str())
         .filter(|id| id.starts_with("chk:ev:"))
         .collect();
-    assert_eq!(items, ["chk:ev:1:0", "chk:ev:1:1", "chk:ev:2:0"]);
+    assert_eq!(items, ["chk:ev:1:0", "chk:ev:2:0"]);
 }
 
 #[test]

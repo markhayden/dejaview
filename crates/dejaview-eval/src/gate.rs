@@ -476,7 +476,8 @@ pub fn gate(req: &Request) -> Result<GateReport> {
         // Score.
         let mut by_set = BTreeMap::new();
         by_set.insert(req.set, &labels);
-        let (rows, policy) = summary::rows(req.eval_dir, &by_set, &summary)?;
+        let (rows, policy) =
+            summary::rows(req.eval_dir, std::slice::from_ref(&set), &by_set, &summary)?;
         let c_cell = format!("{model_name}/C");
         let x_cell = format!("{model_name}/{x_arm}");
         let mut c_rows = BTreeMap::new();

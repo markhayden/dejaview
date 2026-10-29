@@ -1,0 +1,70 @@
+[
+  {
+    "status": "ok",
+    "summary": "scripted regions",
+    "measurements": [],
+    "regions": [
+      {
+        "id": "r1",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.1,
+            0.1,
+            0.2,
+            0.2
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "corner",
+        "score": 0.9
+      }
+    ],
+    "images": [],
+    "transforms": [],
+    "provenance": {
+      "tool": "fake_regions",
+      "version": "0.0.1",
+      "duration_ms": 1,
+      "lock_digest": null
+    }
+  },
+  {
+    "status": "ok",
+    "summary": "scripted regions",
+    "measurements": [],
+    "regions": [
+      {
+        "id": "r2",
+        "location": {
+          "frame": "raw:candidate",
+          "kind": "bbox",
+          "bbox": [
+            0.4,
+            0.4,
+            0.5,
+            0.5
+          ],
+          "polygon": null,
+          "yaw": null,
+          "pitch": null,
+          "fov": null
+        },
+        "label": "column",
+        "score": 0.9
+      }
+    ],
+    "images": [],
+    "transforms": [],
+    "provenance": {
+      "tool": "fake_regions",
+      "version": "0.0.1",
+      "duration_ms": 1,
+      "lock_digest": null
+    }
+  }
+]

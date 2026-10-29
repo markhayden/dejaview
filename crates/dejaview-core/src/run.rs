@@ -391,9 +391,10 @@ fn plan_input(prepared: &Prepared, job: &Job, tools: &ToolRegistry) -> ledger::P
         first_look_bytes: job.images.len() as u64 * 160 + checklist_bytes + 400,
         checklist_bytes,
         job_images: job.images.len() as u64,
+        // What a result puts before the model, not the stored envelope with its pixels.
         tool_envelope_bytes: tools
             .manifests()
-            .map(|m| m.returns.max_envelope_bytes)
+            .map(|m| m.returns.presented_bytes())
             .max()
             .unwrap_or(0),
         tool_images: tools

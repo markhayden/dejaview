@@ -39,6 +39,7 @@ fn rows(f: &Fixture) -> Vec<ItemRow> {
         .map(|r| ItemRow {
             set: "s".into(),
             item: r.item.clone(),
+            family: String::new(),
             cell: f.cell.clone(),
             repetition: r.repetition,
             expected: r.expected,
@@ -116,6 +117,7 @@ fn region(image: &str, kind: RegionKind, bbox: Option<[f64; 4]>, ids: &[&str]) -
 
 fn detected_row(labels: Vec<Region>, predictions: Vec<Region>) -> ItemRow {
     ItemRow {
+        family: String::new(),
         set: "s".into(),
         item: "i".into(),
         cell: "c".into(),
@@ -261,6 +263,7 @@ fn later_repetitions_never_move_the_headline() {
         on_error: dejaview_core::config::PolicyOutcome::Review,
     };
     let row = |cell: &str, item: &str, rep: u32, computed: Computed| ItemRow {
+        family: String::new(),
         set: "s".into(),
         item: item.into(),
         cell: cell.into(),
@@ -385,4 +388,140 @@ fn an_iou_at_the_threshold_is_not_a_hit_and_an_empty_cell_does_not_panic() {
     );
     assert_eq!(c.localisation.labelled_regions, 0);
     assert!(compute(&[], &policy).cells.is_empty());
+}
+
+// ---- task 4.5: paired flips between arms of one model -----------------------------------------
+
+fn paired_row(
+    cell: &str,
+    item: &str,
+    family: &str,
+    expected: Expected,
+    computed: Computed,
+) -> ItemRow {
+    ItemRow {
+        set: "s".into(),
+        item: item.into(),
+        family: family.into(),
+        cell: cell.into(),
+        repetition: 1,
+        expected,
+        computed,
+        cost_usd: 0.01,
+        wall_ms: 10,
+        labels: Vec::new(),
+        predictions: Vec::new(),
+    }
+}
+
+/// Arms A and C of one model over six items in three families: two detections gained, one lost,
+/// one false reject gained; the flips list every verdict change; the bootstrap runs under the
+/// frozen seed and reproduces.
+#[test]
+fn paired_flips_between_a_and_c_are_counted_each_way_with_a_reproducible_interval() {
+    use metrics::BootstrapSpec;
+    let a = "fake:m/A";
+    let c = "fake:m/C";
+    let rows = vec![
+        // f1: a detection gained and a false reject gained.
+        paired_row(a, "i1", "f1", Expected::Fail, Computed::Unsure),
+        paired_row(c, "i1", "f1", Expected::Fail, Computed::Fail),
+        paired_row(a, "i2", "f1", Expected::Pass, Computed::Pass),
+        paired_row(c, "i2", "f1", Expected::Pass, Computed::Fail),
+        // f2: a detection gained and one lost.
+        paired_row(a, "i3", "f2", Expected::Fail, Computed::Pass),
+        paired_row(c, "i3", "f2", Expected::Fail, Computed::Fail),
+        paired_row(a, "i4", "f2", Expected::Fail, Computed::Fail),
+        paired_row(c, "i4", "f2", Expected::Fail, Computed::Unsure),
+        // f3: unchanged, and an item only arm A scored.
+        paired_row(a, "i5", "f3", Expected::Fail, Computed::Fail),
+        paired_row(c, "i5", "f3", Expected::Fail, Computed::Fail),
+        paired_row(a, "i6", "f3", Expected::Pass, Computed::Pass),
+        // Another model's arm A alone pairs with nothing.
+        paired_row("fake:other/A", "i1", "f1", Expected::Fail, Computed::Fail),
+    ];
+    let policy = dejaview_eval::summary::policy_of(&dejaview_core::config::PolicyConfig::default());
+    let m = metrics::compute_with(
+        &rows,
+        &policy,
+        Some(BootstrapSpec {
+            seed: 7,
+            resamples: 2000,
+        }),
+    );
+    assert_eq!(m.cells.len(), 3);
+    assert_eq!(m.paired.len(), 1);
+    let p = &m.paired[0];
+    assert_eq!(
+        (p.model.as_str(), p.control.as_str(), p.treatment.as_str()),
+        ("fake:m", a, c)
+    );
+    assert_eq!(p.items, 5);
+    assert_eq!((p.detected_gained, p.detected_lost), (2, 1));
+    assert_eq!((p.false_rejects_gained, p.false_rejects_lost), (1, 0));
+    assert_eq!(p.differing_families, 2, "f1 and f2; f3 agrees");
+    let flipped: Vec<&str> = p.flips.iter().map(|f| f.item.as_str()).collect();
+    assert_eq!(flipped, ["i1", "i2", "i3", "i4"]);
+    assert_eq!(
+        (p.flips[3].from, p.flips[3].to),
+        (Computed::Fail, Computed::Unsure)
+    );
+    let b = p.bootstrap.clone().unwrap();
+    assert_eq!((b.seed, b.resamples), (7, 2000));
+    // Four expected-fail items paired: C detects 3, A detects 2: the point is +1/4.
+    assert!((b.point - 0.25).abs() < 1e-9, "{}", b.point);
+    assert!(b.lower <= b.point && b.point <= b.upper);
+    let again = metrics::compute_with(
+        &rows,
+        &policy,
+        Some(BootstrapSpec {
+            seed: 7,
+            resamples: 2000,
+        }),
+    );
+    assert_eq!(
+        again.paired, m.paired,
+        "the same seed reproduces the interval"
+    );
+    // Without a frozen seed the flips are counted and no interval is claimed.
+    let plain = compute(&rows, &policy);
+    assert_eq!(plain.paired[0].flips.len(), 4);
+    assert!(plain.paired[0].bootstrap.is_none() && plain.paired[0].bootstrap_note.is_none());
+}
+
+/// C against each D arm pairs too, and a lone D arm without C pairs with nothing.
+#[test]
+fn c_pairs_with_every_d_arm_and_nothing_pairs_without_its_control() {
+    let rows = vec![
+        paired_row("fake:m/C", "i1", "f1", Expected::Fail, Computed::Pass),
+        paired_row(
+            "fake:m/D_regions",
+            "i1",
+            "f1",
+            Expected::Fail,
+            Computed::Fail,
+        ),
+        paired_row("fake:m/D", "i1", "f1", Expected::Fail, Computed::Fail),
+        paired_row(
+            "fake:n/D_regions",
+            "i1",
+            "f1",
+            Expected::Fail,
+            Computed::Fail,
+        ),
+    ];
+    let m = compute(
+        &rows,
+        &dejaview_eval::summary::policy_of(&dejaview_core::config::PolicyConfig::default()),
+    );
+    let pairs: Vec<(&str, &str)> = m
+        .paired
+        .iter()
+        .map(|p| (p.control.as_str(), p.treatment.as_str()))
+        .collect();
+    assert_eq!(
+        pairs,
+        [("fake:m/C", "fake:m/D"), ("fake:m/C", "fake:m/D_regions")]
+    );
+    assert!(m.paired.iter().all(|p| p.detected_gained == 1));
 }

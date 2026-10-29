@@ -163,15 +163,29 @@ pub fn labels_of(sets: &[Set]) -> BTreeMap<&str, &Labels> {
 }
 
 /// One row per decision of a labelled item, with the policy the reports record. Items without a
-/// label are not scored; decisions whose report is missing contribute no predictions.
+/// label are not scored; decisions whose report is missing contribute no predictions. The labels
+/// are given apart from the sets because a gate scores a blind set against labels held outside
+/// it; each row carries its item's family (from the set manifests) for the paired bootstrap.
 pub fn rows(
     eval_dir: &Path,
+    sets: &[Set],
     labels: &BTreeMap<&str, &Labels>,
     summary: &Summary,
 ) -> Result<(Vec<ItemRow>, Policy)> {
     let labels: BTreeMap<(&str, &str), &crate::sets::Label> = labels
         .iter()
         .flat_map(|(set, l)| l.label.iter().map(move |l| ((*set, l.item.as_str()), l)))
+        .collect();
+    let families: BTreeMap<(&str, &str), &str> = sets
+        .iter()
+        .flat_map(|s| {
+            s.manifest.item.iter().map(move |i| {
+                (
+                    (s.manifest.set.id.as_str(), i.id.as_str()),
+                    i.family.as_str(),
+                )
+            })
+        })
         .collect();
     let mut policy = None;
     let mut out = Vec::new();
@@ -203,6 +217,10 @@ pub fn rows(
         out.push(ItemRow {
             set: d.set.clone(),
             item: d.item.clone(),
+            family: families
+                .get(&(d.set.as_str(), d.item.as_str()))
+                .map(|f| f.to_string())
+                .unwrap_or_default(),
             cell: d.cell.clone(),
             repetition: d.repetition,
             expected: label.expected,
@@ -231,8 +249,8 @@ pub fn rows(
 
 /// Compute the metrics of an evaluation directory and write `metrics.json` and `report.md`.
 pub fn write(eval_dir: &Path, sets: &[Set], summary: &Summary) -> Result<MatrixMetrics> {
-    let (rows, policy) = rows(eval_dir, &labels_of(sets), summary)?;
-    let m = metrics::compute(&rows, &policy);
+    let (rows, policy) = rows(eval_dir, sets, &labels_of(sets), summary)?;
+    let m = metrics::compute_with(&rows, &policy, summary.bootstrap);
     let json = serde_json::to_string_pretty(&m).map_err(|e| Error::Runner(e.to_string()))?;
     std::fs::write(eval_dir.join(METRICS_FILE), json + "\n").map_err(|e| io(eval_dir, e))?;
     std::fs::write(eval_dir.join(REPORT_FILE), render(summary, &m)).map_err(|e| io(eval_dir, e))?;
@@ -277,8 +295,11 @@ pub fn render_subset(eval_dir: &Path, evalsets_root: &Path, only: &[String]) -> 
         summary.decisions.retain(|d| only.contains(&d.set));
     }
     let sets = load_sets(evalsets_root, &summary)?;
-    let (rows, policy) = rows(eval_dir, &labels_of(&sets), &summary)?;
-    Ok(render(&summary, &metrics::compute(&rows, &policy)))
+    let (rows, policy) = rows(eval_dir, &sets, &labels_of(&sets), &summary)?;
+    Ok(render(
+        &summary,
+        &metrics::compute_with(&rows, &policy, summary.bootstrap),
+    ))
 }
 
 fn pct(p: &metrics::Proportion) -> String {
@@ -311,7 +332,75 @@ pub fn render(summary: &Summary, m: &MatrixMetrics) -> String {
     for c in &m.cells {
         render_cell(&mut s, c);
     }
+    for p in &m.paired {
+        render_paired(&mut s, p);
+    }
     s
+}
+
+fn render_paired(s: &mut String, p: &metrics::PairedMetrics) {
+    let arm = |cell: &str| cell.rsplit('/').next().unwrap_or(cell).to_string();
+    let _ = writeln!(s);
+    let _ = writeln!(
+        s,
+        "## Paired: {} under {} against {}",
+        p.model,
+        arm(&p.treatment),
+        arm(&p.control)
+    );
+    let _ = writeln!(s);
+    let _ = writeln!(
+        s,
+        "{} items scored under both arms (repetition 1); {} flipped. Detected failures: {} gained, {} lost. False rejects: {} gained, {} lost. Families with an expected-fail item whose detection differs: {}.",
+        p.items,
+        p.flips.len(),
+        p.detected_gained,
+        p.detected_lost,
+        p.false_rejects_gained,
+        p.false_rejects_lost,
+        p.differing_families
+    );
+    match (&p.bootstrap, &p.bootstrap_note) {
+        (Some(b), _) => {
+            let _ = writeln!(
+                s,
+                "Paired bootstrap of the detected-failure difference ({} minus {}), seed {}, {} resamples: point {:.4}, 95% interval {:.4} to {:.4}{}.",
+                arm(&p.treatment),
+                arm(&p.control),
+                b.seed,
+                b.resamples,
+                b.point,
+                b.lower,
+                b.upper,
+                if b.insufficient_tail {
+                    " (too few resamples in the tail to resolve it)"
+                } else {
+                    ""
+                }
+            );
+        }
+        (None, Some(note)) => {
+            let _ = writeln!(s, "Paired bootstrap not run: {note}.");
+        }
+        (None, None) => {}
+    }
+    if !p.flips.is_empty() {
+        let _ = writeln!(s);
+        let _ = writeln!(
+            s,
+            "| Item | Expected | {} | {} |",
+            arm(&p.control),
+            arm(&p.treatment)
+        );
+        let _ = writeln!(s, "|---|---|---|---|");
+        for f in &p.flips {
+            let _ = writeln!(
+                s,
+                "| {}/{} | {:?} | {:?} | {:?} |",
+                f.set, f.item, f.expected, f.from, f.to
+            );
+        }
+    }
 }
 
 fn render_cell(s: &mut String, c: &CellMetrics) {

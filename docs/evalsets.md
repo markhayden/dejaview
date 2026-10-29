@@ -131,8 +131,9 @@ through `dejaview sets check`; the live dry run of 2026-10-27 is recorded in ADR
 repository, because an item's construction gives away its label: `source-fidelity/blind-v1` was
 drawn by a seeded script that fixed five new scene families (disjoint from every dev and
 adversarial family) and chose each item's construction, structural op and generator from the
-seed, writing the plan without showing it to the agent that built the set; the owner reviews the
-contact sheets and confirms the labels as for a dev set. And the publish step seals with
+seed, writing the plan without showing it to the agent that built the set (the script and the
+plan sit beside the worksheet in owner storage, `<owner>/source-fidelity/blind-v1/`); the owner
+reviews the contact sheets and confirms the labels as for a dev set. And the publish step seals with
 `--labels-out`, which moves `labels.toml` to `<owner>/<set id>/` and leaves `labels_sha256` in the
 manifest; the labels are given to `eval gate` from there and published by the gate's publication
 step. No judge or tool runs on a blind item before its gate.

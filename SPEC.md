@@ -252,7 +252,8 @@ registry per run:
 - `raw:<image-id>` for each job image, the canonical image.
 - `aligned:<image-id>:<transform-id>` for an image warped into another image's frame by `align`,
   with the transform stored (homography for flat, rotation on the sphere for equirectangular) and
-  the lossless warped pixels.
+  the lossless warped pixels. Its coordinates are the other image's; its root is the image whose
+  pixels it shows, and a location on it maps back to that image through the inverse transform.
 - `crop:<call-id>:<n>` for each image a tool returned, with its parent frame and the mapping back
   to it (bbox or yaw/pitch/fov).
 

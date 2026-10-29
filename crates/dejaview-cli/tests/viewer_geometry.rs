@@ -8,6 +8,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
+use dejaview_core::frames::aligned;
 use dejaview_core::frames::sphere::{self, View};
 use dejaview_core::frames::{Location, LocationKind};
 
@@ -29,6 +30,33 @@ fn location(
         pitch: None,
         fov: None,
     }
+}
+
+/// An aligned frame's mapping to check: a homography or a rotation.
+enum Through {
+    Homography([f64; 9]),
+    Rotation([f64; 9]),
+}
+
+fn aligned_cases() -> Vec<(&'static str, Through, Location)> {
+    let (s, c) = (20f64).to_radians().sin_cos();
+    vec![
+        (
+            "box on a homography-aligned frame",
+            Through::Homography([1.02, 0.01, -0.05, -0.01, 0.98, 0.03, 0.001, -0.002, 1.0]),
+            location(LocationKind::Bbox, Some([0.3, 0.3, 0.6, 0.7]), None),
+        ),
+        (
+            "whole aligned frame clipped at the image edge",
+            Through::Homography([1.0, 0.0, 0.1, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]),
+            location(LocationKind::WholeImage, None, None),
+        ),
+        (
+            "box on a rotation-aligned panorama",
+            Through::Rotation([c, -s, 0.0, s, c, 0.0, 0.0, 0.0, 1.0]),
+            location(LocationKind::Bbox, Some([0.7, 0.45, 0.8, 0.55]), None),
+        ),
+    ]
 }
 
 fn cases() -> Vec<(&'static str, View, Location)> {
@@ -85,6 +113,19 @@ fn cases() -> Vec<(&'static str, View, Location)> {
     ]
 }
 
+fn expected_through(through: &Through, loc: &Location) -> serde_json::Value {
+    let (mapped, clipped) = match through {
+        Through::Homography(h) => aligned::map_through_homography(loc, h, "raw:candidate").unwrap(),
+        Through::Rotation(r) => aligned::map_through_rotation(loc, r, "raw:candidate").unwrap(),
+    };
+    serde_json::json!({
+        "kind": serde_json::to_value(mapped.kind).unwrap(),
+        "bbox": mapped.bbox,
+        "polygon": mapped.polygon,
+        "clipped": clipped,
+    })
+}
+
 fn expected(view: &View, loc: &Location) -> serde_json::Value {
     let (mapped, clipped) = sphere::map_through_view(loc, view, "raw:pano").unwrap();
     serde_json::json!({
@@ -124,7 +165,7 @@ fn close(a: &serde_json::Value, b: &serde_json::Value, tolerance: f64, path: &st
 #[test]
 fn the_viewer_geometry_matches_the_rust_reference_on_the_stored_footprints() {
     let fixture = repo_root().join("fixtures/render/view-footprints.json");
-    let computed: Vec<serde_json::Value> = cases()
+    let mut computed: Vec<serde_json::Value> = cases()
         .iter()
         .map(|(name, view, loc)| {
             serde_json::json!({
@@ -135,6 +176,18 @@ fn the_viewer_geometry_matches_the_rust_reference_on_the_stored_footprints() {
             })
         })
         .collect();
+    for (name, through, loc) in aligned_cases() {
+        let mapping = match &through {
+            Through::Homography(h) => serde_json::json!({ "homography": h }),
+            Through::Rotation(r) => serde_json::json!({ "rotation": r }),
+        };
+        computed.push(serde_json::json!({
+            "name": name,
+            "mapping": mapping,
+            "location": loc,
+            "expected": expected_through(&through, &loc),
+        }));
+    }
     if std::env::var_os("UPDATE_FIXTURES").is_some() {
         std::fs::write(
             &fixture,
@@ -170,8 +223,10 @@ require(process.argv[2]);
 const g = globalThis.dejaviewGeometry;
 const cases = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
 const out = cases.map(c => {
-  const loc = c.location;
-  const r = g.mapThroughView({ kind: loc.kind, bbox: loc.bbox, polygon: loc.polygon }, c.view);
+  const loc = { kind: c.location.kind, bbox: c.location.bbox, polygon: c.location.polygon };
+  const r = c.view ? g.mapThroughView(loc, c.view)
+    : c.mapping.homography ? g.mapThroughHomography(loc, c.mapping.homography)
+    : g.mapThroughRotation(loc, c.mapping.rotation);
   return { kind: r.kind, bbox: r.bbox || null, polygon: r.polygon || null, clipped: r.clipped };
 });
 process.stdout.write(JSON.stringify(out));

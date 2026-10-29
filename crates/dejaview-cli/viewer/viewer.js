@@ -97,12 +97,15 @@ function toRoot(frames, loc) {
   while (frames[frame] && frames[frame].parent) {
     if (++guard > 64) return null;
     const f = frames[frame];
-    if (f.mapping && f.mapping.view) {
+    if (f.mapping && (f.mapping.view || f.mapping.homography || f.mapping.rotation)) {
       if (!geometry) return null;
-      const fp = geometry.mapThroughView({ kind, bbox, polygon }, f.mapping.view);
+      // A view crop maps into its parent; an aligned frame maps back to its own image's raw frame.
+      const fp = f.mapping.view ? geometry.mapThroughView({ kind, bbox, polygon }, f.mapping.view)
+        : f.mapping.homography ? geometry.mapThroughHomography({ kind, bbox, polygon }, f.mapping.homography)
+        : geometry.mapThroughRotation({ kind, bbox, polygon }, f.mapping.rotation);
       if (!fp) return null;
       kind = fp.kind; bbox = fp.bbox || null; polygon = fp.polygon || null; partial = partial || fp.clipped;
-      frame = f.parent;
+      frame = f.mapping.view ? f.parent : `raw:${f.root}`;
       continue;
     }
     if (!f.mapping || !f.mapping.bbox) return null;
@@ -229,7 +232,7 @@ function imagesSection(run, locs) {
     const img = el('img', { src: artifactUrl(run.run, ref), alt: frameId });
     const stage = el('div', { class: 'stage' }, img, svg);
     const dims = frame ? `${frame.width}×${frame.height} ${frame.projection}` : '';
-    const mappingText = m => (m && m.bbox ? `[${m.bbox.map(v => v.toFixed(3)).join(', ')}]` : m && m.view ? `view yaw ${m.view.yaw}° pitch ${m.view.pitch}° fov ${m.view.fov}°` : '');
+    const mappingText = m => (m && m.bbox ? `[${m.bbox.map(v => v.toFixed(3)).join(', ')}]` : m && m.view ? `view yaw ${m.view.yaw}° pitch ${m.view.pitch}° fov ${m.view.fov}°` : m && m.homography ? 'aligned by homography' : m && m.rotation ? 'aligned by rotation' : '');
     const parent = frame && frame.parent ? ` ⊂ ${frame.parent} ${mappingText(frame.mapping)}` : '';
     grid.append(el('figure', null, stage, el('figcaption', null, el('b', { text: frameId }), ` ${dims}${parent}`, ref.truncated ? el('span', { class: 'warn', text: ' truncated' }) : null)));
   }

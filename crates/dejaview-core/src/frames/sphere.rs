@@ -92,6 +92,10 @@ pub fn equirect_of(d: [f64; 3]) -> [f64; 2] {
 }
 
 /// Boundary samples of a normalised box, `per_edge` per edge, clockwise from the top-left.
+pub fn boundary_of(b: &[f64; 4], per_edge: usize) -> Vec<[f64; 2]> {
+    boundary(b, per_edge)
+}
+
 fn boundary(b: &[f64; 4], per_edge: usize) -> Vec<[f64; 2]> {
     let mut out = Vec::with_capacity(4 * per_edge);
     let n = per_edge as f64;
@@ -175,7 +179,8 @@ pub fn map_through_view(loc: &Location, view: &View, parent: &str) -> Result<(Lo
     Ok((out, clipped))
 }
 
-enum Footprint {
+/// A region's footprint on an equirectangular frame.
+pub enum Footprint {
     Polygon {
         vertices: Vec<[f64; 2]>,
         clipped: bool,
@@ -188,16 +193,41 @@ enum Footprint {
 
 /// The equirectangular footprint of view points.
 fn footprint(view: &View, points: &[[f64; 2]]) -> Footprint {
-    let mapped: Vec<[f64; 2]> = points
-        .iter()
-        .map(|p| equirect_of(view.direction(p[0], p[1])))
-        .collect();
-    let centre_x = equirect_of(view.direction(0.5, 0.5))[0];
+    let dirs: Vec<[f64; 3]> = points.iter().map(|p| view.direction(p[0], p[1])).collect();
     // A pole inside the view: the footprint runs all the way around.
     let holds_pole = |pole: [f64; 3]| {
         view.project(pole)
             .is_some_and(|p| (0.0..=1.0).contains(&p[0]) && (0.0..=1.0).contains(&p[1]))
     };
+    footprint_impl(&dirs, view.direction(0.5, 0.5), holds_pole)
+}
+
+/// The equirectangular footprint of a closed boundary of directions whose region faces `centre`
+/// (any vector along the region's middle): cut at the seam when it straddles it, a full-width box
+/// when the boundary winds around a pole, which shows as its longitudes covering the circle.
+pub fn footprint_of_directions(dirs: &[[f64; 3]], centre: [f64; 3]) -> Footprint {
+    let winds = |pole: [f64; 3]| {
+        if dirs.len() < 4 || centre[2] * pole[2] <= 0.0 {
+            return false;
+        }
+        let mut lons: Vec<f64> = dirs.iter().map(|d| d[1].atan2(d[0])).collect();
+        lons.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let mut gap = lons[0] + 2.0 * std::f64::consts::PI - lons[lons.len() - 1];
+        for w in lons.windows(2) {
+            gap = gap.max(w[1] - w[0]);
+        }
+        gap < std::f64::consts::FRAC_PI_2
+    };
+    footprint_impl(dirs, centre, winds)
+}
+
+fn footprint_impl(
+    dirs: &[[f64; 3]],
+    centre: [f64; 3],
+    holds_pole: impl Fn([f64; 3]) -> bool,
+) -> Footprint {
+    let mapped: Vec<[f64; 2]> = dirs.iter().map(|d| equirect_of(*d)).collect();
+    let centre_x = equirect_of(normalise(centre))[0];
     let ys = || {
         let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
         for m in &mapped {

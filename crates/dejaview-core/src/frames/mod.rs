@@ -4,6 +4,7 @@
 //! back to the raw frame of its root image, through bbox crops and, for `view` crops of a
 //! panorama, the sphere geometry in `sphere`.
 
+pub mod aligned;
 pub mod sphere;
 
 use std::collections::BTreeMap;
@@ -53,6 +54,13 @@ pub enum Mapping {
     Bbox([f64; 4]),
     /// A square perspective view of an equirectangular parent (`sphere::View`).
     View { yaw: f64, pitch: f64, fov: f64 },
+    /// An aligned frame of a flat image: the row-major 3×3 homography taking the image's
+    /// normalised coordinates to the parent's. The frame shares the parent's grid; a location on
+    /// it maps back to the image through the inverse.
+    Homography(Vec<f64>),
+    /// An aligned frame of an equirectangular image: the row-major rotation taking the image's
+    /// directions to the parent's.
+    Rotation(Vec<f64>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -64,10 +72,14 @@ pub enum Frame {
         height: u32,
         projection: Projection,
     },
+    /// `image` warped into `parent`'s frame by a transform: the pixels are the image's, the
+    /// coordinates the parent's, so the root is the image and locations map back through the
+    /// inverse of `mapping` (a `Homography` or a `Rotation`).
     Aligned {
         image: String,
         transform_id: String,
         parent: String,
+        mapping: Mapping,
         width: u32,
         height: u32,
         projection: Projection,
@@ -89,6 +101,20 @@ impl Frame {
             | Frame::Crop { projection, .. } => *projection,
         }
     }
+}
+
+/// What an aligned frame is made of, for [`Registry::add_aligned`].
+#[derive(Debug, Clone)]
+pub struct AlignedFrame<'a> {
+    /// The image whose pixels the frame shows.
+    pub image: &'a str,
+    pub transform_id: &'a str,
+    /// The frame whose grid it shares.
+    pub parent: &'a str,
+    /// `Mapping::Homography` or `Mapping::Rotation`, image to parent.
+    pub mapping: Mapping,
+    pub width: u32,
+    pub height: u32,
 }
 
 /// The registry of frames for one run.
@@ -154,6 +180,13 @@ impl Registry {
                 .map(Frame::projection)
                 .unwrap_or_default(),
             Mapping::View { .. } => Projection::Flat,
+            // Not a crop mapping; the registry keeps the parent's projection and `to_root`
+            // refuses the frame.
+            Mapping::Homography(_) | Mapping::Rotation(_) => self
+                .frames
+                .get(parent)
+                .map(Frame::projection)
+                .unwrap_or_default(),
         };
         self.frames.insert(
             id.to_string(),
@@ -162,6 +195,28 @@ impl Registry {
                 mapping,
                 width,
                 height,
+                projection,
+            },
+        );
+    }
+
+    /// Registers an aligned frame (SPEC `aligned:<image>:<transform>`): `image` warped into
+    /// `parent` by the transform; the frame takes the parent's projection.
+    pub fn add_aligned(&mut self, id: &str, aligned: AlignedFrame<'_>) {
+        let projection = self
+            .frames
+            .get(aligned.parent)
+            .map(Frame::projection)
+            .unwrap_or_default();
+        self.frames.insert(
+            id.to_string(),
+            Frame::Aligned {
+                image: aligned.image.to_string(),
+                transform_id: aligned.transform_id.to_string(),
+                parent: aligned.parent.to_string(),
+                mapping: aligned.mapping,
+                width: aligned.width,
+                height: aligned.height,
                 projection,
             },
         );
@@ -182,13 +237,11 @@ impl Registry {
         let mut current = frame;
         loop {
             match current {
-                Frame::Raw { image, .. } => return image,
-                Frame::Aligned { parent, .. } | Frame::Crop { parent, .. } => {
-                    match self.frames.get(parent) {
-                        Some(p) => current = p,
-                        None => return parent,
-                    }
-                }
+                Frame::Raw { image, .. } | Frame::Aligned { image, .. } => return image,
+                Frame::Crop { parent, .. } => match self.frames.get(parent) {
+                    Some(p) => current = p,
+                    None => return parent,
+                },
             }
         }
     }
@@ -303,15 +356,36 @@ impl Registry {
                         partial,
                     });
                 }
-                Frame::Aligned { parent, .. } => {
-                    // Aligned frames share their parent's coordinates for locations; the warp is
-                    // applied to pixels, not to normalised coordinates (task 4.3a refines this).
-                    current.frame = parent.clone();
+                Frame::Aligned { image, mapping, .. } => {
+                    // The frame's coordinates are the parent's; the pixels are the image's, so
+                    // the location goes back through the inverse transform to the image's raw
+                    // frame.
+                    let raw = format!("raw:{image}");
+                    let (next, clipped) = match mapping {
+                        Mapping::Homography(h) => {
+                            aligned::map_through_homography(&current, h, &raw)?
+                        }
+                        Mapping::Rotation(r) => aligned::map_through_rotation(&current, r, &raw)?,
+                        Mapping::Bbox(_) | Mapping::View { .. } => {
+                            return Err(Error::Submission(format!(
+                                "aligned frame {:?} carries a crop mapping",
+                                current.frame
+                            )));
+                        }
+                    };
+                    partial |= clipped;
+                    current = next;
                 }
                 Frame::Crop {
                     parent, mapping, ..
                 } => {
                     let (next, clipped) = match mapping {
+                        Mapping::Homography(_) | Mapping::Rotation(_) => {
+                            return Err(Error::Submission(format!(
+                                "crop frame {:?} carries a transform mapping",
+                                current.frame
+                            )));
+                        }
                         Mapping::Bbox(m) => map_through_bbox(&current, m, parent)?,
                         Mapping::View { yaw, pitch, fov } => sphere::map_through_view(
                             &current,
@@ -336,13 +410,16 @@ impl Registry {
             .frames
             .get(frame_id)
             .ok_or_else(|| Error::Submission(format!("unknown frame {frame_id:?}")))?;
-        let Frame::Crop { mapping, .. } = frame else {
-            return Err(Error::Submission(format!(
-                "{frame_id:?} is not a crop frame"
-            )));
+        let mapping = match frame {
+            Frame::Crop { mapping, .. } | Frame::Aligned { mapping, .. } => mapping,
+            Frame::Raw { .. } => {
+                return Err(Error::Submission(format!("{frame_id:?} is a raw frame")));
+            }
         };
         let m = match mapping {
             Mapping::Bbox(m) => m,
+            Mapping::Homography(h) => return aligned::map_into_homography(root_loc, h, frame_id),
+            Mapping::Rotation(r) => return aligned::map_into_rotation(root_loc, r, frame_id),
             Mapping::View { yaw, pitch, fov } => {
                 return sphere::map_into_view(
                     root_loc,

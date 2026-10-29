@@ -96,5 +96,71 @@
     return footprint(view, points);
   }
 
-  root.dejaviewGeometry = { direction, project, equirectOf, boundary, footprint, mapThroughView };
+  /// The inverse of a row-major 3×3 matrix.
+  function invert3(m) {
+    const det = m[0] * (m[4] * m[8] - m[5] * m[7]) - m[1] * (m[3] * m[8] - m[5] * m[6]) + m[2] * (m[3] * m[7] - m[4] * m[6]);
+    if (!isFinite(det) || Math.abs(det) < 1e-300) return null;
+    return [
+      (m[4] * m[8] - m[5] * m[7]) / det, (m[2] * m[7] - m[1] * m[8]) / det, (m[1] * m[5] - m[2] * m[4]) / det,
+      (m[5] * m[6] - m[3] * m[8]) / det, (m[0] * m[8] - m[2] * m[6]) / det, (m[2] * m[3] - m[0] * m[5]) / det,
+      (m[3] * m[7] - m[4] * m[6]) / det, (m[1] * m[6] - m[0] * m[7]) / det, (m[0] * m[4] - m[1] * m[3]) / det,
+    ];
+  }
+  const applyH = (h, p) => { const d = h[6] * p[0] + h[7] * p[1] + h[8]; return [(h[0] * p[0] + h[1] * p[1] + h[2]) / d, (h[3] * p[0] + h[4] * p[1] + h[5]) / d]; };
+  const cornersOf = loc => (loc.kind === 'bbox' && loc.bbox ? [[loc.bbox[0], loc.bbox[1]], [loc.bbox[2], loc.bbox[1]], [loc.bbox[2], loc.bbox[3]], [loc.bbox[0], loc.bbox[3]]]
+    : loc.kind === 'whole_image' ? [[0, 0], [1, 0], [1, 1], [0, 1]] : loc.kind === 'polygon' && loc.polygon ? loc.polygon : null);
+  const clampAll = pts => { let clipped = false; const out = pts.map(([x, y]) => { const cx = Math.min(1, Math.max(0, x)), cy = Math.min(1, Math.max(0, y)); if (cx !== x || cy !== y) clipped = true; return [cx, cy]; }); return { out, clipped }; };
+
+  /// A location on an aligned flat frame (its parent's coordinates) back to the image's raw
+  /// frame through the inverse homography: the polygon of its corners.
+  function mapThroughHomography(loc, params) {
+    const inv = invert3(params);
+    const pts = cornersOf(loc);
+    if (!inv || !pts) return null;
+    const { out, clipped } = clampAll(pts.map(p => applyH(inv, p)));
+    return { kind: 'polygon', polygon: out, clipped };
+  }
+
+  /// A location on an aligned panorama back to the image's raw frame through the inverse rotation:
+  /// the footprint of its boundary.
+  function mapThroughRotation(loc, params) {
+    const rt = [params[0], params[3], params[6], params[1], params[4], params[7], params[2], params[5], params[8]];
+    const rot = p => [rt[0] * p[0] + rt[1] * p[1] + rt[2] * p[2], rt[3] * p[0] + rt[4] * p[1] + rt[5] * p[2], rt[6] * p[0] + rt[7] * p[1] + rt[8] * p[2]];
+    let samples;
+    if (loc.kind === 'bbox' && loc.bbox) samples = boundary(loc.bbox, 16);
+    else if (loc.kind === 'whole_image') samples = boundary([0, 0, 1, 1], 16);
+    else if (loc.kind === 'polygon' && loc.polygon) samples = loc.polygon;
+    else return null;
+    const dirs = samples.map(p => rot(directionOfEquirect(p[0], p[1])));
+    const centre = dirs.reduce((a, d) => [a[0] + d[0], a[1] + d[1], a[2] + d[2]], [0, 0, 0]);
+    return footprintOfDirections(dirs, centre);
+  }
+
+  function directionOfEquirect(nx, ny) {
+    const lon = nx * 2 * Math.PI - Math.PI, lat = Math.PI / 2 - ny * Math.PI;
+    return [Math.cos(lat) * Math.cos(lon), Math.cos(lat) * Math.sin(lon), Math.sin(lat)];
+  }
+
+  /// The footprint of a closed boundary of directions facing `centre`, as the Rust side does it:
+  /// a pole is held when the longitudes cover the circle with no gap of a quarter turn.
+  function footprintOfDirections(dirs, centre) {
+    const mapped = dirs.map(equirectOf);
+    const centreX = equirectOf(normalise(centre))[0];
+    const winds = sign => {
+      if (dirs.length < 4 || centre[2] * sign <= 0) return false;
+      const lons = dirs.map(d => Math.atan2(d[1], d[0])).sort((a, b) => a - b);
+      let gap = lons[0] + 2 * Math.PI - lons[lons.length - 1];
+      for (let i = 1; i < lons.length; i++) gap = Math.max(gap, lons[i] - lons[i - 1]);
+      return gap < Math.PI / 2;
+    };
+    const ys = mapped.map(m => m[1]);
+    if (winds(1)) return { kind: 'bbox', bbox: [0, 0, 1, Math.max(1e-6, Math.max(...ys))], clipped: false };
+    if (winds(-1)) return { kind: 'bbox', bbox: [0, Math.min(1 - 1e-6, Math.min(...ys)), 1, 1], clipped: false };
+    const straddles = mapped.some(m => Math.abs(m[0] - centreX) > 0.5);
+    if (!straddles) return { kind: 'polygon', polygon: mapped, clipped: false };
+    const edge = centreX < 0.5 ? 0 : 1;
+    return { kind: 'polygon', polygon: mapped.map(m => (Math.abs(m[0] - centreX) > 0.5 ? [edge, m[1]] : m)), clipped: true };
+  }
+
+  root.dejaviewGeometry = { direction, project, equirectOf, boundary, footprint, mapThroughView, mapThroughHomography, mapThroughRotation };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

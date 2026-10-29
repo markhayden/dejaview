@@ -1,6 +1,7 @@
 //! The built-in tools: deterministic, in-process, pure functions over the frames the harness
 //! hands them (SPEC "Transports"). Each one's manifest is embedded from `manifests/`.
 
+pub mod align;
 mod raster;
 pub mod resize;
 pub mod view;
@@ -10,7 +11,11 @@ use dejaview_core::tool::{Envelope, Manifest, Status, Tool};
 
 /// Every built-in, in no particular order; the registry orders them.
 pub fn all() -> Vec<Box<dyn Tool>> {
-    vec![Box::new(view::View::new()), Box::new(resize::Resize::new())]
+    vec![
+        Box::new(view::View::new()),
+        Box::new(resize::Resize::new()),
+        Box::new(align::Align::new()),
+    ]
 }
 
 /// The built-ins' manifests, for listing without a registry.

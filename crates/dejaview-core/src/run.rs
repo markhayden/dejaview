@@ -1280,12 +1280,13 @@ async fn execute_call(
             crate::frames::Frame::Aligned {
                 parent,
                 transform_id,
+                mapping,
                 width,
                 height,
                 ..
             } => (
                 Some(parent.clone()),
-                Some(serde_json::json!({ "id": transform_id })),
+                Some(serde_json::json!({ "id": transform_id, "mapping": mapping })),
                 *width,
                 *height,
             ),
@@ -1377,14 +1378,15 @@ async fn execute_call(
     }
     envelope.check_bounds(&manifest.returns)?;
 
-    // Returned images become crop frames with their pixels stored for later calls. Their ids are
-    // the harness's to assign (`crop:<call id>:<n>`), never an existing frame, and always with
-    // their bytes.
+    // Returned images become frames with their pixels stored for later calls: crops named
+    // `crop:<call id>:<n>`, or aligned frames named `aligned:<image>:<transform>` after a
+    // transform of the same envelope (SPEC "Frames"); never an existing frame, always with bytes.
     for (n, img) in envelope.images.iter().enumerate() {
         let expected = format!("crop:{call_id}:{n}");
-        if img.frame != expected {
+        let aligned = aligned_frame_of(&envelope, img, &manifest.name)?;
+        if aligned.is_none() && img.frame != expected {
             return Err(Error::Tool(format!(
-                "{}: returned image {n} is named {:?}; it must be {expected:?}",
+                "{}: returned image {n} is named {:?}; it must be {expected:?} or an aligned frame of one of its transforms",
                 manifest.name, img.frame
             )));
         }
@@ -1408,13 +1410,26 @@ async fn execute_call(
         };
         let bytes = image::base64_decode(b64)
             .map_err(|e| Error::Tool(format!("{}: returned image: {e}", manifest.name)))?;
-        state.registry.add_crop(
-            &img.frame,
-            &img.parent,
-            img.mapping.clone(),
-            img.width,
-            img.height,
-        );
+        match &aligned {
+            Some((image_id, transform_id)) => state.registry.add_aligned(
+                &img.frame,
+                crate::frames::AlignedFrame {
+                    image: image_id,
+                    transform_id,
+                    parent: &img.parent,
+                    mapping: img.mapping.clone(),
+                    width: img.width,
+                    height: img.height,
+                },
+            ),
+            None => state.registry.add_crop(
+                &img.frame,
+                &img.parent,
+                img.mapping.clone(),
+                img.width,
+                img.height,
+            ),
+        }
         let dir = state.run_dir.join("frames");
         std::fs::create_dir_all(&dir)?;
         let ext = if img.media_type == "image/jpeg" {
@@ -1465,6 +1480,11 @@ async fn execute_call(
                 frame: i.frame.clone(),
                 artifact: state.images_sent.get(&i.frame).cloned(),
                 parent: i.parent.clone(),
+                root: state
+                    .registry
+                    .get(&i.frame)
+                    .map(|f| f.root().to_string())
+                    .unwrap_or_default(),
                 mapping: i.mapping.clone(),
                 width: i.width,
                 height: i.height,
@@ -1493,6 +1513,49 @@ async fn execute_call(
         is_error: false,
         images: envelope.images.iter().map(|i| i.frame.clone()).collect(),
     })
+}
+
+/// For an image named `aligned:<image>:<transform>`, the image and transform ids once the frame
+/// is consistent: a transform of that id in the same envelope, from the image's raw frame to the
+/// returned image's parent, whose kind and parameters are the image's mapping. Crops give `None`.
+fn aligned_frame_of(
+    envelope: &crate::tool::Envelope,
+    img: &crate::tool::envelope::EnvelopeImage,
+    tool: &str,
+) -> Result<Option<(String, String)>> {
+    let Some(rest) = img.frame.strip_prefix("aligned:") else {
+        return Ok(None);
+    };
+    let bad = |why: String| Error::Tool(format!("{tool}: aligned frame {:?}: {why}", img.frame));
+    let (image_id, transform_id) = rest
+        .split_once(':')
+        .ok_or_else(|| bad("the name must be aligned:<image>:<transform>".into()))?;
+    let transform = envelope
+        .transforms
+        .iter()
+        .find(|t| t.id == transform_id)
+        .ok_or_else(|| bad(format!("no transform {transform_id:?} in the envelope")))?;
+    if transform.from != format!("raw:{image_id}") || transform.to != img.parent {
+        return Err(bad(format!(
+            "transform {transform_id:?} goes from {:?} to {:?}, not from raw:{image_id} to {:?}",
+            transform.from, transform.to, img.parent
+        )));
+    }
+    let params = match (&img.mapping, transform.kind.as_str()) {
+        (crate::frames::Mapping::Homography(p), "homography")
+        | (crate::frames::Mapping::Rotation(p), "rotation") => p,
+        (mapping, kind) => {
+            return Err(bad(format!(
+                "mapping {mapping:?} does not match the transform kind {kind:?}"
+            )));
+        }
+    };
+    if *params != transform.params {
+        return Err(bad(
+            "the mapping's parameters differ from the transform's".into()
+        ));
+    }
+    Ok(Some((image_id.to_string(), transform_id.to_string())))
 }
 
 /// Validates the submission, journals it with its aggregation rows, and returns the verdict.

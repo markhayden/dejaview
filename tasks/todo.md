@@ -85,8 +85,8 @@ tag.
 - [x] 4.1 Registry in production (2026-10-28: manifest `projections`, `ToolRegistry::with_projections` wrapping tools so envelopes are projected before the run sees them, the projection on the report's tool calls, the Tools section snapshot; `tools list` prints projections; built-in registration lands with the first built-in in 4.2a)
 - [x] 4.2a `view`, `resize`, equirectangular geometry (2026-10-28: built-ins registered and listed; perspective views written from first principles, not ported from the prototype (owner decision 11), checked against the stored view and the analytic scene; view frames map to polygon footprints on the panorama, seam cut, pole as a full-width box)
 - [x] 4.2b Viewer equirectangular overlay (2026-10-28: `geometry.js` mirrors `frames::sphere`; view crops and `view` locations drawn as footprints on the panorama; held to the Rust reference on stored footprints under node rather than by a rendered-pixel compare, which needs a browser)
-- [ ] 4.3a `align` flat and `visual_only` (also: run `eval gate` end to end through the binary once arms C and D can run, and look at the gate tests' forty-second fake runs)
-- [ ] 4.3b `align` equirectangular
+- [x] 4.3a `align` flat and `visual_only` (2026-10-28; still to do from this line: run `eval gate` end to end through the binary now that arms C and D can run, and look at the gate tests' forty-second fake runs)
+- [x] 4.3b `align` equirectangular (2026-10-28, with 4.3a: rotation on the sphere, warped panorama, the same envelope; aligned frames carry the rotation and map back through its inverse)
 - [ ] 4.3c `edge_similarity` and `change_map` → tag `m4.1`
 - [ ] 4.4a Full MCP client, ADR 0015, pagination, concurrency, images
 - [ ] 4.4b MCP failure modes

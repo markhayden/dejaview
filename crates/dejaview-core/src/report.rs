@@ -479,13 +479,14 @@ impl RunReport {
                         if let Some(a) = &img.artifact {
                             r.images_sent.insert(img.frame.clone(), a.clone());
                         }
-                        // As the registry does: a box keeps the parent's projection, a view is flat.
+                        // As the registry does: a box keeps the parent's projection, a view is
+                        // flat; the root is the image the pixels came from.
                         let parent = r.frames.get(&img.parent);
-                        let root = parent
-                            .map(|p| p.root.clone())
-                            .unwrap_or_else(|| img.parent.clone());
+                        let root = img.root.clone();
                         let projection = match &img.mapping {
-                            crate::frames::Mapping::Bbox(_) => parent
+                            crate::frames::Mapping::Bbox(_)
+                            | crate::frames::Mapping::Homography(_)
+                            | crate::frames::Mapping::Rotation(_) => parent
                                 .map(|p| p.projection)
                                 .unwrap_or(crate::job::Projection::Flat),
                             crate::frames::Mapping::View { .. } => crate::job::Projection::Flat,

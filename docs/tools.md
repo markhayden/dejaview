@@ -58,6 +58,18 @@ same name and listed by `dejaview tools list`. Shipped so far:
   when it holds a pole.
 - `resize` (`frame`, `long_edge` 64 to 1024): the frame scaled down with a triangle filter,
   mapping the whole parent; it never enlarges.
+- `align` (`image`, `against`): registers one image onto another of the same projection with the
+  estimators of ADR 0014 (a homography for flat pairs, a rotation for panoramas). A registered
+  pair returns the transform `t1` with its quality, the measurements (`ncc`, `inlier_fraction`,
+  `overlap`, `texture`, and `translation_px`, `rotation_deg`, `scale` or `yaw_deg`, `pitch_deg`,
+  `roll_deg`) and the aligned frame `aligned:<image>:t1`: the image warped losslessly into
+  `against`'s grid, capped at 1024 px, whose coordinates are `against`'s and whose pixels are the
+  image's. A location on it maps back to the image's raw frame through the inverse transform
+  (`frames::aligned`): a box becomes the polygon of its corners under a homography, its footprint
+  under a rotation. A pair that does not register is `not_applicable` with one
+  `alignment_failure` region over the image, the evidence SF2 binds to; a textureless pair is
+  `not_applicable` with no region. It declares the `visual_only` projection the control arms run
+  it under.
 
 The alignment estimators behind `align` are in place (`dejaview_tools::align`, ADR 0014): `align_flat` returns
 the homography from source to candidate pixel coordinates and `align_sphere` the rotation between

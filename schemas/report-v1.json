@@ -817,6 +817,40 @@
             "view"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An aligned frame of a flat image: the row-major 3×3 homography taking the image's\nnormalised coordinates to the parent's. The frame shares the parent's grid; a location on\nit maps back to the image through the inverse.",
+          "properties": {
+            "homography": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "homography"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "An aligned frame of an equirectangular image: the row-major rotation taking the image's\ndirections to the parent's.",
+          "properties": {
+            "rotation": {
+              "items": {
+                "format": "double",
+                "type": "number"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "rotation"
+          ],
+          "type": "object"
         }
       ]
     },

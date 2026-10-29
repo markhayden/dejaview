@@ -51,3 +51,15 @@ The pass found the happy paths and the tamper paths well covered and reported th
 | Low: unknown tool, `--version`, unknown command; `raw:nope` refused in the model's words. | Tested. |
 | `tools setup --no-fetch` and `--models-from` exclusivity. | Recorded (clap enforces `conflicts_with`). |
 | A missing `admissions.toml` meaning "nothing admitted". | Recorded: the gate creates the file; arm D on an absent file is covered by the gate test's default. |
+
+## Spec success criteria, checked one by one
+
+| Criterion | State at M5 |
+|---|---|
+| 1. `cargo install dejaview`, one config and one variable give a report and exit code on each direct profile | Held since M2: the live smoke runs one `check` per profile from the release archive; the staged-registry install and the archive smoke were rerun for this checkpoint. |
+| 2. `cargo test --workspace` passes offline in under five minutes with every fixture replayed | Holds: the check suite's two test passes (default and `testkit` features) took 376 s of test time together, about three minutes each, with the recordings of all three vendors replayed. |
+| 3. Five public dev sets of 20 labelled items, hashes verified, families recorded, published after review; one sealed blind set for the first tool's use case | Holds: five dev sets and five adversarial sets since M3; `source-fidelity/blind-v1` built, reviewed by the owner, sealed with its labels held out, scored and published. |
+| 4. A baseline per model on the five dev sets with arms A and C, every metric as numerator over denominator with intervals | Holds: `docs/results/baseline-2026-10` (arm A, six models) and `docs/results/arm-c-2026-10` (arms A and C paired, five models). |
+| 5. The change-region finder scored by the predeclared gate against C on the sealed blind set, outcome and full matrix published | Holds: `docs/results/gate-regions-initial-2026-10`, outcome `rejected`, receipt `8e0c8307a72475ac`, matrix and results beside it. |
+| 6. A report viewer showing any run directory offline with every image, tool result and location in raw coordinates | Held since M3 (`report view`), extended in M4 for view footprints on panoramas. |
+| 7. `docs/provider-data.md` covers every shipped profile and the harness refuses to run without the opt-in | Held since M2 and checked by a catalog test. |

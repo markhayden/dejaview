@@ -7,8 +7,8 @@ describes the tool contract as built so far. The full design is SPEC.md "Tools".
 
 Every tool describes itself once, in a manifest (`schemas/manifest-v1.json`): name, version,
 purpose and guidance text, cost tier, dependencies, which arguments take image ids and frame ids,
-the evidence kind its regions carry, the bounds its results stay within (`returns`), and three
-schemas: the model schema (what the provider receives), the input schema (the model schema plus
+the evidence kind its regions carry, the bounds its results stay within (`returns`), the
+evaluation projections it supports (`projections`), and three schemas: the model schema (what the provider receives), the input schema (the model schema plus
 the required `_dejaview` object the harness injects), and the output schema. `manifest_version`
 defaults to the current version and is validated. `fixtures/tools/regions.toml` is the example.
 
@@ -18,6 +18,17 @@ Every result is an envelope (`schemas/envelope-v1.json`): status, a one-paragrap
 measurements, regions, images, transforms and provenance. Regions become checklist evidence items
 by evidence kind; images become crop frames; `invalid_args` is answered to the model as a tool
 error; anything else out of bounds is `error: tool`.
+
+## Evaluation projections
+
+An evaluation arm may run a tool under a named projection of its envelope (SPEC "Evaluation
+projections"): `ToolRegistry::with_projections` wraps the named tools so every envelope is
+projected before the run, the checklist or the model sees it. The only projection so far is
+`visual_only`, the control arms' `align`: images and transforms (with their parameters) kept,
+`quality`, measurements and regions withheld, a fixed summary, `status` mapped to `ok` or
+`not_applicable`. A tool must declare a projection in its manifest to run under it; the report's
+tool call entry names the projection and its stored envelope is the projected one. The runner
+takes the projections from the arm (`align:visual_only` in the descriptor's selections).
 
 ## Context injection
 

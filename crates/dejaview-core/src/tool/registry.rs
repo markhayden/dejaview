@@ -7,6 +7,8 @@ use crate::{Error, Result};
 
 pub struct ToolRegistry {
     tools: Vec<Arc<dyn Tool>>,
+    /// The projection each tool runs under, by name; absent means the full envelope.
+    projections: std::collections::BTreeMap<String, String>,
 }
 
 impl ToolRegistry {
@@ -65,7 +67,39 @@ impl ToolRegistry {
             }
             i += 1;
         }
-        Ok(ToolRegistry { tools })
+        Ok(ToolRegistry {
+            tools,
+            projections: std::collections::BTreeMap::new(),
+        })
+    }
+
+    /// Runs the named tools under the named projections (SPEC "Evaluation projections"): every
+    /// envelope they return is projected before the run sees it. A tool that is not enabled, or
+    /// does not declare the projection, is a configuration error.
+    pub fn with_projections(
+        mut self,
+        projections: &std::collections::BTreeMap<String, String>,
+    ) -> Result<ToolRegistry> {
+        for (name, projection) in projections {
+            let pos = self
+                .tools
+                .iter()
+                .position(|t| &t.manifest().name == name)
+                .ok_or_else(|| {
+                    Error::Config(format!(
+                        "projection {projection:?} names tool {name:?}, which is not enabled"
+                    ))
+                })?;
+            let inner = Arc::clone(&self.tools[pos]);
+            self.tools[pos] = Arc::new(super::Projected::new(inner, projection)?);
+            self.projections.insert(name.clone(), projection.clone());
+        }
+        Ok(self)
+    }
+
+    /// The projection a tool runs under, if any.
+    pub fn projection_of(&self, name: &str) -> Option<&str> {
+        self.projections.get(name).map(String::as_str)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -159,6 +193,61 @@ mod tests {
         .expect("registry");
         let names: Vec<&str> = reg.manifests().map(|m| m.name.as_str()).collect();
         assert_eq!(names, ["align", "regions", "view"]);
+    }
+
+    #[test]
+    fn projections_wrap_declared_tools_and_refuse_the_rest() {
+        let declared = |name: &str| -> Box<dyn Tool> {
+            let text = crate::fixture("tools/regions.toml")
+                .replace("name = \"regions\"", &format!("name = \"{name}\""))
+                .replace("requires = [\"align\"]", "requires = []")
+                .replace(
+                    "concurrent = false",
+                    "concurrent = false\nprojections = [\"visual_only\"]",
+                );
+            Box::new(Named(Manifest::from_toml(&text).expect("manifest")))
+        };
+        let projections = |pairs: &[(&str, &str)]| {
+            pairs
+                .iter()
+                .map(|(t, p)| (t.to_string(), p.to_string()))
+                .collect::<std::collections::BTreeMap<_, _>>()
+        };
+        let reg = ToolRegistry::new(
+            vec![declared("align"), tool("view", "cheap", &[])],
+            &["align".into(), "view".into()],
+            &[],
+        )
+        .expect("registry")
+        .with_projections(&projections(&[("align", "visual_only")]))
+        .expect("projected");
+        assert_eq!(reg.projection_of("align"), Some("visual_only"));
+        assert_eq!(reg.projection_of("view"), None);
+        assert_eq!(
+            reg.get("align").map(|t| t.manifest().name.as_str()),
+            Some("align")
+        );
+        // `view` does not declare the projection; a tool that is not enabled cannot be projected;
+        // a projection the harness does not know is refused.
+        for (tool_name, projection) in [
+            ("view", "visual_only"),
+            ("regions", "visual_only"),
+            ("align", "blurry"),
+        ] {
+            let reg = ToolRegistry::new(
+                vec![declared("align"), tool("view", "cheap", &[])],
+                &["align".into(), "view".into()],
+                &[],
+            )
+            .expect("registry");
+            assert!(
+                matches!(
+                    reg.with_projections(&projections(&[(tool_name, projection)])),
+                    Err(Error::Config(_))
+                ),
+                "{tool_name} under {projection}"
+            );
+        }
     }
 
     #[test]

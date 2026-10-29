@@ -1066,12 +1066,14 @@ tool definitions. The rendered text is deterministic and hashed into the cache k
 
 ### Evaluation projections
 
-A tool may declare named **projections** of its envelope for evaluation arms. `align` declares
-`visual_only`: `images` and `transforms` with `params` kept, `quality` removed, `measurements`
-and `regions` empty, `summary` replaced by the fixed text "Alignment computed." or "Alignment
-not available.", `status` mapped to `ok` or `not_applicable`. The projection is applied by the
-harness before anything reaches the model or the checklist, so arms that use it get identical
-visual artifacts and no diagnostic evidence or evidence items.
+A tool may declare named **projections** of its envelope for evaluation arms (manifest
+`projections`). `align` declares `visual_only`: `images` and `transforms` with `params` kept,
+`quality` removed, `measurements` and `regions` empty, `summary` replaced by the fixed text
+"Result computed; its measurements are withheld." or "Result not available.", `status` mapped to
+`ok` or `not_applicable` (`invalid_args` stays: it answers the model's own mistake). The
+projection is applied by the harness before anything reaches the model or the checklist, so arms
+that use it get identical visual artifacts and no diagnostic evidence or evidence items; the
+report records the projection on every call that ran under one.
 
 ### Transports
 

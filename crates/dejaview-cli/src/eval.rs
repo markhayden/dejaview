@@ -449,7 +449,7 @@ impl Factories for CliFactories {
 
     fn tools(
         &self,
-        _selection: &ToolSelection,
+        selection: &ToolSelection,
         config: &Config,
     ) -> dejaview_eval::Result<ToolRegistry> {
         #[cfg(feature = "testkit")]
@@ -461,7 +461,11 @@ impl Factories for CliFactories {
         if let Ok(mut held) = self.lock_digests.lock() {
             *held = digests;
         }
-        Ok(registry)
+        // The arm's projections (`align` under `visual_only` in the control arms) wrap the tools
+        // here, so every envelope the run sees is already projected.
+        registry
+            .with_projections(&selection.projections)
+            .map_err(|e| dejaview_eval::Error::Runner(e.to_string()))
     }
 
     fn lock_digests(&self, _config: &Config) -> std::collections::BTreeMap<String, String> {

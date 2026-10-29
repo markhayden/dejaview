@@ -159,6 +159,9 @@ pub struct ToolCalled {
     pub invalid_args: Option<String>,
     pub status: Option<Status>,
     pub duration_ms: Option<u64>,
+    /// The evaluation projection the tool ran under, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projection: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

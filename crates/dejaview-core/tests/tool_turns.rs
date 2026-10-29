@@ -517,3 +517,61 @@ fn refused_calls_appear_in_the_report_as_not_executed() {
     assert_eq!(calls[1]["reason"], "final_turn");
     assert_eq!(calls[1]["id"], calls[1]["provider_call_id"]);
 }
+
+// ---- task 4.1: evaluation projections ---------------------------------------------------------
+
+/// A tool under `visual_only` (the control arms' `align`) returns its pictures and nothing the
+/// checklist could take: no regions, no measurements, a fixed summary. The report says which
+/// projection the call ran under, and the stored envelope is the projected one.
+#[test]
+fn a_projected_tool_adds_no_evidence_and_the_report_names_the_projection() {
+    let out = tempdir("projected");
+    let p = provider("one-call.json");
+    let text = std::fs::read_to_string(root().join("fixtures/tool-scripts/regions-3-then-1.json"))
+        .unwrap();
+    let envelopes: Vec<Envelope> = serde_json::from_str(&text).unwrap();
+    let t: Vec<Box<dyn Tool>> = vec![Box::new(ScriptedTool::fake_regions(envelopes))];
+    let projections = [("fake_regions".to_string(), "visual_only".to_string())]
+        .into_iter()
+        .collect();
+    let registry = ToolRegistry::new(t, &["fake_regions".into()], &[])
+        .unwrap()
+        .with_projections(&projections)
+        .unwrap();
+    let job = Job::load(&root().join("fixtures/jobs/pair.toml")).unwrap();
+    let o = block_on(run::check(
+        &config(&[]),
+        &job,
+        &root(),
+        &run::Services::new(&p, &registry),
+        &out,
+        "test",
+    ))
+    .unwrap();
+    let r = report(&o.dir);
+    let call = &r["runs"][0]["tool_calls"][0];
+    assert_eq!(call["executed"], true);
+    assert_eq!(call["projection"], "visual_only");
+    assert_eq!(call["added_items"].as_array().unwrap().len(), 0, "{call}");
+    assert_eq!(
+        r["runs"][0]["checklist"]["items"].as_array().unwrap().len(),
+        2,
+        "the static items only"
+    );
+    let sha = call["envelope"]["sha256"].as_str().unwrap();
+    let stored: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(o.dir.join("run-1/artifacts").join(sha)).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(stored["regions"].as_array().unwrap().len(), 0);
+    assert_eq!(stored["summary"], "Result not available.");
+    assert_eq!(stored["status"], "not_applicable");
+    // The model saw the projected result too.
+    let recorded = p.recorded.lock().unwrap();
+    let shown = serde_json::to_string(&recorded[1].history).unwrap();
+    assert!(shown.contains("Result not available."), "{shown}");
+    assert!(
+        !shown.contains("chk:ev:"),
+        "no evidence item reached the model: {shown}"
+    );
+}

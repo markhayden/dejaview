@@ -283,3 +283,25 @@ fn obligations_section_snapshot_architecture() {
     snapshot("architecture.txt", &text);
     assert_eq!(text, render::obligations_section(&r, &j), "byte-stable");
 }
+
+// ---- task 4.1: the Tools section is byte-stable -----------------------------------------------
+
+#[test]
+fn tools_section_snapshot() {
+    let regions = dejaview_core::tool::Manifest::from_toml(
+        &std::fs::read_to_string(root().join("fixtures/tools/regions.toml")).unwrap(),
+    )
+    .unwrap();
+    let fake =
+        dejaview_core::tool::Manifest::from_toml(dejaview_testkit::tool::FAKE_REGIONS_MANIFEST)
+            .unwrap();
+    let text = render::tools_section([&fake, &regions].into_iter());
+    assert!(text.starts_with("\nTools. ") && text.contains("- regions (Expensive, about 25s)"));
+    assert!(text.contains("Requires: align"), "{text}");
+    snapshot("tools.txt", &text);
+    assert_eq!(
+        text,
+        render::tools_section([&fake, &regions].into_iter()),
+        "byte-stable"
+    );
+}

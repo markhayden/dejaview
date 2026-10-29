@@ -694,6 +694,9 @@ fn tools_list(args: &ToolsListArgs) -> i32 {
         if !m.requires.is_empty() {
             println!("  requires: {}", m.requires.join(", "));
         }
+        if !m.projections.is_empty() {
+            println!("  projections: {}", m.projections.join(", "));
+        }
         println!(
             "  model schema: {}",
             serde_json::to_string(&m.model_schema).unwrap_or_default()

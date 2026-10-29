@@ -94,7 +94,16 @@ impl Factories for Fake {
             .filter(|name| available.iter().any(|t| t.manifest().name == **name))
             .cloned()
             .collect();
-        Ok(ToolRegistry::new(available, &enabled, &[]).unwrap())
+        let projections = selection
+            .projections
+            .iter()
+            .filter(|(t, _)| enabled.contains(t))
+            .map(|(t, p)| (t.clone(), p.clone()))
+            .collect();
+        Ok(ToolRegistry::new(available, &enabled, &[])
+            .unwrap()
+            .with_projections(&projections)
+            .unwrap())
     }
 }
 

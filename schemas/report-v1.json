@@ -1338,6 +1338,13 @@
             "null"
           ]
         },
+        "projection": {
+          "description": "The evaluation projection the tool ran under (SPEC \"Evaluation projections\"), if any: the\nenvelope stored is the projected one.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "provider_call_id": {
           "type": "string"
         },

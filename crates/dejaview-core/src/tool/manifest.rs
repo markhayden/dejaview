@@ -81,6 +81,10 @@ pub struct Manifest {
     pub concurrent: bool,
     #[serde(default)]
     pub preconditions: String,
+    /// The evaluation projections this tool supports (`projection::VISUAL_ONLY`); an arm may run
+    /// the tool under one of them.
+    #[serde(default)]
+    pub projections: Vec<String>,
     pub model_schema: serde_json::Value,
     pub input_schema: serde_json::Value,
     pub output_schema: serde_json::Value,
@@ -145,6 +149,20 @@ impl Manifest {
             if value.trim().is_empty() {
                 return Err(Error::Tool(format!(
                     "manifest {}: {field} must not be empty",
+                    self.name
+                )));
+            }
+        }
+        for p in &self.projections {
+            if !super::projection::is_known(p) {
+                return Err(Error::Tool(format!(
+                    "manifest {}: unknown projection {p:?}",
+                    self.name
+                )));
+            }
+            if self.projections.iter().filter(|q| *q == p).count() > 1 {
+                return Err(Error::Tool(format!(
+                    "manifest {}: projection {p:?} declared twice",
                     self.name
                 )));
             }

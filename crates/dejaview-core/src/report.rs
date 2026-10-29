@@ -288,6 +288,10 @@ pub struct ToolCallEntry {
     pub dropped: Vec<String>,
     /// The structured result in full; `None` when the call was not executed.
     pub envelope: Option<ArtifactRef>,
+    /// The evaluation projection the tool ran under (SPEC "Evaluation projections"), if any: the
+    /// envelope stored is the projected one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projection: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -441,6 +445,9 @@ impl RunReport {
                             if e.version.is_some() {
                                 c.version = e.version.clone();
                             }
+                            if e.projection.is_some() {
+                                c.projection = e.projection.clone();
+                            }
                         }
                         None => r.tool_calls.push(ToolCallEntry {
                             id,
@@ -456,6 +463,7 @@ impl RunReport {
                             added_items: Vec::new(),
                             dropped: Vec::new(),
                             envelope: None,
+                            projection: e.projection.clone(),
                         }),
                     }
                 }

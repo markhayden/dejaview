@@ -557,6 +557,7 @@ fn not_executed(call: &ToolCall, reason: &str) -> Event {
         invalid_args: None,
         status: None,
         duration_ms: None,
+        projection: None,
     })
 }
 
@@ -1214,6 +1215,7 @@ async fn execute_call(
                 invalid_args: Some(message.clone()),
                 status,
                 duration_ms: Some(started.elapsed().as_millis() as u64),
+                projection: None,
             }))?;
             return Ok(ContentBlock::ToolResult {
                 tool_use_id: call.id.clone(),
@@ -1337,6 +1339,7 @@ async fn execute_call(
         invalid_args: None,
         status: None,
         duration_ms: None,
+        projection: tools.projection_of(&manifest.name).map(str::to_string),
     }))?;
 
     // The tool runs on its own thread; the run keeps listening for a cancellation meanwhile.

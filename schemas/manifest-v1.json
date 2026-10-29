@@ -166,6 +166,14 @@
       "default": "",
       "type": "string"
     },
+    "projections": {
+      "default": [],
+      "description": "The evaluation projections this tool supports (`projection::VISUAL_ONLY`); an arm may run\nthe tool under one of them.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
     "purpose": {
       "type": "string"
     },

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Publishes a reviewed dev set (docs/evalsets.md). The owner has confirmed every draft label (or
+# Publishes a reviewed set (docs/evalsets.md). The owner has confirmed every draft label (or
 # struck items that were then rebuilt and confirmed) and gives the attestation text. Steps: mark
 # the drafts confirmed with today's date, promote, copy the images into the evalsets clone and
 # commit them there, pin that commit in the manifest, place the set under evalsets/, seal with the
-# attestation, check and verify. Pushing the evalsets clone and committing here are separate steps.
+# attestation, check and verify. For a blind set the seal moves the labels out to owner storage
+# (`<owner>/<set id>/labels.toml`) and the manifest keeps only their hash. Pushing the evalsets
+# clone and committing here are separate steps.
 #
 #   scripts/sets-publish.sh <use-case>/<set> "<attestation>"
 set -euo pipefail
@@ -38,7 +40,11 @@ else:
     s = s.replace('images_repo = "github.com/markhayden/dejaview-evalsets"\n', 'images_repo = "github.com/markhayden/dejaview-evalsets"\n' + line)
 p.write_text(s)
 PY
-cargo run -q -p dejaview -- sets seal --set "evalsets/$set_id" --attest "$attest"
+if grep -q '^split = "blind"' "evalsets/$set_id/set.toml"; then
+  cargo run -q -p dejaview -- sets seal --set "evalsets/$set_id" --attest "$attest" --labels-out "$owner/$set_id"
+else
+  cargo run -q -p dejaview -- sets seal --set "evalsets/$set_id" --attest "$attest"
+fi
 cargo run -q -p dejaview -- sets check evalsets
 cargo run -q -p dejaview -- sets verify-seal --set "evalsets/$set_id"
 echo "published $set_id at $rev; push the evalsets clone, add the row to evalsets/README.md, commit here"

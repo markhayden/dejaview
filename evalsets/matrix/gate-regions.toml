@@ -1,0 +1,25 @@
+# The initial gate of the `regions` tool for source fidelity (PLAN.md task 5.6, SPEC "Admission
+# gates"): arms C and D_regions on the sealed blind set under one model, one repetition, the
+# bootstrap seed, resamples and hypothesis count frozen here before the labels are unsealed.
+# One hypothesis: one tool under one model on one set. The model is gemini-4-argon, the most
+# decisive model of the baseline and the arm C run (every planted defect detected, no unsure
+# answers) at a mid-tier price, so a difference between the arms is the tool's doing rather than
+# hedging.
+[matrix]
+name = "gate-regions-initial-2026-10"
+config = "evalsets/matrix/gate-regions-config.toml"
+sets = ["source-fidelity/blind-v1"]
+arms = ["C", "D_regions"]
+decision_runs = 1
+repetitions = 1
+spend_cap_usd = 25.0
+
+[matrix.gate]
+seed = 20261030
+resamples = 10000
+hypotheses = 1
+
+[[matrix.models]]
+profile = "google-ai-studio"
+model = "gemini-4-argon"
+account = "google:${DEJAVIEW_GOOGLE_ACCOUNT}"

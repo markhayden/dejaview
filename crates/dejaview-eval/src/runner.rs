@@ -112,6 +112,19 @@ fn safe(segment: &str) -> String {
     segment.replace(['/', ':'], "_")
 }
 
+/// The decision directory as the summary records it: relative to the evaluation directory, so a
+/// published summary carries no local path. The run makes the directory absolute (a pack is
+/// restarted in it), while the evaluation directory is whatever the command line said.
+pub fn relative_dir(decision: &Path, eval_dir: &Path) -> String {
+    let absolute = std::path::absolute(eval_dir).unwrap_or_else(|_| eval_dir.to_path_buf());
+    decision
+        .strip_prefix(&absolute)
+        .or_else(|_| decision.strip_prefix(eval_dir))
+        .unwrap_or(decision)
+        .display()
+        .to_string()
+}
+
 fn decision_dir(cell: &Cell, set_id: &str, item: &str, repetition: u32) -> PathBuf {
     PathBuf::from("results")
         .join(set_id)
@@ -388,12 +401,7 @@ pub fn run(plan: &Plan, factories: &dyn Factories, cancel: Option<&Cancel>) -> R
                         error: outcome.error.clone(),
                         cost_usd: report["cost"]["spent_usd"].as_f64().unwrap_or(0.0),
                         wall_ms,
-                        dir: outcome
-                            .dir
-                            .strip_prefix(&plan.eval_dir)
-                            .unwrap_or(&outcome.dir)
-                            .display()
-                            .to_string(),
+                        dir: relative_dir(&outcome.dir, &plan.eval_dir),
                     };
                     let text = serde_json::to_string_pretty(&result)
                         .map_err(|e| Error::Runner(e.to_string()))?;

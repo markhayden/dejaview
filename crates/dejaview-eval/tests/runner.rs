@@ -325,3 +325,24 @@ fn checklist_item_violations_are_localisation_predictions() {
     dejaview_eval::summary::regenerate(&dir, &root().join("fixtures/evalsets")).unwrap();
     assert_eq!(localisation(&dir), expected);
 }
+
+#[test]
+fn the_summary_records_decision_directories_relative_to_the_evaluation_directory() {
+    // The run makes a decision directory absolute (a pack is restarted in it); the evaluation
+    // directory is whatever the command line said. Either way the summary carries no local path.
+    let relative = Path::new("eval-out/some-run");
+    let absolute = std::path::absolute(relative).unwrap();
+    let decision = absolute.join("results/set/item/cell/A/rep-1/decision-1-2");
+    assert_eq!(
+        dejaview_eval::runner::relative_dir(&decision, relative),
+        "results/set/item/cell/A/rep-1/decision-1-2"
+    );
+    assert_eq!(
+        dejaview_eval::runner::relative_dir(&decision, &absolute),
+        "results/set/item/cell/A/rep-1/decision-1-2"
+    );
+    assert_eq!(
+        dejaview_eval::runner::relative_dir(Path::new("results/x"), relative),
+        "results/x"
+    );
+}

@@ -124,6 +124,13 @@ fn eval_run_completes_a_fake_matrix_and_resumes_without_redoing_it() {
             && doc.join("metrics.json").is_file()
             && doc.join("matrix.toml").is_file()
     );
+    // The published summary names decision directories relative to the evaluation directory.
+    let published: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(doc.join("summary.json")).unwrap()).unwrap();
+    for d in published["decisions"].as_array().unwrap() {
+        let dir = d["dir"].as_str().unwrap();
+        assert!(dir.starts_with("results/"), "{dir}");
+    }
     // A subset of sets prints to stdout and writes nothing; an unknown set is refused.
     let before = std::fs::metadata(out.join("report.md"))
         .unwrap()

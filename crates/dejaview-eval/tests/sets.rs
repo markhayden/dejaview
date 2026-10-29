@@ -512,7 +512,7 @@ fn the_published_sets_are_consistent_at_the_manifest_level() {
     dejaview_eval::sets::check_families(&root).unwrap();
     let readme = std::fs::read_to_string(root.join("README.md")).unwrap();
     let dirs = dejaview_eval::sets::discover(&root).unwrap();
-    assert_eq!(dirs.len(), 10, "{dirs:?}");
+    assert_eq!(dirs.len(), 11, "{dirs:?}");
     for dir in dirs {
         let manifest: Manifest =
             toml::from_str(&std::fs::read_to_string(dir.join("set.toml")).unwrap()).unwrap();
@@ -534,11 +534,14 @@ fn the_published_sets_are_consistent_at_the_manifest_level() {
             if adversarial { 2 } else { 20 },
             "{id}"
         );
-        assert_eq!(
-            manifest.set.split,
-            Split::Dev,
-            "{id}: every published set is a dev set so far"
-        );
+        // The one blind set became heldout when its gate published the labels (receipt
+        // 8e0c8307a72475ac); every other published set is a dev set.
+        let expected_split = if id == "source-fidelity/blind-v1" {
+            Split::Heldout
+        } else {
+            Split::Dev
+        };
+        assert_eq!(manifest.set.split, expected_split, "{id}");
         let labels: Labels = toml::from_str(
             &std::fs::read_to_string(dir.join(manifest.set.labels.as_ref().unwrap())).unwrap(),
         )

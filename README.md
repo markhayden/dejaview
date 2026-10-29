@@ -84,10 +84,26 @@ scripted provider: rules, checklist, tool turns, repairs, ledger, journal, repor
 MCP transport with a provisioned pack; the three direct provider adapters (Anthropic, Google AI
 Studio, OpenAI) are written against recorded conversations and smoked live from the release
 archives (milestone M2). Install with `cargo install dejaview` or from a release archive, copy a
-config from [`examples/`](examples/) and set the one environment variable it names. Nothing is measured
-yet; results land under [`docs/results/`](docs/results/) as they are produced. Plan: [`PLAN.md`](PLAN.md). Decisions: [`docs/adr/`](docs/adr/). External
-reviews of the spec and plan: [`docs/reviews/`](docs/reviews/). Developer setup:
-[`docs/bootstrap.md`](docs/bootstrap.md).
+config from [`examples/`](examples/) and set the one environment variable it names.
+
+What has been measured so far, every number with its interval under
+[`docs/results/`](docs/results/) and the story in [`docs/results/findings.md`](docs/results/findings.md):
+
+- **Baseline (M3).** Six models, no tools, ten public development sets. Every model caught nearly
+  every planted defect (52 to 60 of 60); the differences were in false rejects, hedging and cost,
+  not detection. Opus cost about five times the cheapest model per item for no better detection.
+- **Equal visual access (M4).** Five models under arms A and C, paired item by item. Looking
+  closer did not change verdicts: 39 of 500 paired items flipped, almost all between pass and
+  unsure on clean images. The run also showed that two tool interfaces were hard for models to
+  call, which were fixed before the next run.
+- **First gate (M5).** The `regions` change finder against the visual-access control on a sealed
+  blind set of 20 source-fidelity items under Gemini 4 Argon: **rejected**, because the control
+  already detected all ten planted failures. The tool took back the one false reject and lifted
+  localisation to 10 of 10, neither of which the frozen gate scores. The sets need to be harder
+  before a detection gate can separate tools.
+
+Plan: [`PLAN.md`](PLAN.md). Decisions: [`docs/adr/`](docs/adr/). Reviews of the spec, the plan and
+each milestone: [`docs/reviews/`](docs/reviews/). Developer setup: [`docs/bootstrap.md`](docs/bootstrap.md).
 
 ## Origins
 

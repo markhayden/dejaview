@@ -123,8 +123,12 @@ first.
 
 Configured per pack as `[tools.packs.<name>] command = "..."` (plus `args`, `env`,
 `startup_timeout_s`) for an executable, or `package` and `version` for a provisioned bundle.
-Shared leases across an evaluation (`shared = true`) are task 4.4b's remaining ground together
-with the failure modes.
+With `shared = true` one process serves a whole evaluation: the binary connects the pack once and
+every decision's runs take leases on it, keyed by run directory and run number so one decision's
+`run-1` is not another's; a new lease waits for the previous run's calls, then resets or restarts.
+The failure modes have a test each against the fake server: a server dying mid-call, a malformed
+frame, a response for an unknown id, a late answer after cancellation, reset failure, shutdown
+escalation, and two runs contending for one pack.
 
 ## The Python pack and its provisioning bundle
 

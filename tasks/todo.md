@@ -89,7 +89,7 @@ tag.
 - [x] 4.3b `align` equirectangular (2026-10-28, with 4.3a: rotation on the sphere, warped panorama, the same envelope; aligned frames carry the rotation and map back through its inverse)
 - [x] 4.3c `edge_similarity` and `change_map` → tag `m4.1` (2026-10-28: edge-map correlation and the locally normalised difference map, golden under fixtures/images/change-map)
 - [x] 4.4a Full MCP client, ADR 0015, pagination, concurrency, images (2026-10-28: in-house client kept; multiplexed requests, pagination guards, concurrent tools and serial turns, lease waits for in-flight calls, outputSchema validation, exact blocks, isError truth table, frame chain, concurrent batch dispatch in the run)
-- [ ] 4.4b MCP failure modes
+- [x] 4.4b MCP failure modes (2026-10-28: one fake-server test per mode; leases keyed by decision directory; `shared = true` packs connected once per evaluation)
 - [ ] 4.5 Arm C on the dev sets
 - [ ] 4.6 Segmenter artifact and MODEL.md
 - [ ] Checkpoint M4 → tag `m4`

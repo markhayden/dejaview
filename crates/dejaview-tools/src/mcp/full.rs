@@ -345,3 +345,156 @@ fn the_is_error_truth_table_is_exhaustive() {
     .unwrap();
     assert_eq!(e.images[0].base64.as_deref(), Some("AAAA"));
 }
+
+// ---- task 4.4b: failure modes ----------------------------------------------------------------
+
+/// A server that dies mid-call fails the call as `error: tool` and is replaced for the next one.
+#[test]
+fn a_server_that_dies_mid_call_fails_the_call_and_is_replaced() {
+    let pack = Pack::connect("fake", spawn(&["--die-on-call"]), timeouts(), env()).unwrap();
+    let pid_a = pack.pid().unwrap();
+    let err = pack
+        .call(
+            "run-1",
+            None,
+            "probe_state",
+            json!({ "_dejaview": context("run-1") }),
+        )
+        .err()
+        .unwrap();
+    assert_eq!(err.class(), "tool");
+    assert!(err.to_string().contains("ended the conversation"), "{err}");
+    // The replacement dies the same way, but it is a fresh process each time.
+    let _ = pack.call(
+        "run-1",
+        None,
+        "probe_state",
+        json!({ "_dejaview": context("run-1") }),
+    );
+    assert_ne!(pack.pid(), Some(pid_a));
+    assert_eq!(pack.restarts(), 1);
+}
+
+/// A malformed frame ends the conversation: the pending call fails and the process is replaced.
+#[test]
+fn a_malformed_frame_fails_the_call_and_taints_the_process() {
+    let pack = Pack::connect("fake", spawn(&["--garbage-line"]), timeouts(), env()).unwrap();
+    let pid_a = pack.pid().unwrap();
+    let err = pack
+        .call(
+            "run-1",
+            None,
+            "probe_state",
+            json!({ "_dejaview": context("run-1") }),
+        )
+        .err()
+        .unwrap();
+    assert_eq!(err.class(), "tool");
+    assert!(err.to_string().contains("malformed"), "{err}");
+    let _ = pack.call(
+        "run-1",
+        None,
+        "probe_state",
+        json!({ "_dejaview": context("run-1") }),
+    );
+    assert_ne!(pack.pid(), Some(pid_a), "never reused");
+}
+
+/// A response for an id nobody asked about fails the pending call and taints the process.
+#[test]
+fn a_response_for_an_unknown_id_fails_the_call_and_taints_the_process() {
+    let pack = Pack::connect("fake", spawn(&["--stray-response"]), timeouts(), env()).unwrap();
+    let pid_a = pack.pid().unwrap();
+    let err = pack
+        .call(
+            "run-1",
+            None,
+            "probe_state",
+            json!({ "_dejaview": context("run-1") }),
+        )
+        .err()
+        .unwrap();
+    assert_eq!(err.class(), "tool");
+    assert!(err.to_string().contains("unknown id 999999"), "{err}");
+    let _ = pack.call(
+        "run-1",
+        None,
+        "probe_state",
+        json!({ "_dejaview": context("run-1") }),
+    );
+    assert_ne!(pack.pid(), Some(pid_a));
+}
+
+/// A late answer to a cancelled call is dropped by the reader, and the tainted process is never
+/// asked anything again: the next call runs on a fresh one even within the same run.
+#[test]
+fn a_late_answer_after_cancellation_is_ignored() {
+    let mut t = timeouts();
+    t.call = Duration::from_millis(200);
+    let client = Client::connect(
+        &spawn(&["--slow-call-ms", "600"]),
+        env(),
+        Instant::now() + Duration::from_secs(10),
+    )
+    .unwrap();
+    let err = client
+        .call(
+            "fake_regions",
+            json!({ "image": "candidate", "_dejaview": context("run-1") }),
+            t.call,
+        )
+        .err()
+        .unwrap();
+    assert!(err.to_string().contains("timed out"), "{err}");
+    assert!(client.is_tainted());
+    // The late answer arrives while nothing waits; it is swallowed, and a later request on this
+    // process still gets its own answer (the pack would have replaced the process by now).
+    std::thread::sleep(Duration::from_millis(700));
+    let e = client
+        .call(
+            "probe_state",
+            json!({ "_dejaview": context("run-1") }),
+            Duration::from_secs(5),
+        )
+        .unwrap();
+    assert_eq!(e.structured["status"], "ok");
+    assert!(
+        client
+            .stderr_lines()
+            .iter()
+            .any(|l| l.contains("cancelled requestId")),
+        "the server saw the cancellation: {:?}",
+        client.stderr_lines()
+    );
+    client.shutdown(Duration::from_millis(300));
+}
+
+/// Two decisions share one pack: their runs are told apart by the run directory, so a `run-1`
+/// of a second decision takes a lease of its own rather than inheriting the first's.
+#[test]
+fn runs_of_different_decisions_hold_different_leases_on_a_shared_pack() {
+    let pack = Pack::connect("fake", spawn(&[]), timeouts(), env()).unwrap();
+    let a = std::env::temp_dir().join("dejaview-lease-a");
+    let b = std::env::temp_dir().join("dejaview-lease-b");
+    let probe_in = |dir: &std::path::Path| {
+        pack.call(
+            "run-1",
+            Some(dir),
+            "probe_state",
+            json!({ "_dejaview": context("run-1") }),
+        )
+        .unwrap()
+    };
+    assert_eq!(measurement(&probe_in(&a), "calls_since_reset"), 1);
+    assert_eq!(
+        measurement(&probe_in(&a), "calls_since_reset"),
+        2,
+        "the same run keeps its lease"
+    );
+    assert_eq!(
+        measurement(&probe_in(&b), "calls_since_reset"),
+        1,
+        "another decision's run-1 starts afresh"
+    );
+    assert_eq!(pack.restarts(), 0, "reset, not restart");
+}

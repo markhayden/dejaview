@@ -141,13 +141,19 @@ impl Pack {
         let manifest = self.frozen.iter().find(|m| m.name == tool).ok_or_else(|| {
             Error::Tool(format!("mcp: pack {:?} has no tool {tool:?}", self.name))
         })?;
+        // Runs are numbered within a decision, so the lease is keyed by the run directory too:
+        // a pack shared across an evaluation tells one decision's run-1 from another's.
+        let lease = match run_dir {
+            Some(dir) => format!("{}#{run_id}", dir.display()),
+            None => run_id.to_string(),
+        };
         let client = {
             let mut state = self
                 .state
                 .lock()
                 .map_err(|_| Error::Tool("mcp: pack state poisoned".into()))?;
             let deadline = Instant::now() + self.timeouts.startup;
-            state = self.acquire(state, run_id, run_dir, deadline)?;
+            state = self.acquire(state, &lease, run_dir, deadline)?;
             state.in_flight += 1;
             Arc::clone(
                 state

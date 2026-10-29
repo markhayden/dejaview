@@ -28,6 +28,12 @@ struct Options {
     extra_measurement: bool,
     /// Every result carries a stray text content block.
     text_block: bool,
+    /// The process exits as soon as a `tools/call` arrives.
+    die_on_call: bool,
+    /// A line that is not JSON precedes every call's response.
+    garbage_line: bool,
+    /// A response for an id nobody asked about precedes every call's response.
+    stray_response: bool,
 }
 
 fn options() -> Options {
@@ -44,6 +50,9 @@ fn options() -> Options {
         concurrent: false,
         extra_measurement: false,
         text_block: false,
+        die_on_call: false,
+        garbage_line: false,
+        stray_response: false,
     };
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
@@ -62,6 +71,9 @@ fn options() -> Options {
             "--concurrent" => o.concurrent = true,
             "--extra-measurement" => o.extra_measurement = true,
             "--text-block" => o.text_block = true,
+            "--die-on-call" => o.die_on_call = true,
+            "--garbage-line" => o.garbage_line = true,
+            "--stray-response" => o.stray_response = true,
             "--envelopes" => {
                 let path = args.next().unwrap_or_default();
                 let text = std::fs::read_to_string(&path).unwrap_or_else(|_| "[]".into());
@@ -121,6 +133,14 @@ impl Server {
     fn respond(&self, value: Value) {
         if let Ok(mut out) = self.stdout.lock() {
             let _ = writeln!(out, "{value}");
+            let _ = out.flush();
+        }
+    }
+
+    /// Writes a line that is not JSON.
+    fn garbage(&self) {
+        if let Ok(mut out) = self.stdout.lock() {
+            let _ = writeln!(out, "this is not a frame");
             let _ = out.flush();
         }
     }
@@ -272,6 +292,16 @@ fn main() {
                 server.respond(json!({ "jsonrpc": "2.0", "id": id, "result": result }));
             }
             "tools/call" => {
+                if o.die_on_call {
+                    eprintln!("fake mcp: dying on call");
+                    std::process::exit(3);
+                }
+                if o.garbage_line {
+                    server.garbage();
+                }
+                if o.stray_response {
+                    server.respond(json!({ "jsonrpc": "2.0", "id": 999_999, "result": {} }));
+                }
                 let params = msg["params"].clone();
                 if o.concurrent {
                     let s = Arc::clone(&server);

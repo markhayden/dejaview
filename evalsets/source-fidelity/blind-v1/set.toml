@@ -1,0 +1,111 @@
+# Built by dejaview-sets; labels confirmed by the owner.
+[set]
+id = "source-fidelity/blind-v1"
+use_case = "source-fidelity"
+split = "blind"
+licence = "CC-BY-4.0"
+images_repo = "github.com/markhayden/dejaview-evalsets"
+images_rev = "9820cd479c42007e8ec24be90f63e3efae3efebb"
+labels_sha256 = "22c1dfcd126ea8b57e1d80e82c6032a5518f19b13771210a86e0ce66bdbb799e"
+families = "families.toml"
+rules = { base = "source-fidelity", version = 1 }
+
+[[item]]
+id = "lighthouse-cove-grade"
+family = "lighthouse-cove"
+job = "items/lighthouse-cove-grade/job.toml"
+
+[[item]]
+id = "lighthouse-cove-no-cottage"
+family = "lighthouse-cove"
+job = "items/lighthouse-cove-no-cottage/job.toml"
+
+[[item]]
+id = "lighthouse-cove-crop"
+family = "lighthouse-cove"
+job = "items/lighthouse-cove-crop/job.toml"
+
+[[item]]
+id = "lighthouse-cove-fog"
+family = "lighthouse-cove"
+job = "items/lighthouse-cove-fog/job.toml"
+
+[[item]]
+id = "station-platform-autumn"
+family = "station-platform"
+job = "items/station-platform-autumn/job.toml"
+
+[[item]]
+id = "station-platform-grade"
+family = "station-platform"
+job = "items/station-platform-grade/job.toml"
+
+[[item]]
+id = "station-platform-rotate180"
+family = "station-platform"
+job = "items/station-platform-rotate180/job.toml"
+
+[[item]]
+id = "station-platform-no-clock"
+family = "station-platform"
+job = "items/station-platform-no-clock/job.toml"
+
+[[item]]
+id = "bakery-front-grade"
+family = "bakery-front"
+job = "items/bakery-front-grade/job.toml"
+
+[[item]]
+id = "bakery-front-snow"
+family = "bakery-front"
+job = "items/bakery-front-snow/job.toml"
+
+[[item]]
+id = "bakery-front-no-awning"
+family = "bakery-front"
+job = "items/bakery-front-no-awning/job.toml"
+
+[[item]]
+id = "bakery-front-rotate90"
+family = "bakery-front"
+job = "items/bakery-front-rotate90/job.toml"
+
+[[item]]
+id = "canal-footbridge-crop"
+family = "canal-footbridge"
+job = "items/canal-footbridge-crop/job.toml"
+
+[[item]]
+id = "canal-footbridge-afternoon"
+family = "canal-footbridge"
+job = "items/canal-footbridge-afternoon/job.toml"
+
+[[item]]
+id = "canal-footbridge-no-boat"
+family = "canal-footbridge"
+job = "items/canal-footbridge-no-boat/job.toml"
+
+[[item]]
+id = "canal-footbridge-grade"
+family = "canal-footbridge"
+job = "items/canal-footbridge-grade/job.toml"
+
+[[item]]
+id = "greenhouse-interior-rotate180"
+family = "greenhouse-interior"
+job = "items/greenhouse-interior-rotate180/job.toml"
+
+[[item]]
+id = "greenhouse-interior-no-bench"
+family = "greenhouse-interior"
+job = "items/greenhouse-interior-no-bench/job.toml"
+
+[[item]]
+id = "greenhouse-interior-grade"
+family = "greenhouse-interior"
+job = "items/greenhouse-interior-grade/job.toml"
+
+[[item]]
+id = "greenhouse-interior-baskets"
+family = "greenhouse-interior"
+job = "items/greenhouse-interior-baskets/job.toml"

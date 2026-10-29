@@ -1,0 +1,20 @@
+# Subject or scene families; a family never appears in more than one split.
+[[family]]
+id = "lighthouse-cove"
+description = "a white lighthouse with a red lantern room on a rocky headland, a small stone cottage beside it and a wooden jetty below"
+
+[[family]]
+id = "station-platform"
+description = "a small railway station platform with a Victorian canopy, a round station clock on a post and a red brick waiting room"
+
+[[family]]
+id = "bakery-front"
+description = "a corner bakery with a dark blue shopfront, a striped awning, a bay window display and a bicycle rack"
+
+[[family]]
+id = "canal-footbridge"
+description = "a canal with a green iron footbridge, a brick warehouse on the far bank and a moored narrowboat"
+
+[[family]]
+id = "greenhouse-interior"
+description = "the inside of a Victorian glasshouse with a central iron fountain, a flagstone path and palms in terracotta pots"

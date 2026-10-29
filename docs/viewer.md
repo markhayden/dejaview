@@ -1,6 +1,6 @@
 # Report viewer
 
-The static viewer under `crates/dejaview-cli/viewer/` (`index.html`, `viewer.js`, `viewer.css`):
+The static viewer under `crates/dejaview-cli/viewer/` (`index.html`, `viewer.js`, `geometry.js`, `viewer.css`):
 plain HTML and vanilla JavaScript, no build step, embedded in the binary so an installed
 `dejaview` carries it. Equirectangular overlays arrive in task 4.2b.
 
@@ -18,7 +18,7 @@ The server answers `GET` and `HEAD` only, for exactly these paths:
 
 | Path | Content |
 |---|---|
-| `/`, `/viewer.js`, `/viewer.css` | the embedded viewer |
+| `/`, `/viewer.js`, `/geometry.js`, `/viewer.css` | the embedded viewer |
 | `/report.json` | the decision's report, byte for byte |
 | `/run-<n>/artifacts/<sha256>` | a run artifact: an image the model saw, a request or response body, a tool envelope; typed by its first bytes |
 
@@ -29,6 +29,11 @@ elsewhere cannot reach the report through a name rebound to loopback. Responses 
 `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy:
 default-src 'self'` and `Connection: close`. The page itself requests nothing but these paths
 from the server that served it: no fonts, scripts or images from anywhere else.
+
+The geometry is held to the Rust reference by `viewer_geometry` in the CLI tests: the stored
+footprints in `fixtures/render/view-footprints.json` are computed by `frames::sphere` and
+recomputed by `geometry.js` under `node` when it is on the path (the comparison is reported as
+skipped otherwise).
 
 ## What it shows
 
@@ -41,14 +46,17 @@ every version 1 report; an older binary refuses a newer report rather than misre
   policy, spent against envelope and cap, cache status, prompt and harness versions; a row per
   run; the rules, job and resolved config folded away.
 - **Images the model saw**, per run: every frame in `images_sent` with its size, projection and,
-  for a crop, its parent and mapping box. Every location is drawn twice: on the frame it names, as
-  submitted, and on its root image in **raw coordinates**, mapped through the frame tree
-  (`frames` in the report: raw frames and every crop a tool returned, with the box each crop
-  covers of its parent). Checklist items, findings (violations in red, observed and allowed
-  findings grey) and tool regions (from each call's envelope) have their own colours;
-  `whole_image` is a border, `absent` a dashed border, a location clipped at its parent is dotted.
-  A `view` location has no box mapping until equirectangular support lands and is listed as not
-  drawn.
+  for a crop, its parent and mapping (a box, or the yaw, pitch and fov of a perspective view).
+  Every location is drawn twice: on the frame it names, as submitted, and on its root image in
+  **raw coordinates**, mapped through the frame tree (`frames` in the report: raw frames and every
+  crop a tool returned, with how each sits in its parent). A bbox crop maps by its box; a view
+  crop maps by the sphere geometry in `geometry.js`, the same maths as the harness's
+  `frames::sphere`: a box or polygon drawn in the view becomes the polygon of its footprint on the
+  panorama, cut at the seam and marked clipped when it straddles it, a full-width box when the
+  view holds a pole. A `view` location is drawn as the footprint of the view it names. Checklist
+  items, findings (violations in red, observed and allowed findings grey) and tool regions (from
+  each call's envelope) have their own colours; `whole_image` is a border, `absent` a dashed
+  border, a location clipped at its parent is dotted.
 - **Tool results**: every call with status, duration, arguments, the items it added or dropped,
   the envelope's summary and region count, and a link to the envelope.
 - **Checklist and submission**: the checklist as it stood at the end, joined with each item's

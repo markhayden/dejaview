@@ -56,7 +56,7 @@ rm -rf "$probe"
 
 # check-packaging: the shipped assets are listed as embedded by the crates that own them.
 out="$(scripts/check-packaging.sh 2>&1)"
-for want in "dejaview-core: embeds .*prompts/v1.md" "dejaview-core: embeds .*rules/source-fidelity.toml" "dejaview-providers: embeds catalog.toml" "dejaview-cli: embeds viewer/index.html, viewer/viewer.css, viewer/viewer.js"; do
+for want in "dejaview-core: embeds .*prompts/v1.md" "dejaview-core: embeds .*rules/source-fidelity.toml" "dejaview-providers: embeds catalog.toml" "dejaview-cli: embeds viewer/geometry.js, viewer/index.html, viewer/viewer.css, viewer/viewer.js"; do
   if grep -Eq "$want" <<< "$out"; then pass=$((pass+1));
   else echo "FAIL: check-packaging did not list '$want': $out" >&2; fail=$((fail+1)); fi
 done

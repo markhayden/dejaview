@@ -233,6 +233,28 @@ pub fn data_home() -> PathBuf {
     PathBuf::from(home).join(".local").join("share")
 }
 
+/// The environment a provisioning subprocess (`uv sync`, the pack's `fetch`) gets: the pack
+/// allowlist (`PATH`, `HOME`, locale) plus uv's own settings (`UV_CACHE_DIR`, `UV_OFFLINE`,
+/// `UV_PYTHON` and the rest of `UV_*`), which decide where the locked wheels come from; never a
+/// credential, a credential-shaped name, or an index password.
+fn provisioning_env<I, K, V>(environment: I) -> std::collections::BTreeMap<String, String>
+where
+    I: IntoIterator<Item = (K, V)>,
+    K: Into<String>,
+    V: Into<String>,
+{
+    let all: Vec<(String, String)> = environment
+        .into_iter()
+        .map(|(k, v)| (k.into(), v.into()))
+        .collect();
+    let uv: Vec<String> = all
+        .iter()
+        .map(|(k, _)| k.clone())
+        .filter(|k| k.starts_with("UV_") && !k.contains("PASSWORD") && !k.contains("USERNAME"))
+        .collect();
+    squint_core::env::allowlist(&uv, all)
+}
+
 /// Runs `uv sync` in the install directory with the environment the server launch would get:
 /// the allowlist (`PATH`, `HOME`, locale; never a credential) and nothing else from the caller.
 fn uv_sync<I, K, V>(dir: &Path, python: &str, uv: &Path, environment: I) -> Result<()>
@@ -245,7 +267,7 @@ where
         .args(["sync", "--frozen", "--no-dev", "--python", python])
         .current_dir(dir)
         .env_clear()
-        .envs(squint_core::env::allowlist(&[], environment))
+        .envs(provisioning_env(environment))
         .output()
         .map_err(|e| resolve(format!("cannot run uv ({}): {e}", uv.display())))?;
     if !output.status.success() {
@@ -306,7 +328,7 @@ impl Installed {
             return Ok(());
         };
         let spawn = self.spawn(vec![]);
-        let mut env = squint_core::env::allowlist(&[], environment);
+        let mut env = provisioning_env(environment);
         env.extend(spawn.extra_env.iter().cloned());
         let output = Command::new(&self.executable)
             .args(&args)
@@ -435,6 +457,27 @@ mod tests {
                 environment,
             )
             .unwrap();
+    }
+
+    #[test]
+    fn provisioning_keeps_uvs_settings_and_drops_credentials() {
+        // The network-free install needs the cache and offline settings; a credential, an index
+        // password and an unrelated variable never reach the subprocess.
+        let env = [
+            ("PATH", "/usr/bin"),
+            ("UV_CACHE_DIR", "/cache/uv"),
+            ("UV_OFFLINE", "1"),
+            ("UV_PYTHON", "3.12"),
+            ("UV_INDEX_PRIVATE_PASSWORD", "SYNTHETIC"),
+            ("UV_PUBLISH_TOKEN", "SYNTHETIC"),
+            ("ANTHROPIC_API_KEY", "SYNTHETIC"),
+            ("EDITOR", "vi"),
+        ];
+        let kept = super::provisioning_env(env);
+        assert_eq!(
+            kept.keys().map(String::as_str).collect::<Vec<_>>(),
+            ["PATH", "UV_CACHE_DIR", "UV_OFFLINE", "UV_PYTHON"]
+        );
     }
 
     #[test]

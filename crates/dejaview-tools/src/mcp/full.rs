@@ -346,6 +346,37 @@ fn the_is_error_truth_table_is_exhaustive() {
     assert_eq!(e.images[0].base64.as_deref(), Some("AAAA"));
 }
 
+/// A conforming server may ping; the client answers and no call in flight is disturbed.
+#[test]
+fn a_servers_ping_is_answered_and_disturbs_no_call() {
+    let pack = Pack::connect("fake", spawn(&["--ping"]), timeouts(), env()).unwrap();
+    std::thread::sleep(Duration::from_millis(100));
+    let e = probe(&pack, "run-1");
+    assert_eq!(e.status, Status::Ok);
+    assert!(e.summary.contains("pongs=1"), "{}", e.summary);
+    assert_eq!(pack.restarts(), 0);
+}
+
+/// A failed call carries the server's recent stderr, the one diagnostic left after it died.
+#[test]
+fn a_failed_call_carries_the_servers_stderr() {
+    let pack = Pack::connect("fake", spawn(&["--die-on-call"]), timeouts(), env()).unwrap();
+    let err = pack
+        .call(
+            "run-1",
+            None,
+            "probe_state",
+            json!({ "_dejaview": context("run-1") }),
+        )
+        .err()
+        .unwrap();
+    assert!(
+        err.to_string()
+            .contains("server stderr: fake mcp: dying on call"),
+        "{err}"
+    );
+}
+
 // ---- task 4.4b: failure modes ----------------------------------------------------------------
 
 /// A server that dies mid-call fails the call as `error: tool` and is replaced for the next one.

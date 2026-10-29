@@ -30,10 +30,15 @@ struct Options {
     text_block: bool,
     /// The process exits as soon as a `tools/call` arrives.
     die_on_call: bool,
+    /// The process exits after answering this many calls (0: never): a server that dies between
+    /// runs or between the calls of one run.
+    exit_after_calls: u64,
     /// A line that is not JSON precedes every call's response.
     garbage_line: bool,
     /// A response for an id nobody asked about precedes every call's response.
     stray_response: bool,
+    /// The server pings the client after `initialize`; `probe_state` reports whether a pong came.
+    ping: bool,
 }
 
 fn options() -> Options {
@@ -51,8 +56,10 @@ fn options() -> Options {
         extra_measurement: false,
         text_block: false,
         die_on_call: false,
+        exit_after_calls: 0,
         garbage_line: false,
         stray_response: false,
+        ping: false,
     };
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
@@ -72,8 +79,12 @@ fn options() -> Options {
             "--extra-measurement" => o.extra_measurement = true,
             "--text-block" => o.text_block = true,
             "--die-on-call" => o.die_on_call = true,
+            "--exit-after-calls" => {
+                o.exit_after_calls = args.next().and_then(|s| s.parse().ok()).unwrap_or(0)
+            }
             "--garbage-line" => o.garbage_line = true,
             "--stray-response" => o.stray_response = true,
+            "--ping" => o.ping = true,
             "--envelopes" => {
                 let path = args.next().unwrap_or_default();
                 let text = std::fs::read_to_string(&path).unwrap_or_else(|_| "[]".into());
@@ -125,8 +136,11 @@ struct Server {
     envelopes: Mutex<VecDeque<Value>>,
     stdout: Mutex<std::io::Stdout>,
     calls_since_reset: AtomicU64,
+    calls_total: AtomicU64,
     in_flight: AtomicU64,
     max_in_flight: AtomicU64,
+    /// Pongs received for the server's pings.
+    pongs: AtomicU64,
 }
 
 impl Server {
@@ -182,9 +196,10 @@ impl Server {
                         json!({
                             "status": "ok",
                             "summary": format!(
-                                "calls_since_reset={calls} plain={} secret={}",
+                                "calls_since_reset={calls} plain={} secret={} pongs={}",
                                 u8::from(std::env::var_os("DEJAVIEW_TEST_PLAIN").is_some()),
-                                u8::from(std::env::var_os("DEJAVIEW_TEST_SECRET_KEY").is_some())
+                                u8::from(std::env::var_os("DEJAVIEW_TEST_SECRET_KEY").is_some()),
+                                self.pongs.load(Ordering::SeqCst)
                             ),
                             "measurements": measurements,
                             "regions": [], "images": [], "transforms": [],
@@ -216,6 +231,11 @@ impl Server {
             json!({ "jsonrpc": "2.0", "id": id, "result": { "content": content, "structuredContent": envelope, "isError": is_error } }),
         );
         self.in_flight.fetch_sub(1, Ordering::SeqCst);
+        let total = self.calls_total.fetch_add(1, Ordering::SeqCst) + 1;
+        if o.exit_after_calls > 0 && total >= o.exit_after_calls {
+            eprintln!("fake mcp: exiting after {total} calls");
+            std::process::exit(0);
+        }
     }
 }
 
@@ -234,8 +254,10 @@ fn main() {
         envelopes: Mutex::new(envelopes),
         stdout: Mutex::new(std::io::stdout()),
         calls_since_reset: AtomicU64::new(0),
+        calls_total: AtomicU64::new(0),
         in_flight: AtomicU64::new(0),
         max_in_flight: AtomicU64::new(0),
+        pongs: AtomicU64::new(0),
     });
     let stdin = std::io::stdin();
     for line in stdin.lock().lines() {
@@ -250,6 +272,11 @@ fn main() {
         let method = msg["method"].as_str().unwrap_or("");
         let id = msg.get("id").cloned();
         let o = &server.options;
+        // The client's answer to our ping: a response (no method) for the ping's id.
+        if method.is_empty() && id == Some(json!(900_001)) {
+            server.pongs.fetch_add(1, Ordering::SeqCst);
+            continue;
+        }
         match method {
             "initialize" => {
                 let mut capabilities = json!({});
@@ -262,7 +289,11 @@ fn main() {
                     "serverInfo": { "name": "dejaview-testkit-mcp", "version": "0.0.1" },
                 } }));
             }
-            "notifications/initialized" => {}
+            "notifications/initialized" => {
+                if o.ping {
+                    server.respond(json!({ "jsonrpc": "2.0", "id": 900_001, "method": "ping" }));
+                }
+            }
             "notifications/cancelled" => {
                 eprintln!(
                     "fake mcp: cancelled requestId {}",

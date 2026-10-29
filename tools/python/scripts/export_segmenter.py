@@ -1,10 +1,11 @@
 # /// script
-# requires-python = ">=3.12,<3.14"
+# requires-python = ">=3.13,<3.14"
 # dependencies = [
-#   "torch>=2.6",
-#   "transformers>=4.57",
-#   "onnx>=1.17",
-#   "onnxruntime>=1.20",
+#   "torch==2.15.0",
+#   "transformers==5.21.0",
+#   "onnx==1.23.2",
+#   "onnxruntime==1.31.1",
+#   "huggingface_hub>=1.0",
 #   "pillow>=11",
 #   "numpy>=2",
 #   "scipy>=1.14",
@@ -20,8 +21,11 @@ used (owner decision 11).
 
 Upstream: `tue-mps/ade20k_semantic_eomt_large_512` on Hugging Face (EoMT, Encoder-only Mask
 Transformer, DINOv2 ViT-L backbone), weights MIT, code MIT (github.com/tue-mps/eomt), the
-backbone's DINOv2 weights Apache-2.0. The export runs on the CPU and is deterministic given the
-versions it prints.
+backbone's DINOv2 weights Apache-2.0, pinned to one revision whose weights file must hash to the
+value below. The export runs on the CPU and is deterministic given the pinned versions, which the
+script refuses to run without (`--allow-other-versions` makes a new, differently recorded
+artifact). The parity check is a gate: the script exits non-zero when the ONNX export strays from
+PyTorch by more than the tolerances MODEL.md states.
 """
 
 from __future__ import annotations
@@ -35,7 +39,21 @@ import sys
 import time
 
 MODEL_ID = "tue-mps/ade20k_semantic_eomt_large_512"
+# The Hugging Face revision the artifact is exported from, and the SHA-256 of its weights file.
+REVISION = "aeb262f5a0bc609236d27f1277c3173ce57aeb27"
+WEIGHTS_FILE = "model.safetensors"
+WEIGHTS_SHA256 = "715f374b2bc9f2329caa99c9c3d425dcb072f2d0751a960534b4bfd35fe5930c"
 PREPROCESSING_VERSION = "1"
+# The versions the recorded artifact was made with; a different version is a different artifact.
+PINNED_VERSIONS = {
+    "torch": "2.15.0",
+    "transformers": "5.21.0",
+    "onnx": "1.23.2",
+    "onnxruntime": "1.31.1",
+}
+# What the ONNX export may stray from PyTorch by: class logits, mask logits (max abs) and the
+# share of semantic-map pixels whose label differs.
+TOLERANCE = {"class": 1e-3, "mask": 1e-2, "label_disagreement": 1e-3}
 
 
 def sha256(path: pathlib.Path) -> str:
@@ -83,6 +101,11 @@ def main() -> int:
     ap.add_argument("--size", type=int, default=512)
     ap.add_argument("--inputs", type=int, default=4, help="synthetic images for the parity check")
     ap.add_argument("--seed", type=int, default=20261028)
+    ap.add_argument(
+        "--allow-other-versions",
+        action="store_true",
+        help="export with versions other than the pinned ones (a new artifact, never a replacement)",
+    )
     a = ap.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
 
@@ -91,15 +114,39 @@ def main() -> int:
     import onnxruntime as ort
     import torch
     import transformers
+    from huggingface_hub import hf_hub_download
     from transformers import AutoImageProcessor, EomtForUniversalSegmentation
 
     started = time.time()
+    versions = {
+        "torch": torch.__version__,
+        "transformers": transformers.__version__,
+        "onnx": onnx.__version__,
+        "onnxruntime": ort.__version__,
+    }
     print(
-        f"torch {torch.__version__} transformers {transformers.__version__} onnx {onnx.__version__} onnxruntime {ort.__version__} python {platform.python_version()} {platform.machine()}"
+        " ".join(f"{k} {v}" for k, v in versions.items())
+        + f" python {platform.python_version()} {platform.machine()}"
     )
+    other = {k: (v, PINNED_VERSIONS[k]) for k, v in versions.items() if v != PINNED_VERSIONS[k]}
+    if other and not a.allow_other_versions:
+        for k, (have, want) in other.items():
+            print(f"{k} {have} is not the pinned {want}", file=sys.stderr)
+        print("refusing: the pinned versions reproduce the recorded artifact", file=sys.stderr)
+        return 2
+
+    weights = pathlib.Path(hf_hub_download(MODEL_ID, WEIGHTS_FILE, revision=REVISION))
+    weights_digest = sha256(weights)
+    if weights_digest != WEIGHTS_SHA256:
+        print(
+            f"{WEIGHTS_FILE} at revision {REVISION} hashes to {weights_digest}, not {WEIGHTS_SHA256}",
+            file=sys.stderr,
+        )
+        return 2
+    print(f"weights {WEIGHTS_FILE} sha256 {weights_digest} (revision {REVISION})")
     torch.manual_seed(a.seed)
-    processor = AutoImageProcessor.from_pretrained(MODEL_ID)
-    model = EomtForUniversalSegmentation.from_pretrained(MODEL_ID).eval()
+    processor = AutoImageProcessor.from_pretrained(MODEL_ID, revision=REVISION)
+    model = EomtForUniversalSegmentation.from_pretrained(MODEL_ID, revision=REVISION).eval()
     print(f"loaded {MODEL_ID}: {sum(p.numel() for p in model.parameters()) / 1e6:.1f}M parameters")
     print(
         "processor:",
@@ -181,9 +228,13 @@ def main() -> int:
         )
         goldens.append({"file": golden.name, "sha256": sha256(golden)})
     print("parity:", json.dumps(worst))
+    parity_ok = all(worst[k] <= TOLERANCE[k] for k in TOLERANCE)
 
     record = {
         "model_id": MODEL_ID,
+        "revision": REVISION,
+        "weights_file": WEIGHTS_FILE,
+        "weights_sha256": weights_digest,
         "artifact": artifact.name,
         "sha256": digest,
         "size_bytes": artifact.stat().st_size,
@@ -201,21 +252,23 @@ def main() -> int:
             if k in ("image_mean", "image_std", "size", "do_normalize", "do_rescale", "resample")
         },
         "versions": {
-            "torch": torch.__version__,
-            "transformers": transformers.__version__,
-            "onnx": onnx.__version__,
-            "onnxruntime": ort.__version__,
+            **versions,
             "python": platform.python_version(),
             "machine": platform.machine(),
         },
         "execution_provider": "CPUExecutionProvider",
         "parity": worst,
+        "tolerance": TOLERANCE,
+        "parity_ok": parity_ok,
         "goldens": goldens,
         "seed": a.seed,
         "elapsed_s": round(time.time() - started, 1),
     }
     (a.out / "record.json").write_text(json.dumps(record, indent=2, default=str) + "\n")
     print(f"record: {a.out / 'record.json'}")
+    if not parity_ok:
+        print(f"parity outside tolerance {json.dumps(TOLERANCE)}: {json.dumps(worst)}", file=sys.stderr)
+        return 1
     return 0
 
 

@@ -1,0 +1,83 @@
+{
+  "model_id": "tue-mps/ade20k_semantic_eomt_large_512",
+  "revision": "aeb262f5a0bc609236d27f1277c3173ce57aeb27",
+  "weights_file": "model.safetensors",
+  "weights_sha256": "715f374b2bc9f2329caa99c9c3d425dcb072f2d0751a960534b4bfd35fe5930c",
+  "artifact": "eomt-large-ade20k-512.onnx",
+  "sha256": "184ad11695a51bf67f91d2cf474670894ab8b5c98fdcfcd88e9fce1e23491b85",
+  "size_bytes": 1264419839,
+  "opset": 18,
+  "input": {
+    "name": "pixel_values",
+    "shape": [
+      "batch",
+      3,
+      512,
+      512
+    ],
+    "dtype": "float32"
+  },
+  "outputs": [
+    "class_queries_logits",
+    "masks_queries_logits"
+  ],
+  "preprocessing_version": "1",
+  "processor": {
+    "do_normalize": true,
+    "do_rescale": true,
+    "image_mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "image_std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "resample": 2,
+    "size": {
+      "shortest_edge": 512
+    }
+  },
+  "versions": {
+    "torch": "2.15.0",
+    "transformers": "5.21.0",
+    "onnx": "1.23.2",
+    "onnxruntime": "1.31.1",
+    "python": "3.13.3",
+    "machine": "arm64"
+  },
+  "execution_provider": "CPUExecutionProvider",
+  "parity": {
+    "class": 6.437301635742188e-05,
+    "mask": 0.00177764892578125,
+    "label_disagreement": 0.0
+  },
+  "tolerance": {
+    "class": 0.001,
+    "mask": 0.01,
+    "label_disagreement": 0.001
+  },
+  "parity_ok": true,
+  "goldens": [
+    {
+      "file": "golden-0.npz",
+      "sha256": "b018a0634642aac14d4d0818d721415b199b0e505449c3e4813f06739da595a0"
+    },
+    {
+      "file": "golden-1.npz",
+      "sha256": "5c45eb12e06c3dedb07e900ad2b865088a56ebd5d8a66dc83ce7dfb564480c18"
+    },
+    {
+      "file": "golden-2.npz",
+      "sha256": "0c0e141483f69fa3adfdfb14e5624edfd2fc9380628c6a73bfab90eeffb94ffd"
+    },
+    {
+      "file": "golden-3.npz",
+      "sha256": "1b763191f7ef0feb8f304e167b5199623e1c5e1ecba035f4f49ae605dbfca926"
+    }
+  ],
+  "seed": 20261028,
+  "elapsed_s": 10.1
+}

@@ -224,6 +224,14 @@ pub struct Flip {
 pub struct BootstrapSpec {
     pub seed: u64,
     pub resamples: usize,
+    /// The hypotheses the matrix declares (models × treatment arms), for the Bonferroni
+    /// percentiles.
+    #[serde(default = "one")]
+    pub hypotheses: usize,
+}
+
+fn one() -> usize {
+    1
 }
 
 /// The paired bootstrap interval on the detected-failure difference (SPEC "Gates"), treatment
@@ -233,6 +241,11 @@ pub struct BootstrapSpec {
 pub struct PairedBootstrap {
     pub seed: u64,
     pub resamples: usize,
+    pub hypotheses: usize,
+    /// Families with an expected-fail item: the unit resampled.
+    pub families: usize,
+    pub lower_percentile: f64,
+    pub upper_percentile: f64,
     pub point: f64,
     pub lower: f64,
     pub upper: f64,
@@ -415,12 +428,16 @@ fn paired_metrics(
                     &paired_items,
                     spec.seed,
                     spec.resamples,
-                    1,
+                    spec.hypotheses,
                 ) {
                     Ok(b) => {
                         p.bootstrap = Some(PairedBootstrap {
                             seed: b.seed,
                             resamples: b.resamples,
+                            hypotheses: b.hypotheses,
+                            families: b.families,
+                            lower_percentile: b.lower_percentile,
+                            upper_percentile: b.upper_percentile,
                             point: b.point,
                             lower: b.lower,
                             upper: b.upper,

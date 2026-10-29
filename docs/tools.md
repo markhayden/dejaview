@@ -45,8 +45,8 @@ touches the filesystem.
 ## Transports
 
 **Built-in (in-process Rust).** `Tool` implementations in `crates/dejaview-tools/src/builtin/`,
-manifests embedded from `crates/dejaview-tools/manifests/`, registered ahead of any pack of the
-same name and listed by `dejaview tools list`. Shipped so far:
+manifests embedded from `crates/dejaview-tools/manifests/`, listed by `dejaview tools list`. A pack
+tool of the same name takes the built-in's place (packs are registered first). Shipped so far:
 
 - `view` (`frame`, optional `also`; either `bbox` or `yaw`, `pitch` and `fov`): a crop of a frame
   by normalised box, snapped outward to whole pixels (the mapping records the pixels actually cut)

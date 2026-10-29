@@ -11,9 +11,9 @@
 //! translations (and, for flat images, rotations and scales) by normalised cross-correlation,
 //! and each level from there refines the transform by robust Gauss-Newton on the intensity
 //! residual (a Huber weight tames pixels that genuinely changed). The finest level, capped in
-//! size for cost, yields the quality measurements. A pair whose images lack texture, whose
-//! registration does not converge, or whose registered agreement is low is reported as not
-//! registered rather than given a transform.
+//! size for cost, yields the quality measurements. A pair whose images lack texture is
+//! `LowTexture`, one whose refinement does not converge is `NotConverged`, and one whose
+//! registered agreement is low is `NotRegistered`; none is given a transform.
 
 mod flat;
 pub(crate) mod gray;
@@ -32,8 +32,11 @@ pub enum Status {
     Registered,
     /// One image has too little structure for any transform to be determined.
     LowTexture,
-    /// Registration did not converge or the registered pair does not agree: different scenes,
-    /// a different viewpoint, or a transform outside what `align` represents.
+    /// The refinement did not settle within its iterations or hit a singular system: a numerical
+    /// failure that says nothing about the pair's geometry.
+    NotConverged,
+    /// The registered pair does not agree: different scenes, a different viewpoint, or a
+    /// transform outside what `align` represents.
     NotRegistered,
 }
 
@@ -94,6 +97,18 @@ impl Default for Options {
 /// Added to the local variance before normalising: a local contrast below about 3% of full
 /// scale (quantisation noise, faint gradients) is damped rather than amplified into structure.
 const LCN_EPS: f32 = 1e-3;
+
+/// How a level's refinement ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Refinement {
+    /// The step fell under the threshold.
+    Settled,
+    /// The iterations ran out or the step ran away: the pair may simply not fit.
+    Exhausted,
+    /// A singular system, non-finite parameters or too few samples: a numerical failure that
+    /// says nothing about the pair.
+    Failed,
+}
 /// Pixels this close to an image edge are not measured: the blur and the normalisation window
 /// are clipped there.
 const MARGIN: f64 = 6.0;

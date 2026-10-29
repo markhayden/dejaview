@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use dejaview_core::frames::Mapping;
 use dejaview_core::job::Projection;
 use dejaview_core::tool::{DejaviewContext, FrameHandle, ImageHandle, Status, Tool};
-use dejaview_testkit::images::{Scene, low_texture};
+use dejaview_testkit::images::{IDENTITY, Scene, SphereScene, low_texture};
 use dejaview_tools::builtin;
 use image::RgbImage;
 
@@ -101,7 +101,8 @@ fn edge_similarity_is_one_for_the_same_frame_and_near_zero_for_blank_against_tex
         value(&e, "edge_similarity")
     );
     assert!(e.images.is_empty() && e.regions.is_empty());
-    // Mistakes are the model's.
+    // Mistakes are the model's: the same frame twice, an unknown frame, frames of another shape
+    // or projection.
     let e = tool
         .call(
             &serde_json::json!({ "frame": "raw:source", "against": "raw:source" }),
@@ -109,6 +110,29 @@ fn edge_similarity_is_one_for_the_same_frame_and_near_zero_for_blank_against_tex
         )
         .unwrap();
     assert_eq!(e.status, Status::InvalidArgs);
+    let wide = Scene::random(9, 60, 0.5).render(384, 192);
+    let mut other = context(&dir, &[("raw:wide", &wide)]);
+    other.frames.extend(ctx.frames.clone());
+    let e = tool
+        .call(
+            &serde_json::json!({ "frame": "raw:source", "against": "raw:wide" }),
+            &other,
+        )
+        .unwrap();
+    assert_eq!(e.status, Status::InvalidArgs);
+    assert!(e.summary.contains("share one grid"), "{}", e.summary);
+    let pano_image = SphereScene::random(5, 40).render(384, 192, &IDENTITY);
+    let mut pano = context(&dir, &[("raw:pano", &pano_image)]);
+    pano.frames.get_mut("raw:pano").unwrap().projection = Projection::Equirectangular;
+    pano.frames.extend(ctx.frames.clone());
+    let e = tool
+        .call(
+            &serde_json::json!({ "frame": "raw:source", "against": "raw:pano" }),
+            &pano,
+        )
+        .unwrap();
+    assert_eq!(e.status, Status::InvalidArgs);
+    assert!(e.summary.contains("Equirectangular"), "{}", e.summary);
     let e = tool
         .call(
             &serde_json::json!({ "frame": "raw:source", "against": "raw:nope" }),

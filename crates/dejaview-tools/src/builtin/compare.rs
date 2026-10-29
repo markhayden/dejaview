@@ -49,6 +49,14 @@ fn pair<'a>(
             frame.projection, against.projection
         ));
     }
+    // One grid means one aspect ratio too (sizes may differ: aligned frames are capped).
+    let aspect = |h: &FrameHandle| f64::from(h.pixels.width) / f64::from(h.pixels.height.max(1));
+    if (aspect(frame) / aspect(against) - 1.0).abs() > 0.01 {
+        return Err(format!(
+            "{frame_id:?} is {}×{} and {against_id:?} is {}×{}; the frames must share one grid",
+            frame.pixels.width, frame.pixels.height, against.pixels.width, against.pixels.height
+        ));
+    }
     Ok((frame_id, against_id, frame, against))
 }
 

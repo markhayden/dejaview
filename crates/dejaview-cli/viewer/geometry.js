@@ -60,20 +60,44 @@
     return out;
   }
 
-  /// The equirectangular footprint of view points: { kind: 'polygon', polygon, clipped } cut at
-  /// the seam when it straddles it, or { kind: 'bbox', bbox } across the full width when the view
-  /// holds a pole.
-  function footprint(view, points) {
+  /// Whether a normalised point lies in a region: a box by containment, the whole image by the
+  /// unit square, a polygon by ray casting.
+  function regionContains(loc, p) {
+    if (loc.kind === 'bbox' && loc.bbox) return p[0] >= loc.bbox[0] && p[0] <= loc.bbox[2] && p[1] >= loc.bbox[1] && p[1] <= loc.bbox[3];
+    if (loc.kind === 'whole_image') return p[0] >= 0 && p[0] <= 1 && p[1] >= 0 && p[1] <= 1;
+    if (loc.kind === 'polygon' && loc.polygon) {
+      const poly = loc.polygon; let inside = false;
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[i], b = poly[(i + 1) % poly.length];
+        if ((a[1] > p[1]) !== (b[1] > p[1])) { const x = a[0] + (p[1] - a[1]) / (b[1] - a[1]) * (b[0] - a[0]); if (p[0] < x) inside = !inside; }
+      }
+      return inside;
+    }
+    return false;
+  }
+
+  /// The middle of a region in view coordinates: a box's centre, a polygon's vertex mean.
+  function regionCentre(loc) {
+    if (loc.kind === 'bbox' && loc.bbox) return [(loc.bbox[0] + loc.bbox[2]) / 2, (loc.bbox[1] + loc.bbox[3]) / 2];
+    if (loc.kind === 'polygon' && loc.polygon && loc.polygon.length) {
+      const n = loc.polygon.length;
+      return [loc.polygon.reduce((s, v) => s + v[0], 0) / n, loc.polygon.reduce((s, v) => s + v[1], 0) / n];
+    }
+    return [0.5, 0.5];
+  }
+
+  /// The equirectangular footprint of a region's boundary points in a view: { kind: 'polygon',
+  /// polygon, clipped } cut at the seam when consecutive samples jump across it, or
+  /// { kind: 'bbox', bbox } across the full width when the region holds a pole.
+  function footprint(view, points, loc) {
     const mapped = points.map(p => equirectOf(direction(view, p[0], p[1])));
-    const centreX = equirectOf(direction(view, 0.5, 0.5))[0];
-    const holdsPole = pole => {
-      const p = project(view, pole);
-      return p !== null && p[0] >= 0 && p[0] <= 1 && p[1] >= 0 && p[1] <= 1;
-    };
+    const centre = regionCentre(loc);
+    const centreX = equirectOf(direction(view, centre[0], centre[1]))[0];
+    const holdsPole = pole => { const p = project(view, pole); return p !== null && regionContains(loc, p); };
     const ys = mapped.map(m => m[1]);
     if (holdsPole([0, 0, 1])) return { kind: 'bbox', bbox: [0, 0, 1, Math.max(1e-6, Math.max(...ys))], clipped: false };
     if (holdsPole([0, 0, -1])) return { kind: 'bbox', bbox: [0, Math.min(1 - 1e-6, Math.min(...ys)), 1, 1], clipped: false };
-    const straddles = mapped.some(m => Math.abs(m[0] - centreX) > 0.5);
+    const straddles = mapped.length > 1 && mapped.some((m, i) => Math.abs(m[0] - mapped[(i + 1) % mapped.length][0]) > 0.5);
     if (!straddles) return { kind: 'polygon', polygon: mapped, clipped: false };
     const edge = centreX < 0.5 ? 0 : 1;
     return { kind: 'polygon', polygon: mapped.map(m => (Math.abs(m[0] - centreX) > 0.5 ? [edge, m[1]] : m)), clipped: true };
@@ -93,7 +117,7 @@
         for (let k = 0; k < perEdge; k++) { const t = k / perEdge; points.push([a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]); }
       });
     } else return null;
-    return footprint(view, points);
+    return footprint(view, points, loc);
   }
 
   /// The inverse of a row-major 3×3 matrix.
@@ -156,7 +180,7 @@
     const ys = mapped.map(m => m[1]);
     if (winds(1)) return { kind: 'bbox', bbox: [0, 0, 1, Math.max(1e-6, Math.max(...ys))], clipped: false };
     if (winds(-1)) return { kind: 'bbox', bbox: [0, Math.min(1 - 1e-6, Math.min(...ys)), 1, 1], clipped: false };
-    const straddles = mapped.some(m => Math.abs(m[0] - centreX) > 0.5);
+    const straddles = mapped.length > 1 && mapped.some((m, i) => Math.abs(m[0] - mapped[(i + 1) % mapped.length][0]) > 0.5);
     if (!straddles) return { kind: 'polygon', polygon: mapped, clipped: false };
     const edge = centreX < 0.5 ? 0 : 1;
     return { kind: 'polygon', polygon: mapped.map(m => (Math.abs(m[0] - centreX) > 0.5 ? [edge, m[1]] : m)), clipped: true };

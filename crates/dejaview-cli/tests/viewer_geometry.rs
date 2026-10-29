@@ -110,6 +110,24 @@ fn cases() -> Vec<(&'static str, View, Location)> {
             },
             location(LocationKind::WholeImage, None, None),
         ),
+        (
+            "box below the pole in a pole-holding view",
+            View {
+                yaw: 0.0,
+                pitch: 80.0,
+                fov: 60.0,
+            },
+            location(LocationKind::Bbox, Some([0.4, 0.6, 0.6, 0.8]), None),
+        ),
+        (
+            "box at the top of a yaw-0 view crossing the seam behind the camera",
+            View {
+                yaw: 0.0,
+                pitch: 60.0,
+                fov: 120.0,
+            },
+            location(LocationKind::Bbox, Some([0.3, 0.0, 0.7, 0.1]), None),
+        ),
     ]
 }
 

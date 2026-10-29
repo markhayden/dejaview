@@ -285,6 +285,7 @@ pub fn run(plan: &Plan, factories: &dyn Factories, cancel: Option<&Cancel>) -> R
         bootstrap: m.gate.as_ref().map(|g| crate::metrics::BootstrapSpec {
             seed: g.seed,
             resamples: g.resamples,
+            hypotheses: plan.matrix.hypotheses(),
         }),
     };
     'outer: for set in &sets {

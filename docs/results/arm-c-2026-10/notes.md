@@ -6,8 +6,9 @@ five models, one repetition, decision cap $10, matrix cap $75, bootstrap seed 20
   per-decision cap; and with it the Anthropic share would pass the standing $25 per vendor.
 - **Arm C.** The visual-access control: `view` (crops and perspective views) and `align` under
   its `visual_only` projection, so the model gets the aligned candidate as a picture and no
-  measurement. Prompts differ from arm A only in the Tools section (`prompt_equivalence` in the
-  runner tests), so a flip between the arms is the tools' doing.
+  measurement. Prompts differ from arm A only in the Tools section (the test
+  `arm_c_prompts_differ_from_arm_a_only_in_the_tools_section` builds both from this matrix), so a
+  flip between the arms is the tools' doing.
 - **Paired flips.** The report pairs A against C per model on the items both scored: flips each
   way, detected failures and false rejects gained and lost, and the paired bootstrap of the
   detected-failure difference under the frozen seed. The M3 baseline is historical context,

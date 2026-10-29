@@ -447,6 +447,7 @@ fn paired_flips_between_a_and_c_are_counted_each_way_with_a_reproducible_interva
         Some(BootstrapSpec {
             seed: 7,
             resamples: 2000,
+            hypotheses: 1,
         }),
     );
     assert_eq!(m.cells.len(), 3);
@@ -477,6 +478,7 @@ fn paired_flips_between_a_and_c_are_counted_each_way_with_a_reproducible_interva
         Some(BootstrapSpec {
             seed: 7,
             resamples: 2000,
+            hypotheses: 1,
         }),
     );
     assert_eq!(
@@ -487,6 +489,46 @@ fn paired_flips_between_a_and_c_are_counted_each_way_with_a_reproducible_interva
     let plain = compute(&rows, &policy);
     assert_eq!(plain.paired[0].flips.len(), 4);
     assert!(plain.paired[0].bootstrap.is_none() && plain.paired[0].bootstrap_note.is_none());
+}
+
+/// Later repetitions never enter a pairing, and a matrix with no expected-fail family gets no
+/// interval but the reason.
+#[test]
+fn paired_metrics_ignore_later_repetitions_and_say_why_no_interval_exists() {
+    use metrics::BootstrapSpec;
+    let policy = dejaview_eval::summary::policy_of(&dejaview_core::config::PolicyConfig::default());
+    let mut rows = vec![
+        paired_row("fake:m/A", "i1", "f1", Expected::Fail, Computed::Fail),
+        paired_row("fake:m/C", "i1", "f1", Expected::Fail, Computed::Fail),
+    ];
+    let mut rep2 = paired_row("fake:m/C", "i1", "f1", Expected::Fail, Computed::Pass);
+    rep2.repetition = 2;
+    rows.push(rep2);
+    let m = compute(&rows, &policy);
+    assert_eq!(m.paired[0].items, 1);
+    assert!(m.paired[0].flips.is_empty(), "repetition 2 does not pair");
+    let pass_only = vec![
+        paired_row("fake:m/A", "i1", "f1", Expected::Pass, Computed::Pass),
+        paired_row("fake:m/C", "i1", "f1", Expected::Pass, Computed::Fail),
+    ];
+    let m = metrics::compute_with(
+        &pass_only,
+        &policy,
+        Some(BootstrapSpec {
+            seed: 1,
+            resamples: 100,
+            hypotheses: 1,
+        }),
+    );
+    assert!(m.paired[0].bootstrap.is_none());
+    assert!(
+        m.paired[0]
+            .bootstrap_note
+            .as_deref()
+            .is_some_and(|n| n.contains("expected-fail")),
+        "{:?}",
+        m.paired[0].bootstrap_note
+    );
 }
 
 /// C against each D arm pairs too, and a lone D arm without C pairs with nothing.

@@ -280,11 +280,10 @@ fn validity_table_seam_rules_on_equirectangular() {
     let mut l = loc("raw:pano", LocationKind::Bbox);
     l.bbox = Some([0.9, 0.2, 1.0, 0.4]);
     assert!(r.validate(&l).is_ok(), "touching the right edge is fine");
+    // A normalised box cannot wrap round the seam; one spanning the full width is the full
+    // circle (a sky band) and is allowed.
     l.bbox = Some([0.0, 0.2, 1.0, 0.4]);
-    assert!(
-        r.validate(&l).is_err(),
-        "spanning both edges straddles the seam"
-    );
+    assert!(r.validate(&l).is_ok(), "the full width is the full circle");
 }
 
 #[test]

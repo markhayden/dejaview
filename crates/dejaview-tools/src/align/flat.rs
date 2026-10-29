@@ -4,7 +4,13 @@ use image::RgbImage;
 
 use super::gray::Gray;
 use super::linalg::{self, IDENTITY, Mat3};
-use super::{LCN_EPS, Options, Quality, Status};
+use super::{LCN_EPS, Options, Quality, Refinement, Status};
+
+/// A step moving no source corner by more than this at the level has settled.
+const SETTLED_PX: f64 = 1e-3;
+/// A refinement out of iterations whose last step was under this has settled enough: the
+/// transform is within the tolerance ADR 0014 measured.
+const SETTLED_ENOUGH_PX: f64 = 0.05;
 
 /// The result of [`align_flat`].
 #[derive(Debug, Clone, PartialEq)]
@@ -115,18 +121,18 @@ pub fn align_flat(source: &RgbImage, candidate: &RgbImage, opts: &Options) -> Fl
         &Norm::of(&top_c.lcn),
     );
     let mut iterations = 0;
-    let mut converged = true;
-    let finest = (0..levels)
-        .find(|&l| ps[l].lcn.width.max(ps[l].lcn.height) <= opts.max_side)
-        .unwrap_or(levels - 1);
+    let mut refinement = Refinement::Settled;
+    let finest = 0;
     for l in (finest..levels).rev() {
         let (s, c) = (&ps[l], &pc[l]);
         let (ns, nc) = (Norm::of(&s.lcn), Norm::of(&c.lcn));
         let mut hp = to_pixels(&hn, &ns, &nc);
-        let (done, iters) = gauss_newton(&s.lcn, &c.lcn, &c.gx, &c.gy, &mut hp, &ns, &nc, opts);
+        let (outcome, iters) = gauss_newton(&s.lcn, &c.lcn, &c.gx, &c.gy, &mut hp, &ns, &nc, opts);
         iterations += iters;
-        if !done {
-            converged = false;
+        // A numerical failure ends the refinement; a level that merely ran out of iterations
+        // hands its transform on to the finer levels, and the finest level's outcome stands.
+        refinement = outcome;
+        if outcome == Refinement::Failed {
             break;
         }
         hn = to_normalised(&hp, &ns, &nc);
@@ -141,10 +147,9 @@ pub fn align_flat(source: &RgbImage, candidate: &RgbImage, opts: &Options) -> Fl
         inlier_fraction: inliers,
         texture,
     };
-    let registered = converged
-        && overlap >= opts.min_overlap
-        && ncc >= opts.min_ncc
-        && inliers >= opts.min_inliers;
+    let agrees = overlap >= opts.min_overlap && ncc >= opts.min_ncc && inliers >= opts.min_inliers;
+    let registered = refinement == Refinement::Settled && agrees;
+    let status = status_of(registered, refinement, agrees);
     let reduced = to_pixels(&hn, &Norm::of(&gs), &Norm::of(&gc));
     // Reduced source pixels are original pixels over 2^halved_s; the same for the candidate.
     let (fs, fc) = (f64::from(1u32 << halved_s), f64::from(1u32 << halved_c));
@@ -157,11 +162,7 @@ pub fn align_flat(source: &RgbImage, candidate: &RgbImage, opts: &Options) -> Fl
     ));
     FlatAlignment {
         homography: if registered { homography } else { scale_only },
-        status: if registered {
-            Status::Registered
-        } else {
-            Status::NotRegistered
-        },
+        status,
         quality,
         iterations,
     }
@@ -176,6 +177,19 @@ fn halve_towards(mut g: Gray, other: &Gray) -> (Gray, u32) {
         halvings += 1;
     }
     (g, halvings)
+}
+
+/// The outcome from how the refinement ended and how the pair agrees under the best transform.
+/// A numerical failure is never evidence about the pair; a refinement that ran out of iterations
+/// on a pair that does not agree is the natural end for a pair that does not fit, and is reported
+/// as not registered; one that ran out while the pair agrees is not converged.
+pub(crate) fn status_of(registered: bool, refinement: Refinement, agrees: bool) -> Status {
+    match (registered, refinement, agrees) {
+        (true, _, _) => Status::Registered,
+        (false, Refinement::Failed, _) => Status::NotConverged,
+        (false, Refinement::Exhausted, true) => Status::NotConverged,
+        (false, _, _) => Status::NotRegistered,
+    }
 }
 
 /// The pure scaling between two image sizes: what a pair of the same scene at different
@@ -202,9 +216,12 @@ struct Level {
     gy: Gray,
 }
 
+/// The normalised levels the estimator uses, finest first: levels above `max_side` on the longer
+/// side are neither refined nor measured, so nothing is built for them.
 fn pyramid(g: &Gray, opts: &Options) -> Vec<Level> {
     g.pyramid(opts.min_side)
         .into_iter()
+        .filter(|raw| raw.width.max(raw.height) <= opts.max_side)
         .map(|raw| {
             // A light blur before normalising keeps interpolation error small against the
             // structure the residual is measured on.
@@ -327,11 +344,12 @@ fn gauss_newton(
     ns: &Norm,
     nc: &Norm,
     opts: &Options,
-) -> (bool, usize) {
+) -> (Refinement, usize) {
     let n_px = s.width * s.height;
     let stride = ((n_px as f64 / 250_000.0).sqrt().ceil() as usize).max(1);
     let mut hn = to_normalised(hp, ns, nc);
     let huber = f64::from(opts.huber);
+    let mut last_moved = f64::INFINITY;
     for iter in 0..opts.max_iterations {
         let mut a = vec![0.0f64; 64];
         let mut b = vec![0.0f64; 8];
@@ -387,7 +405,7 @@ fn gauss_newton(
             y += stride;
         }
         if used < 64 {
-            return (false, iter);
+            return (Refinement::Failed, iter);
         }
         // Levenberg damping keeps a poorly determined direction from running away.
         for i in 0..8 {
@@ -395,7 +413,7 @@ fn gauss_newton(
             a[i * 8 + i] += 1e-9;
         }
         let Some(delta) = linalg::solve(a, b) else {
-            return (false, iter);
+            return (Refinement::Failed, iter);
         };
         let mut next = hn;
         for (h, d) in next.iter_mut().zip(delta.iter()) {
@@ -403,21 +421,27 @@ fn gauss_newton(
         }
         hn = linalg::normalise(&next);
         if !hn.iter().all(|v| v.is_finite()) {
-            return (false, iter);
+            return (Refinement::Failed, iter);
         }
-        // Converged when no source corner moves more than a thousandth of a pixel at this level.
+        // Settled when no source corner moves more than a thousandth of a pixel at this level.
         let moved = delta_pixels(&delta, ns, nc);
-        if moved < 1e-3 {
+        last_moved = moved;
+        if moved < SETTLED_PX {
             *hp = to_pixels(&hn, ns, nc);
-            return (true, iter + 1);
+            return (Refinement::Settled, iter + 1);
         }
         if moved > nc.s * 4.0 {
-            return (false, iter + 1);
+            return (Refinement::Exhausted, iter + 1);
         }
     }
+    // Out of iterations: settled enough when the last step was already small, otherwise the fit
+    // never came to rest.
     *hp = to_pixels(&hn, ns, nc);
-    // Out of iterations: converged enough if the last step was small.
-    (true, opts.max_iterations)
+    if last_moved < SETTLED_ENOUGH_PX {
+        (Refinement::Settled, opts.max_iterations)
+    } else {
+        (Refinement::Exhausted, opts.max_iterations)
+    }
 }
 
 /// The largest pixel motion a parameter step implies at the source corners.

@@ -27,8 +27,9 @@ async service with `futures`, `tokio-util`, `tracing` and friends as dependencie
 
 ## Decision
 
-Keep the in-house client (`crates/dejaview-tools/src/mcp/`, about six hundred lines with the
-pack): a synchronous, multiplexed JSON-RPC client over the child's stdio.
+Keep the in-house client (`crates/dejaview-tools/src/mcp/`, about nine hundred lines with the
+pack, and as many again of tests): a synchronous, multiplexed JSON-RPC client over the child's
+stdio.
 
 - A reader thread routes every response to the request waiting for its id; requests from several
   threads share the process, so tools whose manifests declare `concurrent = true` run together

@@ -261,8 +261,8 @@ Every frame has a root image id and a projection. A **location** is a tagged rec
 
 | `kind` | requires non-null | allowed on |
 |---|---|---|
-| `bbox` | `frame`, `bbox = [x0, y0, x1, y1]` normalised, `x0 < x1`, `y0 < y1` | any frame; on equirectangular frames the box may not straddle the seam at yaw ±180° |
-| `polygon` | `frame`, `polygon` of 3 to 64 normalised vertices, simple | any frame; on equirectangular frames it may not cross the seam (a tool that needs to emits two) |
+| `bbox` | `frame`, `bbox = [x0, y0, x1, y1]` normalised, `x0 < x1`, `y0 < y1` | any frame; a normalised box cannot wrap round the seam of an equirectangular frame, and one spanning the full width is the full circle |
+| `polygon` | `frame`, `polygon` of 3 to 64 normalised vertices, simple | any frame; on equirectangular frames a polygon cannot wrap round the seam (a tool that needs both sides emits two; the registry cuts a view's footprint that crosses it to the side holding the region's centre and marks it clipped) |
 | `view` | `frame`, `yaw` in `[-180, 180)`, `pitch` in `[-90, 90]`, `fov` in `[10, 120]` | equirectangular frames only |
 | `whole_image` | `frame` | any frame; a global defect such as a wrong projection or a broken render |
 | `absent` | `frame` (the image in which the thing is missing) | any frame |

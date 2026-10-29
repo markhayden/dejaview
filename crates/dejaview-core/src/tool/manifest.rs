@@ -44,10 +44,11 @@ pub struct Bounds {
 }
 
 /// Bytes the presentation of one result adds per region, measurement and image beyond their own
-/// text: ids, locations, scores and framing.
-const PRESENTED_REGION_BYTES: u64 = 260;
-const PRESENTED_MEASUREMENT_BYTES: u64 = 120;
-const PRESENTED_IMAGE_BYTES: u64 = 200;
+/// text: ids, a location at its largest (a 64-vertex polygon with every nullable field written),
+/// scores, a frame line with a nine-number mapping, and framing.
+const PRESENTED_REGION_BYTES: u64 = 64 * 22 + 160;
+const PRESENTED_MEASUREMENT_BYTES: u64 = 160;
+const PRESENTED_IMAGE_BYTES: u64 = 320;
 const PRESENTED_FRAMING_BYTES: u64 = 120;
 
 impl Bounds {
@@ -320,11 +321,11 @@ mod tests {
         let presented = b.presented_bytes();
         assert_eq!(
             presented,
-            120 + 2048 + 12 * (120 + 260) + 8 * 120 + 200,
-            "summary, twelve regions with labels, eight measurements, one image"
+            120 + 2048 + 12 * (120 + 64 * 22 + 160) + 8 * 160 + 320,
+            "summary, twelve regions at their largest with labels, eight measurements, one image"
         );
         assert!(
-            presented < b.max_envelope_bytes / 5,
+            presented < b.max_envelope_bytes,
             "{presented} vs {}",
             b.max_envelope_bytes
         );

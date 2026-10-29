@@ -117,6 +117,7 @@ fn the_report_lists_paired_flips_and_the_interval_when_two_arms_are_present() {
         Some(dejaview_eval::metrics::BootstrapSpec {
             seed: 3,
             resamples: 500,
+            hypotheses: 1,
         }),
     );
     let summary = Summary {
@@ -135,6 +136,7 @@ fn the_report_lists_paired_flips_and_the_interval_when_two_arms_are_present() {
         bootstrap: Some(dejaview_eval::metrics::BootstrapSpec {
             seed: 3,
             resamples: 500,
+            hypotheses: 1,
         }),
     };
     let text = render(&summary, &m);
@@ -144,7 +146,7 @@ fn the_report_lists_paired_flips_and_the_interval_when_two_arms_are_present() {
     );
     assert!(text.contains("2 items scored under both arms (repetition 1); 1 flipped. Detected failures: 1 gained, 0 lost."), "{text}");
     assert!(
-        text.contains("seed 3, 500 resamples: point 1.0000"),
+        text.contains("seed 3, 500 resamples over 1 families, 1 hypothesis: point 1.0000"),
         "{text}"
     );
     assert!(text.contains("| s/i1 | Fail | Pass | Fail |"), "{text}");

@@ -30,7 +30,7 @@ description = "[left, top, right, bottom] as fractions of the frame, for a crop.
 [tool.model_schema.properties.yaw]
 type = "number"
 minimum = -180
-maximum = 180
+exclusiveMaximum = 180
 description = "Degrees from the centre column of a panorama, increasing to the right. With pitch and fov."
 [tool.model_schema.properties.pitch]
 type = "number"

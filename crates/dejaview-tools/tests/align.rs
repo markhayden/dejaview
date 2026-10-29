@@ -90,6 +90,22 @@ fn a_translation_is_recovered_to_a_tenth_of_a_pixel() {
     );
 }
 
+/// The ADR 0014 tolerance at the width its table quotes, in release builds only: a 2048 px
+/// pyramid takes minutes under debug assertions.
+#[cfg(not(debug_assertions))]
+#[test]
+fn at_2048_a_rotation_with_scale_is_recovered_within_the_recorded_tolerance() {
+    let (w, h) = (2048, 1536);
+    let truth = similarity(w, h, 1.06, 6.5, -3.0, 2.5);
+    let (a, (centre, corner, angle)) = flat_case(2148, w, h, &truth, false);
+    assert_eq!(a.status, Status::Registered, "{a:?}");
+    assert!(
+        centre < 0.05 && corner < 0.1,
+        "centre {centre} corner {corner} {a:?}"
+    );
+    assert!(angle < 0.01, "angle {angle}");
+}
+
 #[test]
 fn rotation_scale_and_translation_are_recovered_together() {
     let truth = similarity(512, 384, 1.06, 6.5, -3.0, 2.5);
@@ -140,6 +156,31 @@ fn a_candidate_at_twice_the_resolution_is_mapped_through_the_scale() {
         centre < 0.2 && corner < 0.4,
         "centre {centre} corner {corner}"
     );
+}
+
+/// A refinement that cannot settle is a numerical outcome, told apart from a pair that does not
+/// register: with no iterations allowed nothing converges, and no transform is claimed.
+#[test]
+fn a_refinement_that_does_not_converge_is_not_converged_rather_than_not_registered() {
+    // An identical pair agrees under the coarse transform, so the only thing missing is a
+    // refinement that settled: not converged, no transform claimed.
+    let scene = Scene::random(1, 220, 0.75);
+    let source = scene.render(256, 192);
+    let opts = Options {
+        max_iterations: 0,
+        ..Options::default()
+    };
+    let a = align_flat(&source, &source, &opts);
+    assert_eq!(a.status, Status::NotConverged, "{a:?}");
+    assert_eq!(
+        a.homography[2], 0.0,
+        "no transform claimed: {:?}",
+        a.homography
+    );
+    let pano = SphereScene::random(30, 400).render(128, 64, &IDENTITY);
+    let s = align_sphere(&pano, &pano, &opts);
+    assert_eq!(s.status, Status::NotConverged, "{s:?}");
+    assert_eq!(s.quality.overlap, 0.0);
 }
 
 #[test]

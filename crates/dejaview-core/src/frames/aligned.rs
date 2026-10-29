@@ -36,12 +36,17 @@ fn invert(m: &[f64; 9]) -> Result<[f64; 9]> {
     ])
 }
 
-fn apply(h: &[f64; 9], p: [f64; 2]) -> [f64; 2] {
+/// `None` on the mapping's horizon (`d` at zero), where the point has no finite image.
+fn apply(h: &[f64; 9], p: [f64; 2]) -> Option<[f64; 2]> {
     let d = h[6] * p[0] + h[7] * p[1] + h[8];
-    [
+    if d.abs() < 1e-12 {
+        return None;
+    }
+    let q = [
         (h[0] * p[0] + h[1] * p[1] + h[2]) / d,
         (h[3] * p[0] + h[4] * p[1] + h[5]) / d,
-    ]
+    ];
+    q.iter().all(|v| v.is_finite()).then_some(q)
 }
 
 /// The points a location is made of: a box's corners, a polygon's vertices, the unit square for
@@ -108,7 +113,12 @@ pub fn map_through_homography(loc: &Location, h: &[f64], raw: &str) -> Result<(L
         out.frame = raw.to_string();
         return Ok((out, false));
     };
-    let mapped: Vec<[f64; 2]> = points.iter().map(|p| apply(&inv, *p)).collect();
+    let mapped: Vec<[f64; 2]> = points.iter().filter_map(|p| apply(&inv, *p)).collect();
+    if mapped.len() < 3 {
+        return Err(Error::Submission(format!(
+            "location maps onto the horizon of {raw:?}"
+        )));
+    }
     let (clamped, clipped) = clamp_inside(mapped, raw)?;
     Ok((polygon_location(raw, clamped), clipped))
 }
@@ -121,7 +131,12 @@ pub fn map_into_homography(loc: &Location, h: &[f64], frame: &str) -> Result<Loc
         out.frame = frame.to_string();
         return Ok(out);
     };
-    let mapped: Vec<[f64; 2]> = points.iter().map(|p| apply(&h, *p)).collect();
+    let mapped: Vec<[f64; 2]> = points.iter().filter_map(|p| apply(&h, *p)).collect();
+    if mapped.len() < 3 {
+        return Err(Error::Submission(format!(
+            "location maps onto the horizon of {frame:?}"
+        )));
+    }
     let (clamped, _) = clamp_inside(mapped, frame)?;
     Ok(polygon_location(frame, clamped))
 }

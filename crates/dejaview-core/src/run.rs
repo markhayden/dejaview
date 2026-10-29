@@ -1250,6 +1250,7 @@ fn rejected(
     call: &ToolCall,
     call_id: &str,
     started: Instant,
+    executed: bool,
     status: Option<Status>,
     message: String,
 ) -> Result<ContentBlock> {
@@ -1259,7 +1260,7 @@ fn rejected(
         tool: call.name.clone(),
         version: None,
         arguments: Some(call.arguments.clone()),
-        executed: false,
+        executed,
         reason: None,
         invalid_args: Some(message.clone()),
         status,
@@ -1289,7 +1290,7 @@ fn prepare_call(
     macro_rules! reject {
         ($message:expr) => {{
             return Ok(PreparedCall::Rejected(rejected(
-                journal, call, &call_id, started, None, $message,
+                journal, call, &call_id, started, false, None, $message,
             )?));
         }};
     }
@@ -1471,22 +1472,31 @@ async fn settle_call(
         call_id,
         started,
         manifest,
+        ctx,
         ..
     } = ready;
     let call = &call;
     let mut envelope = outcome?;
     let duration_ms = started.elapsed().as_millis() as u64;
-    // The structured result in full, before anything is dropped or presented.
-    let envelope_ref = state
-        .artifacts
-        .put_body(&serde_json::to_string(&envelope)?)?;
+    // The structured result in full, before anything is dropped or presented, minus the image
+    // bytes: the frame files under `run-N/frames/` hold those, and an envelope with them inline
+    // would not fit an artifact.
+    let envelope_ref = {
+        let mut stored = envelope.clone();
+        for img in &mut stored.images {
+            img.base64 = None;
+        }
+        state.artifacts.put_body(&serde_json::to_string(&stored)?)?
+    };
     if envelope.status == Status::InvalidArgs {
         // The tool found the model's arguments wanting: answered as the model's mistake.
+        // The tool ran and found the arguments wanting.
         return rejected(
             journal,
             call,
             &call_id,
             started,
+            true,
             Some(Status::InvalidArgs),
             envelope.summary.clone(),
         );
@@ -1498,7 +1508,7 @@ async fn settle_call(
     // transform of the same envelope (SPEC "Frames"); never an existing frame, always with bytes.
     for (n, img) in envelope.images.iter().enumerate() {
         let expected = format!("crop:{call_id}:{n}");
-        let aligned = aligned_frame_of(&envelope, img, &manifest.name)?;
+        let aligned = aligned_frame_of(&envelope, img, &manifest.name, &state.registry, &ctx)?;
         if aligned.is_none() && img.frame != expected {
             return Err(Error::Tool(format!(
                 "{}: returned image {n} is named {:?}; it must be {expected:?} or an aligned frame of one of its transforms",
@@ -1661,6 +1671,8 @@ fn aligned_frame_of(
     envelope: &crate::tool::Envelope,
     img: &crate::tool::envelope::EnvelopeImage,
     tool: &str,
+    registry: &Registry,
+    ctx: &DejaviewContext,
 ) -> Result<Option<(String, String)>> {
     let Some(rest) = img.frame.strip_prefix("aligned:") else {
         return Ok(None);
@@ -1669,6 +1681,18 @@ fn aligned_frame_of(
     let (image_id, transform_id) = rest
         .split_once(':')
         .ok_or_else(|| bad("the name must be aligned:<image>:<transform>".into()))?;
+    // The root is an image the call was handed, and a raw frame of the registry.
+    if !ctx.images.contains_key(image_id) {
+        return Err(bad(format!("{image_id:?} is not an image this call named")));
+    }
+    if !matches!(
+        registry
+            .get(&format!("raw:{image_id}"))
+            .map(|f| f.frame().clone()),
+        Some(crate::frames::Frame::Raw { .. })
+    ) {
+        return Err(bad(format!("raw:{image_id} is not a raw frame")));
+    }
     let transform = envelope
         .transforms
         .iter()
@@ -1693,6 +1717,35 @@ fn aligned_frame_of(
         return Err(bad(
             "the mapping's parameters differ from the transform's".into()
         ));
+    }
+    // A sound 3×3: nine finite numbers, invertible for a homography, orthonormal for a rotation.
+    let m: [f64; 9] = params.as_slice().try_into().map_err(|_| {
+        bad(format!(
+            "a 3×3 transform needs 9 parameters, got {}",
+            params.len()
+        ))
+    })?;
+    if m.iter().any(|v| !v.is_finite()) {
+        return Err(bad("the transform has a non-finite parameter".into()));
+    }
+    let det = m[0] * (m[4] * m[8] - m[5] * m[7]) - m[1] * (m[3] * m[8] - m[5] * m[6])
+        + m[2] * (m[3] * m[7] - m[4] * m[6]);
+    match transform.kind.as_str() {
+        "homography" if det.abs() < 1e-12 => {
+            return Err(bad("the homography is singular".into()));
+        }
+        "rotation" => {
+            for i in 0..3 {
+                for j in 0..3 {
+                    let dot: f64 = (0..3).map(|k| m[k * 3 + i] * m[k * 3 + j]).sum();
+                    let want = if i == j { 1.0 } else { 0.0 };
+                    if (dot - want).abs() > 1e-6 {
+                        return Err(bad("the rotation is not orthonormal".into()));
+                    }
+                }
+            }
+        }
+        _ => {}
     }
     Ok(Some((image_id.to_string(), transform_id.to_string())))
 }
@@ -1805,6 +1858,10 @@ fn root_location(
 
 fn new_decision_dir(out_dir: &Path) -> Result<PathBuf> {
     std::fs::create_dir_all(out_dir)?;
+    // Absolute, so the paths handed to tools resolve whatever working directory a tool process
+    // runs in (a pack is restarted in the run directory).
+    let out_dir = std::path::absolute(out_dir)?;
+    let out_dir = out_dir.as_path();
     let unix_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis())

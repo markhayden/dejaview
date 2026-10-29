@@ -27,9 +27,14 @@ pub struct Align {
 
 impl Align {
     pub fn new() -> Align {
+        Align::with_options(Options::default())
+    }
+
+    /// The tool under other estimator settings, for tests of its failure paths.
+    pub fn with_options(options: Options) -> Align {
         Align {
             manifest: Manifest::from_toml(MANIFEST).expect("the align manifest is valid"),
-            options: Options::default(),
+            options,
         }
     }
 }
@@ -95,8 +100,8 @@ impl Tool for Align {
         let img = load(image_id, image)?;
         let tgt = load(against_id, against)?;
         let outcome = match image.projection {
-            Projection::Flat => flat(&img, &tgt, &self.options),
-            Projection::Equirectangular => spherical(&img, &tgt, &self.options),
+            Projection::Flat => flat(&img, &tgt, &self.options)?,
+            Projection::Equirectangular => spherical(&img, &tgt, &self.options)?,
         };
         let (status, quality, kind, params, mut measurements, mut summary) = match &outcome {
             Outcome::Registered {
@@ -198,6 +203,18 @@ impl Tool for Align {
                     "{image_id} and {against_id} could not be registered: {summary}. Nothing follows about their geometry."
                 );
             }
+            align::Status::NotConverged => {
+                // A numerical failure, not evidence about the pair: no region.
+                envelope.status = Status::NotApplicable;
+                summary = format!(
+                    "{image_id} and {against_id} could not be registered: registration did not converge ({summary}). Nothing follows about their geometry."
+                );
+            }
+        }
+        if envelope.measurements.iter().any(|m| !m.value.is_finite()) {
+            return Err(Error::Tool(
+                "align: a measurement is not a finite number".into(),
+            ));
         }
         envelope.summary = summary;
         Ok(envelope)
@@ -235,7 +252,7 @@ fn normalise_homography(h: &[f64; 9], img: &RgbImage, tgt: &RgbImage) -> Vec<f64
     n.to_vec()
 }
 
-fn flat(img: &RgbImage, tgt: &RgbImage, options: &Options) -> Outcome {
+fn flat(img: &RgbImage, tgt: &RgbImage, options: &Options) -> Result<Outcome> {
     let a = align::align_flat(img, tgt, options);
     let text_quality = |q: &align::Quality| {
         format!(
@@ -243,7 +260,7 @@ fn flat(img: &RgbImage, tgt: &RgbImage, options: &Options) -> Outcome {
             q.ncc, q.inlier_fraction, q.overlap, q.texture
         )
     };
-    match a.status {
+    Ok(match a.status {
         align::Status::Registered => {
             let h = a.homography;
             // The motion at the image centre and the rotation and scale of the linear part.
@@ -253,7 +270,7 @@ fn flat(img: &RgbImage, tgt: &RgbImage, options: &Options) -> Outcome {
             let rotation = h[3].atan2(h[0]).to_degrees();
             let scale = (h[0] * h[4] - h[1] * h[3]).abs().sqrt();
             let side = tgt.width().max(tgt.height()).min(MAX_SIDE);
-            let warped = warp_flat(img, tgt, &h, side);
+            let warped = warp_flat(img, tgt, &h, side)?;
             Outcome::Registered {
                 quality: a.quality,
                 kind: "homography".into(),
@@ -283,18 +300,19 @@ fn flat(img: &RgbImage, tgt: &RgbImage, options: &Options) -> Outcome {
                 _ => text_quality(&a.quality),
             },
         },
-    }
+    })
 }
 
 /// `img` resampled into `tgt`'s grid (at `side` on the longer edge) through the inverse of `h`
 /// (image px → target px); pixels with no source are black.
-fn warp_flat(img: &RgbImage, tgt: &RgbImage, h: &[f64; 9], side: u32) -> RgbImage {
+fn warp_flat(img: &RgbImage, tgt: &RgbImage, h: &[f64; 9], side: u32) -> Result<RgbImage> {
     let scale = f64::from(side) / f64::from(tgt.width().max(tgt.height()));
     let (w, hh) = (
         ((f64::from(tgt.width()) * scale).round() as u32).max(1),
         ((f64::from(tgt.height()) * scale).round() as u32).max(1),
     );
-    let inv = align::invert(h).unwrap_or([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]);
+    let inv = align::invert(h)
+        .ok_or_else(|| Error::Tool("align: the registered homography is singular".into()))?;
     let mut out = RgbImage::new(w, hh);
     for (u, v, p) in out.enumerate_pixels_mut() {
         // Target pixel centre at full resolution, then back into the image.
@@ -305,10 +323,10 @@ fn warp_flat(img: &RgbImage, tgt: &RgbImage, h: &[f64; 9], side: u32) -> RgbImag
         }
         *p = image::Rgb(raster::sample(img, sx, sy, false));
     }
-    out
+    Ok(out)
 }
 
-fn spherical(img: &RgbImage, tgt: &RgbImage, options: &Options) -> Outcome {
+fn spherical(img: &RgbImage, tgt: &RgbImage, options: &Options) -> Result<Outcome> {
     let a = align::align_sphere(img, tgt, options);
     let text_quality = |q: &align::Quality| {
         format!(
@@ -316,7 +334,7 @@ fn spherical(img: &RgbImage, tgt: &RgbImage, options: &Options) -> Outcome {
             q.ncc, q.inlier_fraction, q.texture
         )
     };
-    match a.status {
+    Ok(match a.status {
         align::Status::Registered => {
             let side = tgt.width().min(MAX_SIDE);
             let warped = warp_sphere(img, tgt, &a.rotation, side);
@@ -349,7 +367,7 @@ fn spherical(img: &RgbImage, tgt: &RgbImage, options: &Options) -> Outcome {
                 _ => text_quality(&a.quality),
             },
         },
-    }
+    })
 }
 
 /// `img` resampled into `tgt`'s equirectangular grid: a target direction `q` shows the image at

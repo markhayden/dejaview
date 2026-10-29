@@ -90,7 +90,7 @@ function toRoot(frames, loc) {
   let partial = false;
   if (kind === 'view') {
     if (!geometry) return null;
-    const fp = geometry.footprint({ yaw: loc.yaw, pitch: loc.pitch, fov: loc.fov }, geometry.boundary([0, 0, 1, 1], 16));
+    const fp = geometry.mapThroughView({ kind: 'whole_image' }, { yaw: loc.yaw, pitch: loc.pitch, fov: loc.fov });
     kind = fp.kind; bbox = fp.bbox || null; polygon = fp.polygon || null; partial = fp.clipped;
   }
   let guard = 0;

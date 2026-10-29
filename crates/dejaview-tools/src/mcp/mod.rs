@@ -86,10 +86,41 @@ struct Shared {
     tombstones: Mutex<BTreeSet<u64>>,
     /// A call timed out or was cancelled, or the stream broke: never reuse this process.
     tainted: AtomicBool,
+    /// The server's last `STDERR_LINES` lines, for the error a failed call carries.
     stderr: Mutex<Vec<String>>,
+    stdin: Mutex<Option<ChildStdin>>,
 }
 
+/// Lines of the server's stderr kept.
+const STDERR_LINES: usize = 200;
+
 impl Shared {
+    fn write(&self, message: &Value) -> Result<()> {
+        let mut guard = self
+            .stdin
+            .lock()
+            .map_err(|_| tool_err("the server's stdin lock is poisoned"))?;
+        let stdin = guard
+            .as_mut()
+            .ok_or_else(|| tool_err("the server's stdin is closed"))?;
+        let mut text = serde_json::to_string(message)?;
+        text.push('\n');
+        stdin
+            .write_all(text.as_bytes())
+            .and_then(|()| stdin.flush())
+            .map_err(|e| tool_err(format!("cannot write to the server: {e}")))
+    }
+
+    /// The server's recent stderr as one string for an error message, or nothing.
+    fn stderr_tail(&self) -> String {
+        let lines = self.stderr.lock().map(|v| v.clone()).unwrap_or_default();
+        if lines.is_empty() {
+            String::new()
+        } else {
+            format!("; server stderr: {}", lines.join(" | "))
+        }
+    }
+
     fn fail_all(&self, why: &str) {
         if let Ok(mut pending) = self.pending.lock() {
             for (_, tx) in pending.drain() {
@@ -99,8 +130,25 @@ impl Shared {
     }
 
     fn deliver(&self, message: Value) {
+        // A message with a method is the server's: a notification is nothing to us; a request
+        // gets an answer (`ping` a pong, anything else method-not-found) and never touches the
+        // calls in flight.
+        if let Some(method) = message.get("method").and_then(Value::as_str) {
+            if let Some(id) = message.get("id") {
+                let reply = if method == "ping" {
+                    json!({ "jsonrpc": "2.0", "id": id, "result": {} })
+                } else {
+                    json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32601, "message": "Method not found" } })
+                };
+                let _ = self.write(&reply);
+            }
+            return;
+        }
         let Some(id) = message.get("id").and_then(Value::as_u64) else {
-            return; // a notification or a server request: nothing waits for it
+            // A response with no usable id: nobody asked for it.
+            self.tainted.store(true, Ordering::SeqCst);
+            self.fail_all("response without a numeric id");
+            return;
         };
         if self
             .tombstones
@@ -127,7 +175,6 @@ impl Shared {
 pub struct Client {
     child: Mutex<Child>,
     pid: u32,
-    stdin: Mutex<Option<ChildStdin>>,
     shared: Arc<Shared>,
     next_id: AtomicU64,
     tools: Vec<ListedTool>,
@@ -178,6 +225,7 @@ impl Client {
             tombstones: Mutex::new(BTreeSet::new()),
             tainted: AtomicBool::new(false),
             stderr: Mutex::new(Vec::new()),
+            stdin: Mutex::new(Some(stdin)),
         });
         let reader_shared = Arc::clone(&shared);
         std::thread::spawn(move || {
@@ -204,6 +252,9 @@ impl Client {
         std::thread::spawn(move || {
             for line in BufReader::new(stderr_pipe).lines().map_while(|l| l.ok()) {
                 if let Ok(mut v) = sink.stderr.lock() {
+                    if v.len() >= STDERR_LINES {
+                        v.remove(0);
+                    }
                     v.push(line);
                 }
             }
@@ -212,7 +263,6 @@ impl Client {
         let mut client = Client {
             child: Mutex::new(child),
             pid,
-            stdin: Mutex::new(Some(stdin)),
             shared,
             next_id: AtomicU64::new(1),
             tools: Vec::new(),
@@ -320,19 +370,7 @@ impl Client {
     }
 
     fn send(&self, message: &Value) -> Result<()> {
-        let mut guard = self
-            .stdin
-            .lock()
-            .map_err(|_| tool_err("the server's stdin lock is poisoned"))?;
-        let stdin = guard
-            .as_mut()
-            .ok_or_else(|| tool_err("the server's stdin is closed"))?;
-        let mut text = serde_json::to_string(message)?;
-        text.push('\n');
-        stdin
-            .write_all(text.as_bytes())
-            .and_then(|()| stdin.flush())
-            .map_err(|e| tool_err(format!("cannot write to the server: {e}")))
+        self.shared.write(message)
     }
 
     fn notify(&self, method: &str, params: Value) -> Result<()> {
@@ -369,21 +407,29 @@ impl Client {
                 }
                 Ok(m.get("result").cloned().unwrap_or(Value::Null))
             }
-            Ok(Err(why)) => Err(tool_err(format!("{method} (id {id}): {why}"))),
+            Ok(Err(why)) => Err(tool_err(format!(
+                "{method} (id {id}): {why}{}",
+                self.shared.stderr_tail()
+            ))),
             Err(RecvTimeoutError::Timeout) => Err(self.cancel(id, method)),
             Err(RecvTimeoutError::Disconnected) => {
                 self.shared.tainted.store(true, Ordering::SeqCst);
-                Err(tool_err(format!("the server died during {method}")))
+                Err(tool_err(format!(
+                    "the server died during {method}{}",
+                    self.shared.stderr_tail()
+                )))
             }
         }
     }
 
     fn cancel(&self, id: u64, method: &str) -> Error {
-        if let Ok(mut p) = self.shared.pending.lock() {
-            p.remove(&id);
-        }
+        // The tombstone goes down before the pending entry, so a late answer landing between
+        // the two is a late answer, never a stray id that fails the other calls in flight.
         if let Ok(mut t) = self.shared.tombstones.lock() {
             t.insert(id);
+        }
+        if let Ok(mut p) = self.shared.pending.lock() {
+            p.remove(&id);
         }
         self.shared.tainted.store(true, Ordering::SeqCst);
         let _ = self.notify(
@@ -423,7 +469,7 @@ impl Client {
 
     /// Close stdin, wait, SIGTERM, wait, SIGKILL.
     pub fn shutdown(&self, grace: Duration) {
-        if let Ok(mut s) = self.stdin.lock() {
+        if let Ok(mut s) = self.shared.stdin.lock() {
             drop(s.take());
         }
         let Ok(mut child) = self.child.lock() else {

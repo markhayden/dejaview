@@ -364,14 +364,19 @@ fn render_paired(s: &mut String, p: &metrics::PairedMetrics) {
         (Some(b), _) => {
             let _ = writeln!(
                 s,
-                "Paired bootstrap of the detected-failure difference ({} minus {}), seed {}, {} resamples: point {:.4}, 95% interval {:.4} to {:.4}{}.",
+                "Paired bootstrap of the detected-failure difference ({} minus {}), seed {}, {} resamples over {} families, {} hypothes{}: point {:.4}, interval {:.4} to {:.4} at percentiles {:.4} and {:.4}{}.",
                 arm(&p.treatment),
                 arm(&p.control),
                 b.seed,
                 b.resamples,
+                b.families,
+                b.hypotheses,
+                if b.hypotheses == 1 { "is" } else { "es" },
                 b.point,
                 b.lower,
                 b.upper,
+                b.lower_percentile,
+                b.upper_percentile,
                 if b.insufficient_tail {
                     " (too few resamples in the tail to resolve it)"
                 } else {

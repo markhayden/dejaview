@@ -448,6 +448,7 @@ impl RunReport {
                             if e.projection.is_some() {
                                 c.projection = e.projection.clone();
                             }
+                            c.executed = e.executed;
                         }
                         None => r.tool_calls.push(ToolCallEntry {
                             id,

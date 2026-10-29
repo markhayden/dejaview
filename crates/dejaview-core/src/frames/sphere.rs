@@ -118,11 +118,52 @@ fn boundary(b: &[f64; 4], per_edge: usize) -> Vec<[f64; 2]> {
     out
 }
 
+/// Whether a normalised point lies in a region: a box by containment, the whole image by the
+/// unit square, a polygon by ray casting.
+fn region_contains(loc: &Location, p: [f64; 2]) -> bool {
+    match loc.kind {
+        LocationKind::Bbox => loc
+            .bbox
+            .is_some_and(|b| p[0] >= b[0] && p[0] <= b[2] && p[1] >= b[1] && p[1] <= b[3]),
+        LocationKind::WholeImage => (0.0..=1.0).contains(&p[0]) && (0.0..=1.0).contains(&p[1]),
+        LocationKind::Polygon => loc.polygon.as_ref().is_some_and(|poly| {
+            let n = poly.len();
+            let mut inside = false;
+            for i in 0..n {
+                let (a, b) = (poly[i], poly[(i + 1) % n]);
+                if (a[1] > p[1]) != (b[1] > p[1]) {
+                    let x = a[0] + (p[1] - a[1]) / (b[1] - a[1]) * (b[0] - a[0]);
+                    if p[0] < x {
+                        inside = !inside;
+                    }
+                }
+            }
+            inside
+        }),
+        LocationKind::View | LocationKind::Absent => false,
+    }
+}
+
+/// The middle of a region in view coordinates: a box's centre, a polygon's vertex mean.
+fn region_centre(loc: &Location) -> [f64; 2] {
+    match (loc.kind, loc.bbox, &loc.polygon) {
+        (LocationKind::Bbox, Some(b), _) => [(b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0],
+        (LocationKind::Polygon, _, Some(p)) if !p.is_empty() => {
+            let n = p.len() as f64;
+            [
+                p.iter().map(|v| v[0]).sum::<f64>() / n,
+                p.iter().map(|v| v[1]).sum::<f64>() / n,
+            ]
+        }
+        _ => [0.5, 0.5],
+    }
+}
+
 /// Maps a location in a view-mapped crop to its equirectangular parent. A box becomes the
 /// polygon of its mapped boundary (sixteen samples per edge); a polygon maps vertex by vertex
-/// with edges subdivided while the 64-vertex limit allows. A footprint that straddles the seam is
-/// cut to the side holding the view's centre and flagged clipped; one that holds a pole becomes
-/// a box across the full width down to the footprint's farthest latitude.
+/// with edges subdivided while the 64-vertex limit allows. A footprint whose boundary jumps across
+/// the seam is cut to the side holding the region's centre and flagged clipped; one whose region
+/// holds a pole becomes a box across the full width down to the footprint's farthest latitude.
 pub fn map_through_view(loc: &Location, view: &View, parent: &str) -> Result<(Location, bool)> {
     let mut out = loc.clone();
     out.frame = parent.to_string();
@@ -161,7 +202,12 @@ pub fn map_through_view(loc: &Location, view: &View, parent: &str) -> Result<(Lo
         }
         LocationKind::View | LocationKind::Absent => Vec::new(),
     };
-    let footprint = footprint(view, &points);
+    let footprint = footprint(
+        view,
+        &points,
+        |p| region_contains(loc, p),
+        region_centre(loc),
+    );
     out.kind = LocationKind::Polygon;
     out.bbox = None;
     out.polygon = None;
@@ -191,15 +237,17 @@ pub enum Footprint {
     },
 }
 
-/// The equirectangular footprint of view points.
-fn footprint(view: &View, points: &[[f64; 2]]) -> Footprint {
+/// The equirectangular footprint of a region's boundary points in a view. A pole inside the
+/// region (not merely inside the view) makes the footprint run all the way around.
+fn footprint(
+    view: &View,
+    points: &[[f64; 2]],
+    region_contains: impl Fn([f64; 2]) -> bool,
+    centre: [f64; 2],
+) -> Footprint {
     let dirs: Vec<[f64; 3]> = points.iter().map(|p| view.direction(p[0], p[1])).collect();
-    // A pole inside the view: the footprint runs all the way around.
-    let holds_pole = |pole: [f64; 3]| {
-        view.project(pole)
-            .is_some_and(|p| (0.0..=1.0).contains(&p[0]) && (0.0..=1.0).contains(&p[1]))
-    };
-    footprint_impl(&dirs, view.direction(0.5, 0.5), holds_pole)
+    let holds_pole = |pole: [f64; 3]| view.project(pole).is_some_and(&region_contains);
+    footprint_impl(&dirs, view.direction(centre[0], centre[1]), holds_pole)
 }
 
 /// The equirectangular footprint of a closed boundary of directions whose region faces `centre`
@@ -250,14 +298,22 @@ fn footprint_impl(
             y1: 1.0,
         };
     }
-    let straddles = mapped.iter().any(|m| (m[0] - centre_x).abs() > 0.5);
+    // The boundary crosses the seam when consecutive samples (the closing edge included) jump by
+    // more than half the width.
+    let straddles = mapped.len() > 1
+        && mapped
+            .iter()
+            .zip(mapped.iter().cycle().skip(1))
+            .any(|(a, b)| (a[0] - b[0]).abs() > 0.5);
     if !straddles {
         return Footprint::Polygon {
             vertices: mapped,
             clipped: false,
         };
     }
-    // Cut at the seam: points on the far side are moved to the seam edge nearest the centre.
+    // Cut at the seam: points on the far side from the region's centre are moved to the seam
+    // edge nearest the centre. SPEC asks a tool that needs both sides to emit two regions; the
+    // registry keeps one and says it clipped.
     let edge = if centre_x < 0.5 { 0.0 } else { 1.0 };
     let vertices = mapped
         .iter()
@@ -460,6 +516,28 @@ mod tests {
         let b = m.bbox.unwrap();
         assert_eq!((b[0], b[1], b[2]), (0.0, 0.0, 1.0));
         assert!(b[3] > 0.1 && b[3] < 0.3, "{b:?}");
+        // A small box in that view below the pole holds no pole: a polygon, not the cap.
+        let (m, _) = map_through_view(
+            &loc(LocationKind::Bbox, Some([0.4, 0.6, 0.6, 0.8])),
+            &pole,
+            "raw:p",
+        )
+        .unwrap();
+        assert_eq!(m.kind, LocationKind::Polygon, "{m:?}");
+        // A region at the top edge of a yaw-0 view looking high up crosses the seam behind the
+        // camera and is cut, though the view's centre is at x 0.5.
+        let high = View {
+            yaw: 0.0,
+            pitch: 60.0,
+            fov: 120.0,
+        };
+        let (m, clipped) = map_through_view(
+            &loc(LocationKind::Bbox, Some([0.3, 0.0, 0.7, 0.1])),
+            &high,
+            "raw:p",
+        )
+        .unwrap();
+        assert!(clipped, "{m:?}");
     }
 
     #[test]

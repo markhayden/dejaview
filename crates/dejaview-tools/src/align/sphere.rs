@@ -4,9 +4,10 @@
 
 use image::RgbImage;
 
+use super::flat::status_of;
 use super::gray::Gray;
 use super::linalg::{self, IDENTITY, Mat3};
-use super::{LCN_EPS, Options, Quality, Status};
+use super::{LCN_EPS, Options, Quality, Refinement, Status};
 
 /// The result of [`align_sphere`].
 #[derive(Debug, Clone, PartialEq)]
@@ -75,15 +76,13 @@ pub fn align_sphere(source: &RgbImage, candidate: &RgbImage, opts: &Options) -> 
     }
     let mut r = coarse_search(&ps[levels - 1], &pc[levels - 1]);
     let mut iterations = 0;
-    let mut converged = true;
-    let finest = (0..levels)
-        .find(|&l| ps[l].width <= opts.max_side)
-        .unwrap_or(levels - 1);
+    let mut refinement = Refinement::Settled;
+    let finest = 0;
     for l in (finest..levels).rev() {
-        let (done, iters) = gauss_newton(&ps[l], &pc[l], &mut r, opts);
+        let (outcome, iters) = gauss_newton(&ps[l], &pc[l], &mut r, opts);
         iterations += iters;
-        if !done {
-            converged = false;
+        refinement = outcome;
+        if outcome == Refinement::Failed {
             break;
         }
     }
@@ -94,7 +93,9 @@ pub fn align_sphere(source: &RgbImage, candidate: &RgbImage, opts: &Options) -> 
         inlier_fraction: inliers,
         texture,
     };
-    let registered = converged && ncc >= opts.min_ncc && inliers >= opts.min_inliers;
+    let agrees = ncc >= opts.min_ncc && inliers >= opts.min_inliers;
+    let registered = refinement == Refinement::Settled && agrees;
+    let status = status_of(registered, refinement, agrees);
     let rotation = if registered { r } else { IDENTITY };
     let (yaw_deg, pitch_deg, roll_deg) = linalg::yaw_pitch_roll(&rotation);
     SphereAlignment {
@@ -102,12 +103,11 @@ pub fn align_sphere(source: &RgbImage, candidate: &RgbImage, opts: &Options) -> 
         yaw_deg,
         pitch_deg,
         roll_deg,
-        status: if registered {
-            Status::Registered
-        } else {
-            Status::NotRegistered
+        status,
+        quality: Quality {
+            overlap: if registered { 1.0 } else { 0.0 },
+            ..quality
         },
-        quality,
         iterations,
     }
 }
@@ -120,9 +120,11 @@ fn texture_of(g: &Gray) -> f64 {
     cur.texture()
 }
 
+/// The normalised levels, finest first; levels wider than `max_side` are not built.
 fn pyramid(g: &Gray, opts: &Options) -> Vec<Gray> {
     g.pyramid(opts.min_side)
         .into_iter()
+        .filter(|raw| raw.width <= opts.max_side)
         .map(|raw| raw.blur3().lcn(opts.lcn_radius, LCN_EPS))
         .collect()
 }
@@ -209,9 +211,10 @@ fn rotation_zyx(yaw_deg: f64, pitch_deg: f64, roll_deg: f64) -> Mat3 {
 
 /// Robust Gauss-Newton on the three rotation parameters with a numerical Jacobian: six extra
 /// warps per iteration, each a rotation step of half a pixel at this level.
-fn gauss_newton(s: &Gray, c: &Gray, r: &mut Mat3, opts: &Options) -> (bool, usize) {
+fn gauss_newton(s: &Gray, c: &Gray, r: &mut Mat3, opts: &Options) -> (Refinement, usize) {
     let eps = std::f64::consts::PI / s.width as f64;
     let huber = f64::from(opts.huber);
+    let mut last_moved = f64::INFINITY;
     for iter in 0..opts.max_iterations {
         let base = warp(s, c, r);
         let mut jac: Vec<Vec<f32>> = Vec::with_capacity(3);
@@ -260,20 +263,27 @@ fn gauss_newton(s: &Gray, c: &Gray, r: &mut Mat3, opts: &Options) -> (bool, usiz
             a[p * 3 + p] += 1e-12;
         }
         let Some(delta) = linalg::solve(a, b) else {
-            return (false, iter);
+            return (Refinement::Failed, iter);
         };
         let step = [-delta[0], -delta[1], -delta[2]];
         let norm = (step[0] * step[0] + step[1] * step[1] + step[2] * step[2]).sqrt();
         if !norm.is_finite() || norm > 1.0 {
-            return (false, iter + 1);
+            return (Refinement::Exhausted, iter + 1);
         }
         *r = linalg::matmul(&linalg::exp_so3(step), r);
-        // Converged when the step moves no direction by more than a thousandth of a pixel.
-        if norm * s.width as f64 / (2.0 * std::f64::consts::PI) < 1e-3 {
-            return (true, iter + 1);
+        // Settled when the step moves no direction by more than a thousandth of a pixel.
+        let moved_px = norm * s.width as f64 / (2.0 * std::f64::consts::PI);
+        last_moved = moved_px;
+        if moved_px < 1e-3 {
+            return (Refinement::Settled, iter + 1);
         }
     }
-    (true, opts.max_iterations)
+    // Out of iterations: settled enough when the last step was already small.
+    if last_moved < 0.05 {
+        (Refinement::Settled, opts.max_iterations)
+    } else {
+        (Refinement::Exhausted, opts.max_iterations)
+    }
 }
 
 fn measure(s: &Gray, c: &Gray, r: &Mat3, opts: &Options) -> (f64, f64) {

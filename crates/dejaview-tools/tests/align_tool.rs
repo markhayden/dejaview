@@ -198,6 +198,36 @@ fn an_unrelated_pair_is_not_applicable_with_an_alignment_failure_region() {
     assert!(e.summary.contains("too little texture"), "{}", e.summary);
 }
 
+/// A numerical failure of the estimator is not evidence about the pair: `not_applicable`, no
+/// region, and a summary that says the registration did not converge.
+#[test]
+fn a_registration_that_does_not_converge_gives_no_evidence() {
+    let dir = tempdir("not-converged");
+    let scene = Scene::random(4, 220, 0.75);
+    let source = scene.render(256, 192);
+    let ctx = context(
+        &dir,
+        &[
+            ("candidate", &source, Projection::Flat),
+            ("source", &source, Projection::Flat),
+        ],
+    );
+    let tool = builtin::align::Align::with_options(dejaview_tools::align::Options {
+        max_iterations: 0,
+        ..dejaview_tools::align::Options::default()
+    });
+    let e = tool
+        .call(
+            &serde_json::json!({ "image": "candidate", "against": "source" }),
+            &ctx,
+        )
+        .unwrap();
+    assert_eq!(e.status, Status::NotApplicable, "{}", e.summary);
+    assert!(e.regions.is_empty(), "{}", e.summary);
+    assert!(e.images.is_empty() && e.transforms.is_empty());
+    assert!(e.summary.contains("did not converge"), "{}", e.summary);
+}
+
 #[test]
 fn align_refuses_mixed_projections_and_the_same_image_twice() {
     let dir = tempdir("invalid");
@@ -454,4 +484,114 @@ source = { path = "source.png" }
     let poly = sf2["root"]["polygon"].as_array().unwrap();
     let x0 = poly[0][0].as_f64().unwrap();
     assert!((x0 - 0.6).abs() < 0.01, "{poly:?}");
+}
+
+/// Through the run with a panorama pair: the aligned frame carries a rotation, and a location on
+/// it maps back to the candidate through the inverse rotation, shifted by the yaw the candidate
+/// was turned by.
+#[test]
+fn a_finding_on_an_aligned_panorama_maps_back_through_the_rotation() {
+    let out = tempdir("run-pano");
+    let world = tempdir("run-pano-world");
+    let scene = SphereScene::random(31, 400);
+    let source = scene.render(512, 256, &IDENTITY);
+    // The candidate is the scene turned by a tenth of a circle.
+    let candidate = scene.render(512, 256, &images::rotation(36.0, 0.0, 0.0));
+    source.save(world.join("source.png")).unwrap();
+    candidate.save(world.join("candidate.png")).unwrap();
+    std::fs::write(
+        world.join("job.toml"),
+        r#"[job]
+use_case = "source-fidelity"
+brief = "Restyle the scene; keep the structure."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "candidate.png" }
+projection = "equirectangular"
+
+[[job.images]]
+id = "source"
+role = "source"
+source = { path = "source.png" }
+projection = "equirectangular"
+"#,
+    )
+    .unwrap();
+    let script = serde_json::json!([
+        {
+            "tool_calls": [{ "id": "c1", "name": "align", "arguments": { "image": "candidate", "against": "source" } }],
+            "stop_reason": "tool_use"
+        },
+        {
+            "tool_calls": [{ "id": "c_submit", "name": "submit_verdict", "arguments": {
+                "schema_version": 1,
+                "items": [
+                    { "id": "chk:ob:SF1@candidate", "disposition": "held", "confidence": "confident", "reason": "scripted", "allowed_by": null, "location": null, "evidence": ["call:1"] },
+                    { "id": "chk:ob:SF2@candidate", "disposition": "violation", "confidence": "confident", "reason": "scripted: a stretch in the aligned view", "allowed_by": null,
+                      "location": { "frame": "aligned:candidate:t1", "kind": "bbox", "bbox": [0.45, 0.45, 0.55, 0.55], "polygon": null, "yaw": null, "pitch": null, "fov": null }, "evidence": ["call:1"] }
+                ],
+                "findings": [],
+                "opinion": { "verdict": "fail", "reason": "r" }
+            } }],
+            "stop_reason": "tool_use"
+        }
+    ]);
+    let provider = ScriptedProvider::new(serde_json::from_value(script).unwrap());
+    let registry = ToolRegistry::new(builtin::all(), &["align".into()], &[]).unwrap();
+    let config = Config::parse(
+        &std::fs::read_to_string(root().join("fixtures/config/view.toml"))
+            .unwrap()
+            .replace("enabled = [\"view\", \"resize\"]", "enabled = [\"align\"]"),
+        &["budget.spend_cap_usd=100".into()],
+        &|_| None,
+    )
+    .unwrap();
+    let job = Job::load(&world.join("job.toml")).unwrap();
+    let o = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(run::check(
+            &config,
+            &job,
+            &world,
+            &run::Services::new(&provider, &registry),
+            &out,
+            "test",
+        ))
+        .unwrap();
+    assert_eq!(o.exit_code, 1, "{:?}", o.error);
+    let r: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(o.dir.join("report.json")).unwrap()).unwrap();
+    let run0 = &r["runs"][0];
+    assert_eq!(
+        run0["tool_calls"][0]["status"], "ok",
+        "{}",
+        run0["tool_calls"][0]
+    );
+    let frame = &run0["frames"]["aligned:candidate:t1"];
+    assert_eq!(frame["root"], "candidate", "{frame}");
+    assert_eq!(frame["projection"], "equirectangular", "{frame}");
+    assert!(frame["mapping"]["rotation"].is_array(), "{frame}");
+    let sf2 = run0["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["id"] == "chk:ob:SF2@candidate")
+        .unwrap()
+        .clone();
+    assert_eq!(sf2["root"]["image"], "candidate");
+    assert_eq!(sf2["root"]["kind"], "polygon");
+    // A box centred on the source's grid lands a tenth of the width away on the candidate, at the
+    // same height: a pure yaw moves longitude only.
+    let poly = sf2["root"]["polygon"].as_array().unwrap();
+    let n = poly.len() as f64;
+    let cx = poly.iter().map(|p| p[0].as_f64().unwrap()).sum::<f64>() / n;
+    let cy = poly.iter().map(|p| p[1].as_f64().unwrap()).sum::<f64>() / n;
+    assert!(
+        ((cx - 0.5).abs() - 0.1).abs() < 0.01 && (cy - 0.5).abs() < 0.01,
+        "centre ({cx}, {cy}) of {poly:?}"
+    );
 }

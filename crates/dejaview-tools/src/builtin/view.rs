@@ -65,6 +65,9 @@ impl Tool for View {
         };
         let also = match also_id {
             None => None,
+            Some(id) if id == frame_id => {
+                return invalid("also must name a different frame from frame".into());
+            }
             Some(id) => match ctx.frames.get(id) {
                 Some(h) if h.projection == handle.projection => Some((id, h)),
                 Some(_) => {

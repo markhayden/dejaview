@@ -138,7 +138,12 @@ impl Gray {
     #[inline]
     pub fn sample(&self, x: f64, y: f64) -> Option<f32> {
         let (fx, fy) = (x - 0.5, y - 0.5);
-        if !(fx >= 0.0 && fy >= 0.0) {
+        // Bounded in f64 before any cast: a non-finite or huge coordinate is simply outside.
+        if !(fx >= 0.0
+            && fy >= 0.0
+            && fx <= (self.width - 1) as f64
+            && fy <= (self.height - 1) as f64)
+        {
             return None;
         }
         let (x0, y0) = (fx as usize, fy as usize);

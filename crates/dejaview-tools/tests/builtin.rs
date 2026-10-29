@@ -281,6 +281,14 @@ fn view_refuses_bad_arguments_as_the_models_mistake() {
             "equirectangular",
         ),
         (
+            serde_json::json!({ "frame": "raw:pano", "yaw": 180.0, "pitch": 0.0, "fov": 60.0 }),
+            "yaw 180",
+        ),
+        (
+            serde_json::json!({ "frame": "raw:pano", "yaw": 0.0, "pitch": 95.0, "fov": 60.0 }),
+            "pitch 95",
+        ),
+        (
             serde_json::json!({ "frame": "raw:pano", "yaw": 0.0, "pitch": 0.0 }),
             "go together",
         ),
@@ -292,6 +300,11 @@ fn view_refuses_bad_arguments_as_the_models_mistake() {
         (
             serde_json::json!({ "frame": "raw:candidate", "bbox": [0.5, 0.5, 0.4, 0.9] }),
             "left < right",
+        ),
+        // A box past the right edge of a panorama: the seam is crossed by two boxes, never one.
+        (
+            serde_json::json!({ "frame": "raw:pano", "bbox": [0.9, 0.25, 1.1, 0.75] }),
+            "fractions",
         ),
         (
             serde_json::json!({ "frame": "raw:candidate", "bbox": [0.5, 0.5, 0.51, 0.51] }),

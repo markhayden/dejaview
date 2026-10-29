@@ -186,11 +186,13 @@ impl Registry {
 
     pub fn add_crop(&mut self, id: &str, parent: &str, mapping: Mapping, width: u32, height: u32) {
         let projection = match &mapping {
-            Mapping::Bbox(_) => self
+            // A box of a panorama is a flat picture unless it is the whole frame (a resize).
+            Mapping::Bbox(b) if *b == [0.0, 0.0, 1.0, 1.0] => self
                 .frames
                 .get(parent)
                 .map(Frame::projection)
                 .unwrap_or_default(),
+            Mapping::Bbox(_) => Projection::Flat,
             Mapping::View { .. } => Projection::Flat,
             // Not a crop mapping; the registry keeps the parent's projection and `to_root`
             // refuses the frame.
@@ -324,11 +326,6 @@ impl Registry {
                 null("polygon", loc.polygon.is_some())?;
                 no_view()?;
                 validate_bbox(&b)?;
-                if projection == Projection::Equirectangular && b[0] <= 0.0 && b[2] >= 1.0 {
-                    return Err(Error::Submission(
-                        "bbox straddles the seam of an equirectangular frame".into(),
-                    ));
-                }
             }
             LocationKind::Polygon => {
                 let p = loc
@@ -338,15 +335,6 @@ impl Registry {
                 null("bbox", loc.bbox.is_some())?;
                 no_view()?;
                 validate_polygon(p)?;
-                if projection == Projection::Equirectangular {
-                    let min_x = p.iter().map(|v| v[0]).fold(f64::INFINITY, f64::min);
-                    let max_x = p.iter().map(|v| v[0]).fold(f64::NEG_INFINITY, f64::max);
-                    if min_x <= 0.0 && max_x >= 1.0 {
-                        return Err(Error::Submission(
-                            "polygon crosses the seam of an equirectangular frame".into(),
-                        ));
-                    }
-                }
             }
             LocationKind::View => {
                 null("bbox", loc.bbox.is_some())?;
@@ -391,6 +379,27 @@ impl Registry {
         self.validate(loc)?;
         let mut current = loc.clone();
         let mut partial = false;
+        // A view location names a view into its panorama: its root geometry is that view's
+        // footprint on the frame it sits on.
+        if current.kind == LocationKind::View {
+            let view = sphere::View {
+                yaw: current.yaw.unwrap_or(0.0),
+                pitch: current.pitch.unwrap_or(0.0),
+                fov: current.fov.unwrap_or(90.0),
+            };
+            let whole = Location {
+                frame: current.frame.clone(),
+                kind: LocationKind::WholeImage,
+                bbox: None,
+                polygon: None,
+                yaw: None,
+                pitch: None,
+                fov: None,
+            };
+            let (mapped, clipped) = sphere::map_through_view(&whole, &view, &current.frame)?;
+            current = mapped;
+            partial |= clipped;
+        }
         loop {
             let frame = self
                 .frames
@@ -583,6 +592,18 @@ fn map_through_bbox(loc: &Location, m: &[f64; 4], parent: &str) -> Result<(Locat
     let mut out = loc.clone();
     out.frame = parent.to_string();
     let mut clipped = false;
+    if loc.kind == LocationKind::WholeImage {
+        // The whole crop is its box on the parent, clipped to it.
+        let c = [
+            m[0].clamp(0.0, 1.0),
+            m[1].clamp(0.0, 1.0),
+            m[2].clamp(0.0, 1.0),
+            m[3].clamp(0.0, 1.0),
+        ];
+        out.kind = LocationKind::Bbox;
+        out.bbox = Some(c);
+        return Ok((out, c != *m));
+    }
     if let Some(b) = loc.bbox {
         let [x0, y0] = fwd(b[0], b[1]);
         let [x1, y1] = fwd(b[2], b[3]);
@@ -672,6 +693,66 @@ mod tests {
         assert_eq!(chain[1].mapping, Some(Mapping::Bbox([0.0, 0.0, 0.5, 0.5])));
         assert!(chain[2].parent.is_none() && chain[2].mapping.is_none());
         assert!(r.chain("nope").is_empty());
+    }
+
+    #[test]
+    fn a_box_of_a_panorama_is_flat_but_its_full_frame_keeps_the_projection() {
+        let mut r = Registry::new();
+        r.add_raw("p", 1024, 512, Projection::Equirectangular);
+        r.add_crop(
+            "crop:call:1:0",
+            "raw:p",
+            Mapping::Bbox([0.0, 0.25, 0.25, 0.75]),
+            256,
+            256,
+        );
+        r.add_crop(
+            "crop:call:2:0",
+            "raw:p",
+            Mapping::Bbox([0.0, 0.0, 1.0, 1.0]),
+            512,
+            256,
+        );
+        assert_eq!(
+            r.get("crop:call:1:0").unwrap().projection(),
+            Projection::Flat
+        );
+        assert_eq!(
+            r.get("crop:call:2:0").unwrap().projection(),
+            Projection::Equirectangular
+        );
+        let view = Location {
+            frame: "crop:call:1:0".into(),
+            kind: LocationKind::View,
+            bbox: None,
+            polygon: None,
+            yaw: Some(0.0),
+            pitch: Some(0.0),
+            fov: Some(60.0),
+        };
+        assert!(
+            r.validate(&view).is_err(),
+            "a quarter of a panorama is no sphere"
+        );
+        // A view location on the panorama itself maps to its footprint.
+        let on_pano = Location {
+            frame: "raw:p".into(),
+            ..view
+        };
+        let m = r.to_root(&on_pano).unwrap();
+        assert_eq!(m.kind, LocationKind::Polygon, "{m:?}");
+        // The whole of a crop maps to its box on the parent.
+        let whole = Location {
+            frame: "crop:call:1:0".into(),
+            kind: LocationKind::WholeImage,
+            bbox: None,
+            polygon: None,
+            yaw: None,
+            pitch: None,
+            fov: None,
+        };
+        let m = r.to_root(&whole).unwrap();
+        assert_eq!(m.bbox(), Some([0.0, 0.25, 0.25, 0.75]));
     }
 
     #[test]

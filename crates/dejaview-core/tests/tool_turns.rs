@@ -518,6 +518,69 @@ fn refused_calls_appear_in_the_report_as_not_executed() {
     assert_eq!(calls[1]["id"], calls[1]["provider_call_id"]);
 }
 
+// ---- task 4.4b: the paths a tool is handed are absolute ---------------------------------------
+
+#[test]
+fn a_tool_is_handed_absolute_paths_to_its_pixels() {
+    let out = tempdir("absolute");
+    let relative = {
+        // A relative output directory, as the default config has.
+        let cwd = std::env::current_dir().unwrap();
+        pathdiff(&out, &cwd)
+    };
+    let p = provider("one-call.json");
+    let text = std::fs::read_to_string(root().join("fixtures/tool-scripts/regions-3-then-1.json"))
+        .unwrap();
+    let envelopes: Vec<Envelope> = serde_json::from_str(&text).unwrap();
+    let scripted = std::sync::Arc::new(ScriptedTool::fake_regions(envelopes));
+    let registry = ToolRegistry::new(
+        vec![Box::new(SharedTool(std::sync::Arc::clone(&scripted)))],
+        &["fake_regions".into()],
+        &[],
+    )
+    .unwrap();
+    let job = Job::load(&root().join("fixtures/jobs/pair.toml")).unwrap();
+    block_on(run::check(
+        &config(&[]),
+        &job,
+        &root(),
+        &run::Services::new(&p, &registry),
+        &relative,
+        "test",
+    ))
+    .unwrap();
+    let calls = scripted.calls.lock().unwrap();
+    let ctx = &calls[0].1;
+    let path = std::path::Path::new(ctx.images["candidate"].path.as_deref().unwrap());
+    assert!(path.is_absolute(), "{path:?}");
+    assert!(path.is_file());
+    assert!(ctx.run_dir.as_ref().unwrap().is_absolute());
+}
+
+/// The scripted tool shared with the test so its recorded calls can be read afterwards.
+struct SharedTool(std::sync::Arc<ScriptedTool>);
+
+impl Tool for SharedTool {
+    fn manifest(&self) -> &dejaview_core::tool::Manifest {
+        self.0.manifest()
+    }
+    fn call(
+        &self,
+        args: &serde_json::Value,
+        ctx: &dejaview_core::tool::DejaviewContext,
+    ) -> dejaview_core::Result<Envelope> {
+        self.0.call(args, ctx)
+    }
+}
+
+/// `target` relative to `base` when `target` is under it, else `target` itself.
+fn pathdiff(target: &std::path::Path, base: &std::path::Path) -> PathBuf {
+    target
+        .strip_prefix(base)
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| target.to_path_buf())
+}
+
 // ---- task 4.1: evaluation projections ---------------------------------------------------------
 
 /// A tool under `visual_only` (the control arms' `align`) returns its pictures and nothing the

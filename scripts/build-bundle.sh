@@ -18,23 +18,23 @@ cp "$wheel" "$bundle/"
 cp MODEL.md "$bundle/"
 cat > "$bundle/pyproject.toml" <<PY
 [project]
-name = "dejaview-tools-provisioning"
+name = "squint-tools-provisioning"
 version = "$version"
 requires-python = ">=3.12"
-dependencies = ["dejaview-tools==$version"]
+dependencies = ["squint-tools==$version"]
 
 [tool.uv]
 package = false
 
 [tool.uv.sources]
-dejaview-tools = { path = "$wheel_name" }
+squint-tools = { path = "$wheel_name" }
 PY
 (cd "$bundle" && uv lock --quiet)
 python3 - "$bundle" "$version" <<'PY'
 import hashlib, pathlib, sys
 bundle = pathlib.Path(sys.argv[1]); version = sys.argv[2]
-lines = ["[bundle]", 'package = "dejaview-tools"', f'version = "{version}"', 'python = ">=3.12"',
-         'executable = ".venv/bin/dejaview-tools"', "", "[bundle.files]"]
+lines = ["[bundle]", 'package = "squint-tools"', f'version = "{version}"', 'python = ">=3.12"',
+         'executable = ".venv/bin/squint-tools"', "", "[bundle.files]"]
 for f in sorted(p for p in bundle.iterdir() if p.name != "bundle.toml"):
     lines.append(f'"{f.name}" = "{hashlib.sha256(f.read_bytes()).hexdigest()}"')
 (bundle / "bundle.toml").write_text("\n".join(lines) + "\n")

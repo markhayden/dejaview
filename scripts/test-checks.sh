@@ -11,14 +11,14 @@ if CRATE_GRAPH_FILE="$empty" scripts/check-crate-graph.sh >/dev/null 2>&1; then
 else pass=$((pass+1)); fi
 
 # crate graph: one removed edge must fail and name it.
-one="$(mktemp)"; grep -v 'dejaview-eval -> dejaview-providers' scripts/crate-graph.txt > "$one"
+one="$(mktemp)"; grep -v 'squint-eval -> squint-providers' scripts/crate-graph.txt > "$one"
 out="$(CRATE_GRAPH_FILE="$one" scripts/check-crate-graph.sh 2>&1 || true)"
-if grep -q 'unexpected prod edge: dejaview-eval -> dejaview-providers' <<< "$out"; then pass=$((pass+1));
+if grep -q 'unexpected prod edge: squint-eval -> squint-providers' <<< "$out"; then pass=$((pass+1));
 else echo "FAIL: crate-graph check did not name the missing edge" >&2; fail=$((fail+1)); fi
 rm -f "$empty" "$one"
 
 # check-filter: a filter that selects nothing must fail; an unknown package must fail loudly.
-if scripts/check-filter.sh dejaview-core no_such_test_name >/dev/null 2>&1; then
+if scripts/check-filter.sh squint-core no_such_test_name >/dev/null 2>&1; then
   echo "FAIL: check-filter accepted an empty selection" >&2; fail=$((fail+1)); else pass=$((pass+1)); fi
 if scripts/check-filter.sh no-such-package foo >/dev/null 2>&1; then
   echo "FAIL: check-filter accepted an unknown package" >&2; fail=$((fail+1)); else pass=$((pass+1)); fi
@@ -41,22 +41,22 @@ if CRATE_DIRS="$probe/crate" scripts/check-packaging.sh >/dev/null 2>&1; then pa
 else echo "FAIL: check-packaging rejected a packaged asset" >&2; fail=$((fail+1)); fi
 rm -rf "$probe"
 
-# archive-smoke: an archive with no dejaview binary must fail and say so; a bad checksum file must
+# archive-smoke: an archive with no squint binary must fail and say so; a bad checksum file must
 # fail before anything is unpacked.
-probe="$(mktemp -d)"; mkdir -p "$probe/dejaview-x"; printf 'readme\n' > "$probe/dejaview-x/README.md"
-tar cJf "$probe/dejaview-x.tar.xz" -C "$probe" dejaview-x
-out="$(scripts/archive-smoke.sh "$probe/dejaview-x.tar.xz" 2>&1 || true)"
-if grep -q 'no dejaview binary inside' <<< "$out"; then pass=$((pass+1));
+probe="$(mktemp -d)"; mkdir -p "$probe/squint-x"; printf 'readme\n' > "$probe/squint-x/README.md"
+tar cJf "$probe/squint-x.tar.xz" -C "$probe" squint-x
+out="$(scripts/archive-smoke.sh "$probe/squint-x.tar.xz" 2>&1 || true)"
+if grep -q 'no squint binary inside' <<< "$out"; then pass=$((pass+1));
 else echo "FAIL: archive-smoke accepted an archive without the binary: $out" >&2; fail=$((fail+1)); fi
-printf '%s  dejaview-x.tar.xz\n' "$(printf '0%.0s' $(seq 64))" > "$probe/dejaview-x.tar.xz.sha256"
-out="$(scripts/archive-smoke.sh "$probe/dejaview-x.tar.xz" 2>&1 || true)"
+printf '%s  squint-x.tar.xz\n' "$(printf '0%.0s' $(seq 64))" > "$probe/squint-x.tar.xz.sha256"
+out="$(scripts/archive-smoke.sh "$probe/squint-x.tar.xz" 2>&1 || true)"
 if grep -q 'checksum mismatch' <<< "$out"; then pass=$((pass+1));
 else echo "FAIL: archive-smoke accepted a wrong checksum: $out" >&2; fail=$((fail+1)); fi
 rm -rf "$probe"
 
 # check-packaging: the shipped assets are listed as embedded by the crates that own them.
 out="$(scripts/check-packaging.sh 2>&1)"
-for want in "dejaview-core: embeds .*prompts/v1.md" "dejaview-core: embeds .*rules/source-fidelity.toml" "dejaview-providers: embeds catalog.toml" "dejaview-cli: embeds viewer/geometry.js, viewer/index.html, viewer/viewer.css, viewer/viewer.js"; do
+for want in "squint-core: embeds .*prompts/v1.md" "squint-core: embeds .*rules/source-fidelity.toml" "squint-providers: embeds catalog.toml" "squint-cli: embeds viewer/geometry.js, viewer/index.html, viewer/viewer.css, viewer/viewer.js"; do
   if grep -Eq "$want" <<< "$out"; then pass=$((pass+1));
   else echo "FAIL: check-packaging did not list '$want': $out" >&2; fail=$((fail+1)); fi
 done
@@ -65,10 +65,10 @@ done
 # credential must fail, one that prints no SF1 from `rules show` must fail, and one whose
 # `report view` serves nothing must fail.
 probe="$(mktemp -d)"
-cat > "$probe/dejaview" <<'STUB'
+cat > "$probe/squint" <<'STUB'
 #!/usr/bin/env bash
 case "$1" in
-  --version) echo "dejaview 0.0.0 (stub)" ;;
+  --version) echo "squint 0.0.0 (stub)" ;;
   tools) ;;
   rules) echo "${STUB_RULES-SF1 must_hold candidate}" ;;
   check) echo "auth: set ANTHROPIC_API_KEY" >&2; exit "${STUB_CHECK_EXIT-64}" ;;
@@ -76,20 +76,20 @@ case "$1" in
     # `report view <dir> --port 0`: serve the directory on loopback and print a URL line, as the
     # binary does; python's server prints its own URL in the same shape.
     [ "${STUB_VIEW-serve}" = serve ] || exit 0
-    echo '<title>dejaview report</title>' > "$3/index.html"
+    echo '<title>squint report</title>' > "$3/index.html"
     exec python3 -I -u -m http.server --bind 127.0.0.1 --directory "$3" 0 ;;
 esac
 STUB
-chmod +x "$probe/dejaview"
-if scripts/offline-smoke.sh "$probe/dejaview" >/dev/null 2>&1; then pass=$((pass+1));
+chmod +x "$probe/squint"
+if scripts/offline-smoke.sh "$probe/squint" >/dev/null 2>&1; then pass=$((pass+1));
 else echo "FAIL: offline-smoke rejected a conforming stub" >&2; fail=$((fail+1)); fi
-out="$(STUB_CHECK_EXIT=3 scripts/offline-smoke.sh "$probe/dejaview" 2>&1 || true)"
+out="$(STUB_CHECK_EXIT=3 scripts/offline-smoke.sh "$probe/squint" 2>&1 || true)"
 if grep -q 'expected exit 64' <<< "$out"; then pass=$((pass+1));
 else echo "FAIL: offline-smoke accepted exit 3 on the missing credential: $out" >&2; fail=$((fail+1)); fi
-out="$(STUB_RULES="nothing" scripts/offline-smoke.sh "$probe/dejaview" 2>&1 || true)"
+out="$(STUB_RULES="nothing" scripts/offline-smoke.sh "$probe/squint" 2>&1 || true)"
 if grep -q 'did not print the shipped base' <<< "$out"; then pass=$((pass+1));
 else echo "FAIL: offline-smoke accepted a rules show without SF1: $out" >&2; fail=$((fail+1)); fi
-out="$(STUB_VIEW=none scripts/offline-smoke.sh "$probe/dejaview" 2>&1 || true)"
+out="$(STUB_VIEW=none scripts/offline-smoke.sh "$probe/squint" 2>&1 || true)"
 if grep -q 'printed no URL' <<< "$out"; then pass=$((pass+1));
 else echo "FAIL: offline-smoke accepted a report view that serves nothing: $out" >&2; fail=$((fail+1)); fi
 rm -rf "$probe"

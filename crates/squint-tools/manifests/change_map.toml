@@ -1,0 +1,42 @@
+# The built-in change map tool (SPEC "Transports", task 4.3c).
+[tool]
+name = "change_map"
+version = "1.0.0"
+purpose = "Shows where two frames in one grid differ in structure: a grey map, bright where the locally normalised luminance disagrees, dark where it agrees."
+when_to_use = "After align, over the aligned candidate and the source, to see at a glance where the picture changed before looking closer with view."
+when_not_to_use = "Between frames that are not in one grid; everything would light up."
+output_guidance = "The map is a pointer, not a verdict: bright areas are where to look, and a uniform tone or colour change leaves the map dark. Inspect bright areas with view before deciding."
+cost = { tier = "cheap", seconds = 1.0 }
+requires = ["align"]
+frame_args = ["frame", "against"]
+returns = { max_images = 1, max_long_edge = 1024, max_image_bytes = 2_000_000, max_summary_bytes = 2048, max_regions = 0, max_region_label_bytes = 0, max_measurements = 1, max_transforms = 0, max_envelope_bytes = 3_000_000 }
+frames_out = ["crop"]
+preconditions = "`frame` and `against` share one grid; the map is drawn in `frame`'s coordinates."
+
+[tool.model_schema]
+type = "object"
+additionalProperties = false
+required = ["frame", "against"]
+[tool.model_schema.properties.frame]
+type = "string"
+description = "The frame whose grid the map is drawn in, for example raw:source."
+[tool.model_schema.properties.against]
+type = "string"
+description = "The frame to compare it with, for example aligned:candidate:t1."
+
+[tool.input_schema]
+type = "object"
+additionalProperties = false
+required = ["frame", "against", "_squint"]
+[tool.input_schema.properties.frame]
+type = "string"
+[tool.input_schema.properties.against]
+type = "string"
+[tool.input_schema.properties._squint]
+type = "object"
+
+[tool.output_schema]
+type = "object"
+[tool.output_schema.properties.measurements]
+type = "array"
+description = "changed_fraction (ratio): the share of pixels whose normalised luminance differs by more than one unit."

@@ -1,4 +1,4 @@
-"""The ``_dejaview`` context: images and frames with pixels by path and inline."""
+"""The ``_squint`` context: images and frames with pixels by path and inline."""
 
 import base64
 import io
@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from dejaview_tools.context import Context, ContextError
+from squint_tools.context import Context, ContextError
 
 
 def png_bytes(width, height, value):

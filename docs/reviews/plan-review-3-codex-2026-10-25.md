@@ -7,7 +7,7 @@
 | 1 | Seal does not protect the complete experiment | **Resolves.** Task 3.1 binds membership, families, canonical jobs, images, rules and external labels, with mutation tests. Task 5.5 correctly distinguishes owner attestation from supporting journal searches. |
 | 2 | Incomplete resume identity and crash recovery | **Resolves.** Task 3.4a matches the edited spec: resolved execution descriptor, single writer, durable holds before sends, conservative recovery, settlement at most once and retained errors. |
 | 3 | Estimator contradicts per-decision admission | **Resolves.** Task 3.4c now warns rather than refuses and compares individual estimates with individual reservations. Its acceptance explicitly permits completion when the envelope sum exceeds the cap. |
-| 4 | Package identity and fake-provider build path contradict each other | **Resolves.** CLI selectors consistently use `-p dejaview`, and the optional dependency/non-default feature is explicit. That choice introduces a publication dependency addressed below. |
+| 4 | Package identity and fake-provider build path contradict each other | **Resolves.** CLI selectors consistently use `-p squint-cli`, and the optional dependency/non-default feature is explicit. That choice introduces a publication dependency addressed below. |
 | 5 | Impossible execution orders and inconsistent dependencies | **Partly resolves.** Adapter recording dependencies, checklist prerequisites and the principal M1 scenarios are corrected. The graph still contradicts task lists, and the revised admission, packaging and estimator tasks retain ordering problems. |
 | 6 | Admission rules lack reproducible verification | **Resolves.** Tasks 1.15, 3.4b and 3.5a/b now assign reproducibility fixtures, arm construction, repetition-1 scoring and gate outcome tables. |
 | 7 | Confirmation lacks a distinct state; scoring commits publication | **Resolves.** Initial and confirmation stages, linked receipts, configuration equality, disjoint confirmation families and confirmed-only arm D now match the spec. Publication produces reviewable files and never commits automatically. |
@@ -24,9 +24,9 @@
 
    **Section:** Crate dependency graph; 0.1; 2.10a.
 
-   **Why:** The CLI now has a normal optional dependency on `dejaview-testkit`, but the publication sequence omits that package. Disabling the feature does not remove the dependency from Cargo’s package-resolution obligations. Separately, successive per-crate `cargo publish --dry-run` calls do not upload preceding dependencies, so ordering those calls does not establish a working first publication. [Cargo dependency resolution](https://doc.rust-lang.org/cargo/reference/resolver.html#features), [Cargo publish](https://doc.rust-lang.org/cargo/commands/cargo-publish.html).
+   **Why:** The CLI now has a normal optional dependency on `squint-testkit`, but the publication sequence omits that package. Disabling the feature does not remove the dependency from Cargo’s package-resolution obligations. Separately, successive per-crate `cargo publish --dry-run` calls do not upload preceding dependencies, so ordering those calls does not establish a working first publication. [Cargo dependency resolution](https://doc.rust-lang.org/cargo/reference/resolver.html#features), [Cargo publish](https://doc.rust-lang.org/cargo/commands/cargo-publish.html).
 
-   **Concrete change:** Add `dejaview-testkit` after `core` in the publication dependency order and check ownership/availability of every published package name in 0.1. Replace independent per-crate dry runs with a workspace publication dry run supported by the pinned Cargo version; stage packaged dependencies in a temporary registry for the clean installation test. Add a final acceptance step after owner publication: “From outside the repository, `cargo install dejaview --version <released-version> --locked` succeeds and passes the ordinary-release smoke.”
+   **Concrete change:** Add `squint-testkit` after `core` in the publication dependency order and check ownership/availability of every published package name in 0.1. Replace independent per-crate dry runs with a workspace publication dry run supported by the pinned Cargo version; stage packaged dependencies in a temporary registry for the clean installation test. Add a final acceptance step after owner publication: “From outside the repository, `cargo install squint-cli --version <released-version> --locked` succeeds and passes the ordinary-release smoke.”
 
 2. **[major] The mandatory checks do not explicitly run the feature-gated CLI suite**
 
@@ -34,7 +34,7 @@
 
    **Why:** Individual CLI verification commands enable `testkit`, but the mandatory commit/checkpoint command remains `cargo test --workspace`; `just check-scripted` is mentioned without being made part of `just check`. Default tests can consequently skip feature-required targets—or fail if those tests unconditionally expect scripted flags. A feature-enabled walking-slice executable also cannot itself prove feature-off rejection. [Cargo feature selection](https://doc.rust-lang.org/cargo/commands/cargo-test.html#feature-selection), [Required features on targets](https://doc.rust-lang.org/cargo/reference/cargo-targets.html#the-required-features-field).
 
-   **Concrete change:** Require `just check` and CI to run both `cargo test --workspace` and `cargo test --workspace --features dejaview/testkit`, plus feature-enabled Clippy. Build the feature-off release executable separately and test flag rejection against that executable. Declare permitted dev-dependency edges separately from production edges, check the graph with all features enabled, and require named filtered suites to enumerate and execute at least one test.
+   **Concrete change:** Require `just check` and CI to run both `cargo test --workspace` and `cargo test --workspace --features squint-cli/testkit`, plus feature-enabled Clippy. Build the feature-off release executable separately and test flag rejection against that executable. Declare permitted dev-dependency edges separately from production edges, check the graph with all features enabled, and require named filtered suites to enumerate and execute at least one test.
 
 3. **[major] The runner consumes an admission contract defined by its own downstream task**
 
@@ -72,9 +72,9 @@
 
    **Section:** 1.13; 4.4b.
 
-   **Why:** The CLI scenario launches `dejaview-testkit-mcp`, while the listed source path `src/bin/mcp.rs` would ordinarily produce a binary named `mcp` unless its target name is configured. `cargo test -p dejaview-tools` does not establish that a separate dependency package’s executable is built and available on `PATH`. This makes the advertised standalone verification dependent on an unexplained previous build. [Cargo targets](https://doc.rust-lang.org/cargo/reference/cargo-targets.html).
+   **Why:** The CLI scenario launches `squint-testkit-mcp`, while the listed source path `src/bin/mcp.rs` would ordinarily produce a binary named `mcp` unless its target name is configured. `cargo test -p squint-tools` does not establish that a separate dependency package’s executable is built and available on `PATH`. This makes the advertised standalone verification dependent on an unexplained previous build. [Cargo targets](https://doc.rust-lang.org/cargo/reference/cargo-targets.html).
 
-   **Concrete change:** Declare `[[bin]] name = "dejaview-testkit-mcp"` with `path = "src/bin/mcp.rs"`. Add a test helper that builds that target, obtains its absolute executable path from Cargo’s JSON output and supplies it to the MCP fixtures. Invoke that helper from the standalone MCP verification and standard checks.
+   **Concrete change:** Declare `[[bin]] name = "squint-testkit-mcp"` with `path = "src/bin/mcp.rs"`. Add a test helper that builds that target, obtains its absolute executable path from Cargo’s JSON output and supplies it to the MCP fixtures. Invoke that helper from the standalone MCP verification and standard checks.
 
 8. **[minor] Scanner exemptions now permit arbitrary credentials in exempted files**
 

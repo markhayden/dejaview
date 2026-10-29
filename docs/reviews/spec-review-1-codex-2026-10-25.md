@@ -190,7 +190,7 @@
 
     **Section:** “Commands,” “Testing strategy,” and “Tech stack,” approximately lines 601–604, 621, and 723–742.
 
-    **Why:** Replaying one recorded fixture per adapter cannot validate every model capability and endpoint preset promised by the spec. Byte-identical request testing needs a rule for dynamic authentication, timestamps, and signatures. Ordinary Python tests are documented to download weights, while the testing boundary says no test accesses the network without `DEJAVIEW_LIVE=1`. The private segmenter export also lacks a specified public artifact, license record, and reproducibility contract.
+    **Why:** Replaying one recorded fixture per adapter cannot validate every model capability and endpoint preset promised by the spec. Byte-identical request testing needs a rule for dynamic authentication, timestamps, and signatures. Ordinary Python tests are documented to download weights, while the testing boundary says no test accesses the network without `SQUINT_LIVE=1`. The private segmenter export also lacks a specified public artifact, license record, and reproducibility contract.
 
     **Concrete change:** Define fixtures by supported model-capability/backend combination, compare canonical requests after excluding explicitly identified volatile fields, and include full image/tool/repair conversations. Separate artifact fetching from offline tests. Require the segmenter’s immutable artifact hash, license/provenance record, preprocessing version, runtime/execution provider, and determinism or tolerance guarantees before its milestone can begin.
 

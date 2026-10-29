@@ -1,10 +1,10 @@
 <p align="center">
-  <img src=".github/assets/logo.png" alt="dejaview" width="320" />
+  <img src=".github/assets/logo.png" alt="squint" width="320" />
 </p>
 
 <p align="center"><strong>Because "looks good to me" doesn't scale.</strong></p>
 
-dejaview is an agentic harness for evaluating the integrity of images. You give it an image to
+squint is an agentic harness for evaluating the integrity of images. You give it an image to
 check, whatever it should be checked against (a source photo, a reference subject, a brief),
 and the rules that matter. A vision model works through the question with a set of tools,
 then returns a verdict you can check: `pass`, `fail` or `unsure`, what it found, where it is
@@ -19,7 +19,7 @@ and neither explains itself.
 
 Asking a vision model "does this look right?" gets you part of the way. It is good at
 deciding whether a change matters and bad at noticing small ones: a logo nudged a few pixels,
-a spot that went missing, a sixth finger in a crowd. dejaview gives the model
+a spot that went missing, a sixth finger in a crowd. squint gives the model
 tools for exactly that, and makes it show its work.
 
 ## What it checks
@@ -48,7 +48,7 @@ rules and back with tools.
 
 You describe a **job**: the candidate image, the images it should be judged against (a source
 photo, one or more reference subjects), the use case, and any requirements of your own in plain
-language. dejaview turns the rules for that use case and your requirements into a numbered list
+language. squint turns the rules for that use case and your requirements into a numbered list
 of **obligations**, each resolved to the image it judges, and builds a **checklist** the model
 must answer item by item.
 
@@ -83,7 +83,7 @@ against recorded fixtures. The harness core (milestones M0 and M1) runs a job en
 scripted provider: rules, checklist, tool turns, repairs, ledger, journal, report, cache, and the
 MCP transport with a provisioned pack; the three direct provider adapters (Anthropic, Google AI
 Studio, OpenAI) are written against recorded conversations and smoked live from the release
-archives (milestone M2). Install with `cargo install dejaview` or from a release archive, copy a
+archives (milestone M2). Install with `cargo install squint-cli` or from a release archive, copy a
 config from [`examples/`](examples/) and set the one environment variable it names.
 
 What has been measured so far, every number with its interval under
@@ -107,9 +107,14 @@ each milestone: [`docs/reviews/`](docs/reviews/). Developer setup: [`docs/bootst
 
 ## Origins
 
-dejaview grew out of [Pixel](https://github.com/markhayden/bakin-bits-official/tree/main/agents/pixel),
+squint grew out of [Pixel](https://github.com/markhayden/bakin-bits-official/tree/main/agents/pixel),
 the image-artist agent for [Bakin](https://github.com/markhayden/bakin), where generating
 images turned out to be the easy half and knowing whether they were right was the hard one.
+
+The project was called dejaview until 2026-10-29. The five library crates published to
+crates.io under that name (`dejaview-core` and its siblings, 0.1.0) are superseded by the
+`squint-*` crates and yanked; the results documents and receipts written before the rename keep
+the old name, because their hashes cover it.
 
 ## License
 

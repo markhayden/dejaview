@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from dejaview_tools import cli, models
+from squint_tools import cli, models
 
 
 def test_the_shipped_record_names_the_segmenter_and_its_goldens():
@@ -13,7 +13,7 @@ def test_the_shipped_record_names_the_segmenter_and_its_goldens():
     assert record.artifact == "eomt-large-ade20k-512.onnx"
     assert len(record.files) == 5
     assert record.release_url(record.artifact).startswith(
-        "https://github.com/markhayden/dejaview/releases/download/segmenter-v1/"
+        "https://github.com/markhayden/squint/releases/download/segmenter-v1/"
     )
     assert record.data["tolerance"] == {"class": 1e-3, "mask": 1e-2, "label_disagreement": 1e-3}
 
@@ -67,9 +67,9 @@ def test_the_cli_reports_a_refusal(tmp_path, capsys, monkeypatch):
 
 def test_the_models_directory_follows_xdg(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
-    assert models.models_dir() == tmp_path / "dejaview" / "models"
+    assert models.models_dir() == tmp_path / "squint" / "models"
     record = models.Record("fake-v1", json.loads('{"artifact": "m.onnx", "sha256": "0"}'))
-    assert models.artifact_path(record) == tmp_path / "dejaview" / "models" / "fake-v1" / "m.onnx"
+    assert models.artifact_path(record) == tmp_path / "squint" / "models" / "fake-v1" / "m.onnx"
 
 
 def test_a_source_that_is_neither_a_directory_nor_a_url_is_refused_and_nothing_is_left(tmp_path):

@@ -12,7 +12,7 @@ wheels = [
 ]
 
 [[package]]
-name = "dejaview-tools"
+name = "squint-tools"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [

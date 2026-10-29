@@ -84,13 +84,13 @@
 
    **Concrete change:** Add: “The journal is append-only; provider conversation history contains only replayable turns. Complete rejected calls receive native error outputs before repair. A partial, non-replayable turn is journaled but excluded from the next provider request; consume the single repair by reissuing from the preceding valid history under an adapter-specific, fixture-tested policy. Predeclare and reserve any larger repair output allowance. Repair after the final turn remains submission-only. Missing Gemini call IDs are accepted only by explicitly cataloged legacy contracts.”
 
-6. **[major] `_dejaview` injection lacks a compatible MCP schema and error contract**
+6. **[major] `_squint` injection lacks a compatible MCP schema and error contract**
 
    **Section:** “Manifest” and “Transports,” approximately lines 867–871 and 895–909.
 
-   **Why:** The same input schema is described as both the model tool definition and native MCP `inputSchema`, but Rust subsequently injects `_dejaview`. A closed schema without that property rejects the actual MCP call; a required property exposes transport metadata and paths to the model unless a projection removes it. The draft also does not define precedence between MCP `isError`/JSON-RPC errors and envelope `status`, allowing conflicting success and failure signals. MCP documents input validation, structured output schemas, and two distinct error channels in its [tools specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools).
+   **Why:** The same input schema is described as both the model tool definition and native MCP `inputSchema`, but Rust subsequently injects `_squint`. A closed schema without that property rejects the actual MCP call; a required property exposes transport metadata and paths to the model unless a projection removes it. The draft also does not define precedence between MCP `isError`/JSON-RPC errors and envelope `status`, allowing conflicting success and failure signals. MCP documents input validation, structured output schemas, and two distinct error channels in its [tools specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools).
 
-   **Concrete change:** Add: “MCP `inputSchema` validates the complete arguments including required `_dejaview`; a versioned model-schema projection removes harness-owned fields. The harness rejects model attempts to supply those fields and injects them only after model-argument validation. Native `outputSchema` describes the complete envelope. Conflicting `isError` and envelope status is `error: tool`; only a documented `invalid_args` mapping is recoverable. Require exact image-block count/order/media-type correspondence, including an empty `content` array when no blocks exist.”
+   **Concrete change:** Add: “MCP `inputSchema` validates the complete arguments including required `_squint`; a versioned model-schema projection removes harness-owned fields. The harness rejects model attempts to supply those fields and injects them only after model-argument validation. Native `outputSchema` describes the complete envelope. Conflicting `isError` and envelope status is `error: tool`; only a documented `invalid_args` mapping is recoverable. Require exact image-block count/order/media-type correspondence, including an empty `content` array when no blocks exist.”
 
 7. **[major] The MCP image envelope cannot deliver the aligned inputs required by the first ML tool**
 
@@ -98,7 +98,7 @@
 
    **Why:** `regions` requires an aligned frame produced by the Rust `align` tool. The injected MCP envelope supplies canonical PNGs and image metadata, but no transform registry, selected transform, or derived-frame handle. The Python process therefore cannot identify or reproduce the alignment that satisfied its precondition. Having an aligned frame somewhere in Rust’s registry does not make it available to a separate process.
 
-   **Concrete change:** Add: “Calls requiring derived frames name the exact frame IDs. `_dejaview` includes their canonical parents, complete transform chains and parameters, and either lossless derived pixels or the versioned information needed to reproduce them. Preconditions identify the selected frame explicitly; multiple eligible alignments are never resolved by implicit ‘latest’ state. Both transports receive equivalent frame inputs.”
+   **Concrete change:** Add: “Calls requiring derived frames name the exact frame IDs. `_squint` includes their canonical parents, complete transform chains and parameters, and either lossless derived pixels or the versioned information needed to reproduce them. Preconditions identify the selected frame explicitly; multiple eligible alignments are never resolved by implicit ‘latest’ state. Both transports receive equivalent frame inputs.”
 
 8. **[major] Shared MCP reset can corrupt concurrent or supposedly independent runs**
 
@@ -136,7 +136,7 @@
 
     **Section:** “Python tool pack” and “Commands,” approximately lines 923–935 and 1135–1140.
 
-    **Why:** `uv tool install dejaview-tools==<version>` installs a package into uv’s tool environment; it does not automatically consume that package’s repository `uv.lock` or create the specified dejaview version directory. Consequently, recording a lock digest would not prove that the installed dependencies match it. uv documents tool installation separately from project lock synchronization; ordinary `uv run` can also synchronize before running tests. See [uv tool installation](https://docs.astral.sh/uv/reference/cli/#uv-tool-install) and [locking and syncing](https://docs.astral.sh/uv/concepts/projects/sync/).
+    **Why:** `uv tool install squint-tools==<version>` installs a package into uv’s tool environment; it does not automatically consume that package’s repository `uv.lock` or create the specified squint version directory. Consequently, recording a lock digest would not prove that the installed dependencies match it. uv documents tool installation separately from project lock synchronization; ordinary `uv run` can also synchronize before running tests. See [uv tool installation](https://docs.astral.sh/uv/reference/cli/#uv-tool-install) and [locking and syncing](https://docs.astral.sh/uv/concepts/projects/sync/).
 
     **Concrete change:** Replace setup with: “Distribute a versioned provisioning bundle containing `pyproject.toml`, `uv.lock`, the tool package, and their digests. Setup verifies the bundle and runs `uv sync --frozen --no-dev` in its version-specific directory using the declared Python version, then fetches model artifacts. Runtime launches that environment’s executable directly. Offline development checks use the provisioned environment or `uv run --frozen --offline --no-sync`; absent dependencies fail without downloading.”
 

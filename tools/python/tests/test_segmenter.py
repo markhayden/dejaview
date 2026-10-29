@@ -1,7 +1,7 @@
 """Parity of the fetched segmenter against the published goldens, within the recorded tolerance.
 
-These tests need the artifact and goldens that `dejaview-tools fetch` places under the models
-directory (`DEJAVIEW_MODELS` points at another directory); without them they are skipped and
+These tests need the artifact and goldens that `squint-tools fetch` places under the models
+directory (`SQUINT_MODELS` points at another directory); without them they are skipped and
 say so. They are marked `segmenter`.
 """
 
@@ -11,15 +11,15 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from dejaview_tools import models, segmenter
+from squint_tools import models, segmenter
 
-MODELS = Path(os.environ["DEJAVIEW_MODELS"]) if os.environ.get("DEJAVIEW_MODELS") else None
+MODELS = Path(os.environ["SQUINT_MODELS"]) if os.environ.get("SQUINT_MODELS") else None
 RECORD = models.Record.load()
 PRESENT = all((models.artifact_path(RECORD, MODELS).parent / f).is_file() for f in RECORD.files)
 
 needs_model = pytest.mark.skipif(
     not PRESENT,
-    reason=f"the segmenter and its goldens are not under {models.artifact_path(RECORD, MODELS).parent}: run `dejaview-tools fetch`",
+    reason=f"the segmenter and its goldens are not under {models.artifact_path(RECORD, MODELS).parent}: run `squint-tools fetch`",
 )
 
 

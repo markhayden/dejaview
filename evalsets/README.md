@@ -1,8 +1,8 @@
 # Evaluation sets
 
 The manifests, jobs, families and confirmed labels of the public sets (docs/evalsets.md). Images
-live in [dejaview-evalsets](https://github.com/markhayden/dejaview-evalsets) and are placed here
-by `dejaview sets fetch --set <id>`; `dejaview sets check evalsets/` checks everything that is
+live in [squint-evalsets](https://github.com/markhayden/squint-evalsets) and are placed here
+by `squint sets fetch --set <id>`; `squint sets check evalsets/` checks everything that is
 checkable by code, and each set's `seal.toml` binds its content to the owner's attestation.
 
 | Set | Split | Items | Families | Generators | Failure types | Reviewed |

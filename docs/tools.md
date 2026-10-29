@@ -9,7 +9,7 @@ Every tool describes itself once, in a manifest (`schemas/manifest-v1.json`): na
 purpose and guidance text, cost tier, dependencies, which arguments take image ids and frame ids,
 the evidence kind its regions carry, the bounds its results stay within (`returns`), the
 evaluation projections it supports (`projections`), and three schemas: the model schema (what the provider receives), the input schema (the model schema plus
-the required `_dejaview` object the harness injects), and the output schema. `manifest_version`
+the required `_squint` object the harness injects), and the output schema. `manifest_version`
 defaults to the current version and is validated. `fixtures/tools/regions.toml` is the example.
 
 ## Envelope
@@ -35,17 +35,17 @@ takes the projections from the arm (`align:visual_only` in the descriptor's sele
 
 ## Context injection
 
-After validating the model's arguments against the model schema (no `_dejaview`, no unknown
+After validating the model's arguments against the model schema (no `_squint`, no unknown
 keys, required keys present), the harness resolves image and frame arguments through its frame
-registry and injects `_dejaview`: run and call ids, the named images with their lossless pixels by
+registry and injects `_squint`: run and call ids, the named images with their lossless pixels by
 path under the run directory, the named frames with their transform chains, and the rules' hints
 for the tool. An id that is not in the registry, such as a path, is an unknown id and never
 touches the filesystem.
 
 ## Transports
 
-**Built-in (in-process Rust).** `Tool` implementations in `crates/dejaview-tools/src/builtin/`,
-manifests embedded from `crates/dejaview-tools/manifests/`, listed by `dejaview tools list`. A pack
+**Built-in (in-process Rust).** `Tool` implementations in `crates/squint-tools/src/builtin/`,
+manifests embedded from `crates/squint-tools/manifests/`, listed by `squint tools list`. A pack
 tool of the same name takes the built-in's place (packs are registered first). Shipped so far:
 
 - `view` (`frame`, optional `also`; either `bbox` or `yaw`, `pitch` and `fov`): a crop of a frame
@@ -53,7 +53,7 @@ tool of the same name takes the built-in's place (packs are registered first). S
   and scaled to a 1024 px long edge when larger; or a square perspective view into an
   equirectangular frame, sized to the panorama's own resolution over the field of view between
   256 and 1024 px, rendered by inverse-mapping every pixel to the sphere and sampling the panorama
-  across the seam (`dejaview_core::frames::sphere`). `also` repeats the same region in a second
+  across the seam (`squint_core::frames::sphere`). `also` repeats the same region in a second
   frame of the same projection. Boxes under 8 px, angles on a flat frame, both forms at once, or
   `fov` outside 10 to 120 are `invalid_args`. Returned frames are `crop:<call>:<n>` with the
   mapping the registry maps locations through: a box on a view frame becomes the polygon of its
@@ -84,7 +84,7 @@ tool of the same name takes the built-in's place (packs are registered first). S
   more than one unit. Bright where structure changed, dark under a uniform tone or colour change.
   Requires `align`.
 
-The alignment estimators behind `align` are in place (`dejaview_tools::align`, ADR 0014): `align_flat` returns
+The alignment estimators behind `align` are in place (`squint_tools::align`, ADR 0014): `align_flat` returns
 the homography from source to candidate pixel coordinates and `align_sphere` the rotation between
 two equirectangular panoramas, each with `overlap`, `ncc`, `inlier_fraction` and `texture` and
 an outcome of `registered`, `low_texture` or `not_registered`. Direct registration on locally
@@ -93,17 +93,17 @@ measured within 0.05 px and 0.01° at 2048 px on synthetic scenes with exact gro
 refusing unrelated, textureless, mirrored, quarter-turned and barely overlapping pairs
 (`fixtures/images/align/`).
 
-**MCP over stdio, revision 2025-11-25** (`crates/dejaview-tools/src/mcp/`). The client is
+**MCP over stdio, revision 2025-11-25** (`crates/squint-tools/src/mcp/`). The client is
 synchronous like the `Tool` trait. On connect it spawns the server with the environment allowlist
 (`PATH`, `HOME`, the locale, the pack's declared variables minus every credential name), sends
 `initialize` and requires exactly `2025-11-25` and the `tools` capability (otherwise
 `error: resolve`), sends `notifications/initialized`, lists tools following `nextCursor`, and
 freezes the manifests: each tool's `name`, `inputSchema` and `outputSchema` from the native
-fields, the rest from a `dejaview` object in its annotations, with `description` equal to
+fields, the rest from a `squint` object in its annotations, with `description` equal to
 `purpose`.
 
 A pack serves one run at a time under a lease. A run acquires the lease before its first call,
-within `startup_timeout_s`, one deadline for everything: `dejaview/reset` and its acknowledgement
+within `startup_timeout_s`, one deadline for everything: `squint/reset` and its acknowledgement
 (after which no prior-run state survives), or, when the server answers method-not-found, hangs, or
 is tainted, shutdown and a restart whose tool list must equal the frozen one. A call runs under
 `budget.tool_timeout_s`; past it the client sends `notifications/cancelled`, tombstones the id so
@@ -135,8 +135,8 @@ escalation, and two runs contending for one pack.
 
 ## Writing a tool, with `view` as the example
 
-A built-in is a Rust type implementing `dejaview_core::tool::Tool` in
-`crates/dejaview-tools/src/builtin/`, registered in `builtin::all()`. `view`
+A built-in is a Rust type implementing `squint_core::tool::Tool` in
+`crates/squint-tools/src/builtin/`, registered in `builtin::all()`. `view`
 (`builtin/view.rs`, manifest `manifests/view.toml`) shows every part:
 
 1. **The manifest** is a TOML file embedded with `include_str!` and parsed once in `new()`. It
@@ -147,7 +147,7 @@ A built-in is a Rust type implementing `dejaview_core::tool::Tool` in
    how the prompt names the picture); bounds what the
    tool may return (`returns`); names the frames it makes (`frames_out`) and the projections it
    supports (`projections`); and gives the model schema (what the provider sees, closed, with a
-   description per argument), the input schema (the model schema plus `_dejaview`) and the output
+   description per argument), the input schema (the model schema plus `_squint`) and the output
    schema (the measurement names and units it may report). `view` takes `frame`, an optional
    `also`, and either `bbox` or `yaw`, `pitch` and `fov`.
 2. **Arguments** arrive validated against the model schema's required keys and closed shape; the
@@ -166,21 +166,21 @@ A built-in is a Rust type implementing `dejaview_core::tool::Tool` in
    `aligned:<image>:<transform>` after a transform in the same envelope. The harness checks every
    bound in `returns`, stores the envelope, registers the frames, shows the model the images and
    maps any location drawn in them back to the root image.
-5. **Tests** live in `crates/dejaview-tools/tests/`: the tool called directly with a context
-   built from synthetic images (`dejaview_testkit::images`), its outputs checked against what the
+5. **Tests** live in `crates/squint-tools/tests/`: the tool called directly with a context
+   built from synthetic images (`squint_testkit::images`), its outputs checked against what the
    maths says (a crop equals the region it cuts; a perspective view matches the analytic view of
    the same scene and a stored golden), its refusals checked one by one, and one run through
    `run::check` with a scripted provider showing the frame in the report and a finding on it
    mapped back to the root.
 
 An MCP tool is the same contract over stdio: the manifest's fields travel in the tool listing's
-`dejaview` annotation, the context arrives as `_dejaview`, and the envelope comes back as
+`squint` annotation, the context arrives as `_squint`, and the envelope comes back as
 `structuredContent` with the images as content blocks.
 
 ## The Python pack and its provisioning bundle
 
-`tools/python/` is a uv project (`dejaview-tools`, on numpy, Pillow and onnxruntime) whose
-`dejaview-tools serve` runs the stdio server. `context.py` parses the `_dejaview` the harness
+`tools/python/` is a uv project (`squint-tools`, on numpy, Pillow and onnxruntime) whose
+`squint-tools serve` runs the stdio server. `context.py` parses the `_squint` the harness
 injects into every call (the run and call ids, the images named by `image_args` and the frames
 named by `frame_args`, each with lossless pixels by path under the run directory or inline, and
 the rules' hints) and loads pixels as RGB arrays; a malformed context is a JSON-RPC error, which
@@ -194,10 +194,10 @@ carries three tools: `echo_region`, the transport proof, which places the given 
 as a region and returns the box cut from the named frame (or the image's raw frame) as its one
 image; and `regions` and `classes` below.
 `just python-check` lints and tests the pack offline; `just pack-test` also drives the real
-server from the Rust client (`crates/dejaview-tools/tests/python_pack.rs`: an image and an
+server from the Rust client (`crates/squint-tools/tests/python_pack.rs`: an image and an
 aligned frame by path in, a valid envelope with one image block out) and puts every manifest the
 pack lists through the three adapters' wire transformations beside `submit_verdict`
-(`crates/dejaview-cli/tests/python_pack_manifests.rs`).
+(`crates/squint-cli/tests/python_pack_manifests.rs`).
 
 **`regions`** (`regions.py`, task 5.4a) is the first real tool: where an aligned pair differs, as
 high-recall pointers. It takes two frames in one grid, `frame` (usually the aligned candidate) and
@@ -228,20 +228,20 @@ recorded beside them.
 
 `scripts/build-bundle.sh` (`just bundle`) builds the wheel and assembles
 `tools/python/dist/bundle-<version>/`: the wheel, a provisioning project whose `pyproject.toml`
-pins `dejaview-tools==<version>` by path to that wheel, its `uv.lock`, `MODEL.md`, and
+pins `squint-tools==<version>` by path to that wheel, its `uv.lock`, `MODEL.md`, and
 `bundle.toml` with the SHA-256 of every file, the declared Python and the executable path.
 
-`dejaview tools setup --bundle <dir>` verifies every digest (a mismatch or an unlisted file is
+`squint tools setup --bundle <dir>` verifies every digest (a mismatch or an unlisted file is
 `error: resolve` and nothing is installed), copies the bundle to
-`$XDG_DATA_HOME/dejaview/tools/<package>-<version>/`, verifies the copy, runs
+`$XDG_DATA_HOME/squint/tools/<package>-<version>/`, verifies the copy, runs
 `uv sync --frozen --no-dev --python <declared>` there, and then the installed pack's `fetch`, so
-the model artifacts are in `$XDG_CACHE_HOME/dejaview/models/` before the first run: from the
+the model artifacts are in `$XDG_CACHE_HOME/squint/models/` before the first run: from the
 release the pack's record names, or with `--models-from <dir>` from a directory (the export's
 output before publication); `--no-fetch` skips the step, and a tool that needs the artifact then
 reports it missing. A fetch the pack refuses (a hash mismatch, an unreachable source) fails the
 setup as `error: resolve` with the pack's own words. A pack configured by `package` and
-`version` is then launched as `<dir>/.venv/bin/dejaview-tools serve` with `UV_OFFLINE=1`,
-`UV_PYTHON_DOWNLOADS=never` and the lock digest in `DEJAVIEW_LOCK_DIGEST`, which the pack echoes
+`version` is then launched as `<dir>/.venv/bin/squint-tools serve` with `UV_OFFLINE=1`,
+`UV_PYTHON_DOWNLOADS=never` and the lock digest in `SQUINT_LOCK_DIGEST`, which the pack echoes
 in every envelope's provenance and the harness folds into the cache key (the same manifest from
 a pack whose lock differs is a different tool). Downloading a published bundle by name arrives
 with M6.
@@ -252,16 +252,16 @@ with inline dependencies of its own, checks the export against PyTorch on synthe
 generated from a seed, and writes `record.json`; `MODEL.md` records the licences, the procedure
 and versions, the artifact's SHA-256 (the script reproduces it), the preprocessing version, the
 runtime and execution provider, the parity measured and the tolerance the parity test holds, and
-the release URL the owner publishes the artifact and goldens at. `dejaview-tools fetch` (task
-5.3) downloads the artifact and goldens from it into `$XDG_CACHE_HOME/dejaview/models/`, hashing
+the release URL the owner publishes the artifact and goldens at. `squint-tools fetch` (task
+5.3) downloads the artifact and goldens from it into `$XDG_CACHE_HOME/squint/models/`, hashing
 every byte against the record shipped in the package and keeping nothing that does not match;
 `segmenter.py` loads the artifact with onnxruntime on the CPU and turns its two heads into the
 semantic map, and the `segmenter`-marked parity test holds it to the recorded tolerance on the
-goldens, skipping with the fetch command when they are absent. `dejaview tools setup` runs
+goldens, skipping with the fetch command when they are absent. `squint tools setup` runs
 `fetch` after the sync in task 5.2.
 
 `just provisioning-test` builds the bundle and runs the ignored tests in
-`crates/dejaview-tools/tests/provisioning.rs`: a clean-directory install whose executable
+`crates/squint-tools/tests/provisioning.rs`: a clean-directory install whose executable
 reports the version the lock pins and lists `echo_region`, `regions` and `classes`, an
 `echo_region` call through MCP with its image block, a tampered bundle refused, and a setup that
 fetches the segmenter and goldens from the export's directory into a models cache and refuses a
@@ -270,8 +270,8 @@ the proof that the launch needs none.
 
 ## Testing
 
-`dejaview-testkit` ships `dejaview-testkit-mcp`, a fake server with flags for every misbehaviour
+`squint-testkit` ships `squint-testkit-mcp`, a fake server with flags for every misbehaviour
 the contract guards against (`--protocol-version`, `--no-tools-capability`, `--no-reset`,
 `--hang-reset`, `--slow-call-ms`, `--ignore-stdin-close`, `--envelopes <file>`), and
-`mcp_server::path()` builds and locates it. `cargo test -p dejaview-tools -- mcp::minimal` runs
+`mcp_server::path()` builds and locates it. `cargo test -p squint-tools -- mcp::minimal` runs
 the lifecycle tests.

@@ -2,9 +2,9 @@
 
 The pack's segmenter is an ONNX export made by this project from publicly licensed upstream
 weights (SPEC "Python tool pack", PLAN task 4.6, owner decision 11: nothing from the private
-prototype is used). The pack ships no model: `dejaview-tools fetch` downloads the artifact and
-goldens recorded here into `$XDG_CACHE_HOME/dejaview/models/segmenter-v1/`, hashing every byte
-against the record shipped inside the package (`src/dejaview_tools/models/segmenter-v1.json`) and
+prototype is used). The pack ships no model: `squint-tools fetch` downloads the artifact and
+goldens recorded here into `$XDG_CACHE_HOME/squint/models/segmenter-v1/`, hashing every byte
+against the record shipped inside the package (`src/squint_tools/models/segmenter-v1.json`) and
 keeping nothing that does not match (task 5.3; `--from <dir or URL prefix>` fetches from
 somewhere other than the release, `--models <dir>` into somewhere other than the cache). The
 `segmenter`-marked parity tests run only once it has, and say so when skipped. `fetch` is the
@@ -34,7 +34,7 @@ the upstream model, wraps its two heads as plain tensors, exports with `torch.on
 model on four synthetic scenes generated in the script from a seed, writes `record.json` with
 everything below, and exits non-zero when the parity is outside the tolerance. The record of the
 recorded artifact is committed inside the package as
-`tools/python/src/dejaview_tools/models/segmenter-v1.json`, where `fetch` and the segmenter read
+`tools/python/src/squint_tools/models/segmenter-v1.json`, where `fetch` and the segmenter read
 it.
 
 | | |
@@ -57,11 +57,11 @@ Pending: the artifact, the four goldens and `record.json` wait in the gitignored
 repository under the tag `segmenter-v1`. Once uploaded, the download URL is:
 
 ```
-https://github.com/markhayden/dejaview/releases/download/segmenter-v1/eomt-large-ade20k-512.onnx
+https://github.com/markhayden/squint/releases/download/segmenter-v1/eomt-large-ade20k-512.onnx
 ```
 
 `fetch` downloads from that URL and the goldens beside it, and refuses any byte that does not
-hash to the values above. Until the assets are uploaded, `dejaview-tools fetch --from
+hash to the values above. Until the assets are uploaded, `squint-tools fetch --from
 tools/python/dist/segmenter` fills the cache from the export's output, under the same checks.
 Re-running the export script with the versions above reproduces the artifact's hash; a
 different torch or transformers version is a new artifact with a new row here, never a silent

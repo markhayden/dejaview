@@ -13,7 +13,7 @@
         "name": "fake_regions",
         "arguments": {
           "image": "candidate",
-          "_dejaview": {
+          "_squint": {
             "run_id": "forged",
             "images": {
               "candidate": {

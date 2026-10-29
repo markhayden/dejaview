@@ -1,7 +1,7 @@
 [workspace]
 members = ["cargo:."]
 
-# Binary distribution (PLAN.md task 2.10b): `dist` builds the `dejaview` archives on a version tag,
+# Binary distribution (PLAN.md task 2.10b): `dist` builds the `squint` archives on a version tag,
 # runs the archive smoke on every architecture before anything is released (host-jobs), and
 # publishes them as a GitHub release. `dist generate` rewrites .github/workflows/release.yml from
 # this file; never edit that workflow by hand.
@@ -9,7 +9,7 @@ members = ["cargo:."]
 # The pinned dist version, also pinned in the justfile (`just bootstrap`).
 cargo-dist-version = "0.33.1"
 ci = "github"
-# Archives only; `cargo install dejaview` is the other supported path (docs/bootstrap.md).
+# Archives only; `cargo install squint-cli` is the other supported path (docs/bootstrap.md).
 installers = []
 targets = ["aarch64-apple-darwin", "x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
 hosting = "github"

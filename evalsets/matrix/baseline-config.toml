@@ -2,7 +2,7 @@
 # the provider, model, rules base, decision runs and tools per cell; what stays is the per-decision
 # cap, the policy and the consent for the Anthropic cells (the other vendors' cells carry their
 # own account in the matrix). The per-decision cap must cover the largest envelope in the matrix
-# (`dejaview eval estimate` prints every envelope): the matrix's spend_cap_usd bounds the total.
+# (`squint eval estimate` prints every envelope): the matrix's spend_cap_usd bounds the total.
 [provider]
 profile = "anthropic"
 model = "claude-sonnet-5-5"
@@ -15,7 +15,7 @@ spend_cap_usd = 10.00
 
 [privacy]
 cloud_calls = true
-account = "anthropic:${DEJAVIEW_ANTHROPIC_ACCOUNT}"
+account = "anthropic:${SQUINT_ANTHROPIC_ACCOUNT}"
 
 [output]
-dir = "./dejaview-out"
+dir = "./squint-out"

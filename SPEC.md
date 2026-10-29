@@ -1,4 +1,4 @@
-# Spec: dejaview harness
+# Spec: squint harness
 
 Status: draft 5, 2026-10-25. Draft 1 came from the interview over `docs/brief.md`; drafts 2 to 5
 answer Codex reviews 1 to 4 (`docs/reviews/`). Review 4 judged draft 4 "ready with changes" and
@@ -12,7 +12,7 @@ being built; when a decision changes, this file changes first.
 Items 7 to 17 were positions taken on the reviewers' questions for the owner. The owner confirmed
 7, 8, 9 and 13 on 2026-10-25 and approved draft 5 for planning; the rest stand as stated.
 
-1. dejaview is self-contained. It ships its own tools; no consumer's existing tooling shapes it.
+1. squint is self-contained. It ships its own tools; no consumer's existing tooling shapes it.
 2. Consumers are the owner's own image-generation pipelines first, then anyone who installs the
    binary, then a hosted service on existing infrastructure.
 3. Nothing needs to run in a browser except a static report viewer.
@@ -85,7 +85,7 @@ endpoint, prompt, rules, tool and schema versions; usage and cost.
 
 **Users.**
 
-- A pipeline that calls `dejaview check` as a subprocess or, later, over HTTP, and acts on the
+- A pipeline that calls `squint check` as a subprocess or, later, over HTTP, and acts on the
   verdict and exit code.
 - The owner, running evaluation matrices to decide which models and tools earn their place, and
   publishing the results.
@@ -107,7 +107,7 @@ environment variable.
 | 4 | Config | TOML, one file per job type. `--set path=value` overrides single values. Secrets only from the environment. | Rust-native, comments, the prototype already used it. |
 | 5 | Rules | Numbered plain-language obligations in TOML with id, kind, `matters`, `hidden_ok`, scope and, for exemptions, what they waive. Base sets ship in the binary; consumer files override by id, disable, or append. | Findings cite ids so code can aggregate by kind. |
 | 6 | Verdict schema | Checklist plus findings. Every checklist item gets a disposition; the verdict is computed in code from code-owned obligation instances. | Silence cannot hide a missing disposition. |
-| 7 | Evaluation sets | Manifest in repo, images elsewhere by SHA-256. Public images in a `dejaview-evalsets` repository; private sets by path. Blind labels sealed and held by the owner. | Review before publishing; honest gates. |
+| 7 | Evaluation sets | Manifest in repo, images elsewhere by SHA-256. Public images in a `squint-evalsets` repository; private sets by path. Blind labels sealed and held by the owner. | Review before publishing; honest gates. |
 | 8 | Model access | Native wire adapters (Anthropic Messages, Gemini generateContent, OpenAI Responses) over direct HTTPS with recorded fixtures; endpoint profiles as data; a pinned model catalog as data. | Gateways and clouds become profiles, not adapters. |
 | 9 | Layout and milestones | Monorepo. Skeleton, adapters, public sets, baseline, zoom, first ML tool. | The method needs a baseline before any tool. |
 
@@ -117,7 +117,7 @@ Sub-decisions:
 - A job has one candidate and any number of references; tools refer to images and frames by id,
   never path.
 - The Python tool pack is published as a versioned provisioning bundle, installed once by
-  `dejaview tools setup` into a locked environment, and launched from that environment offline.
+  `squint tools setup` into a locked environment, and launched from that environment offline.
 - First evaluation sets are public, generated with image models, with defects planted by
   construction and labelled by hand: 20 items per use case to start, growing toward 50 to 100.
   Which image models generate them, and the licence, is decided at M3 and recorded per item.
@@ -138,7 +138,7 @@ Sub-decisions:
                  │             │              │
                  ▼             ▼              ▼
 ┌──────────────────────────────────────────────────────────────┐
-│ dejaview-core                                                 │
+│ squint-core                                                 │
 │  config → obligations → instances per target → checklist      │
 │  prompt → decision (1..n runs of the state machine)           │
 │  validation → aggregation → verdict → journal + report        │
@@ -147,18 +147,18 @@ Sub-decisions:
             │ Provider trait                 │ Tool trait
             ▼                                ▼
 ┌───────────────────────┐        ┌──────────────────────────────┐
-│ dejaview-providers     │        │ dejaview-tools                │
+│ squint-providers     │        │ squint-tools                │
 │  anthropic · gemini    │        │  built-ins (Rust): view,      │
 │  openai adapters       │        │   resize, edge, change_map,   │
 │  endpoint profiles     │        │   align                       │
-│  model catalog         │        │  mcp client (2025-11-25) ─────┼──▶ tools/python (dejaview-tools)
+│  model catalog         │        │  mcp client (2025-11-25) ─────┼──▶ tools/python (squint-tools)
 │  wire schemas          │        │  manifest registry, envelope  │        regions, classes, later ocr…
 │  injected HTTP client  │        └──────────────────────────────┘
 └───────────────────────┘
             ▲
             │ recorded fixtures replace HTTP in tests
 ┌───────────────────────┐        ┌──────────────────────────────┐
-│ dejaview-eval          │        │ dejaview-cli                  │
+│ squint-eval          │        │ squint-cli                  │
 │  set manifests, hashes │        │  check · eval · tools · sets  │
 │  matrix runner, gates  │        │  report · catalog · setup     │
 │  metrics, bootstrap    │        └──────────────────────────────┘
@@ -313,7 +313,7 @@ binding is therefore trusted data from rules and config, covers consumer require
 depends on fixed ids inside a tool.
 
 ```toml
-# crates/dejaview-core/rules/source-fidelity.toml (generic base; ships in the binary)
+# crates/squint-core/rules/source-fidelity.toml (generic base; ships in the binary)
 [rules]
 use_case = "source-fidelity"
 version = 1
@@ -348,7 +348,7 @@ text = "Any other change is noted with its location."
 ```
 
 ```toml
-# crates/dejaview-core/rules/profiles/source-fidelity-architecture.toml (the prototype's venue case, a named profile)
+# crates/squint-core/rules/profiles/source-fidelity-architecture.toml (the prototype's venue case, a named profile)
 [rules]
 use_case = "source-fidelity"
 profile = "architecture"
@@ -629,7 +629,7 @@ the report needs that no run journal carries, including the planned envelope; wr
 first run), one `run-<n>/` per run with its journal, artifacts and frames, and `report.json`.
 
 The **report** (`report.json`, `report_version` pinned) is derived from the header and the
-journals at the end, or by `dejaview report rebuild` from a partial journal, whose terminal status
+journals at the end, or by `squint report rebuild` from a partial journal, whose terminal status
 is then `incomplete`: the job as resolved (ids, roles, labels,
 hashes, dimensions, projection, prepared sizes); merged obligations with provenance and instances;
 checklist with its growth and drops; every turn (stop reason, usage, cost, provider request id,
@@ -787,7 +787,7 @@ to echo, the stop reason, usage (uncached, cache-read and cache-write tokens), a
 request id. The harness appends that content to the history unchanged.
 
 The transport is injected (`http::Client`, reqwest with rustls in the binary; `replay::Player` for
-recorded conversations, `replay::Recorder` around the client when recording). `dejaview check
+recorded conversations, `replay::Recorder` around the client when recording). `squint check
 --replay <dir>` runs a decision against a recording without a credential; `--record <dir>` writes
 one, secrets stripped.
 
@@ -808,7 +808,7 @@ stay in canonical validation.
   required, optional values nullable; unions only in the documented `anyOf` form; remove
   unsupported keywords per the catalog.
 
-Common to every adapter (`dejaview-providers::wire`, `WIRE_VERSION`): `oneOf` becomes `anyOf`; a
+Common to every adapter (`squint-providers::wire`, `WIRE_VERSION`): `oneOf` becomes `anyOf`; a
 union of plain enums becomes one enum; metadata (`$schema`, `title`) and `format` values the
 provider does not list are dropped; the constraint keywords the catalog names for the model are
 removed; `allOf`, `not`, conditionals, `patternProperties`, external references and any keyword
@@ -919,7 +919,7 @@ missing credential is `error: auth`.
 
 ### Model catalog
 
-`crates/dejaview-providers/catalog.toml`, versioned, part of the cache key. Per model id: adapter; context and
+`crates/squint-providers/catalog.toml`, versioned, part of the cache key. Per model id: adapter; context and
 output limits; the image fields above; prices per million input, output and cached tokens, and
 any per-image price; `verified` date and source URL; capabilities: `forced_tool_choice`,
 `strict_tools`, `strict_unsupported_keywords`, `function_call_ids`, `parallel_tools`,
@@ -971,7 +971,7 @@ a miss.
 
 ### Drift
 
-Model ids pinned; resolved model and API version on every report; `dejaview eval canary` reruns
+Model ids pinned; resolved model and API version on every report; `squint eval canary` reruns
 a fixed set uncached on a schedule or on a provider notice, comparing against the pinned baseline
 recorded when the configuration was qualified. One deviating canary marks the configuration
 `suspect`; two consecutive deviations against the same baseline recommend disabling it; a canary
@@ -993,7 +993,7 @@ The harness sends prepared image bytes, the prompt, the obligations, the brief a
 it strips image metadata and never sends filenames or paths. Credentials come from the configured
 scheme, are redacted from headers, URLs, errors, logs, journals and reports, and are never written
 to disk by the harness except by the later OAuth scheme as documented. Local artifacts are
-written with mode 0600 under the run directory and kept until `dejaview report prune` removes
+written with mode 0600 under the run directory and kept until `squint report prune` removes
 them.
 
 ## Tools
@@ -1020,15 +1020,15 @@ frames_out = ["crop"]
 concurrent = false
 preconditions = "`against` must be an aligned frame of the source relative to `image`."
 model_schema = "schemas/tools/regions-model-v1.json"      # what the model sees
-input_schema = "schemas/tools/regions-input-v1.json"      # model_schema + required `_dejaview`
+input_schema = "schemas/tools/regions-input-v1.json"      # model_schema + required `_squint`
 output_schema = "schemas/tools/regions-output-v1.json"    # envelope + this tool's measurement names and units
 ```
 
 Two argument schemas exist for every tool. The **model schema** is what the provider receives as
-the tool definition. The **input schema** is the model schema plus a required `_dejaview` object
+the tool definition. The **input schema** is the model schema plus a required `_squint` object
 the harness injects after validating the model's arguments; it is what a built-in or an MCP
 server validates. The harness rejects, as `invalid_args` to the model, any attempt by the model
-to supply `_dejaview` or any field outside the model schema. Preconditions are checked by the
+to supply `_squint` or any field outside the model schema. Preconditions are checked by the
 harness against the registry before the call; a precondition failure is `invalid_args` naming the
 missing frame.
 
@@ -1054,8 +1054,8 @@ against the manifest's `returns` bounds, which cover the serialised envelope, ev
 and every image; a breach is `error: tool`.
 
 Built-ins implement a `Tool` trait that returns this manifest and executes synchronously. MCP
-tools carry `name`, `description`, `inputSchema` (the input schema, with `_dejaview` required)
-and `outputSchema` (the envelope) natively and the rest under a `dejaview` key in their
+tools carry `name`, `description`, `inputSchema` (the input schema, with `_squint` required)
+and `outputSchema` (the envelope) natively and the rest under a `squint` key in their
 annotations, including the model schema; `description` must equal `purpose`. The harness
 validates manifests at connect time and refuses a tool whose model schema cannot pass the
 selected model's wire transformation.
@@ -1093,7 +1093,7 @@ report records the projection on every call that ran under one.
     `2025-11-25` and advertise the `tools` capability, otherwise `error: resolve`; send
     `notifications/initialized`; `tools/list` with pagination until exhausted; freeze the
     manifests.
-  - *Calls.* `tools/call` with the model's validated arguments plus `_dejaview`:
+  - *Calls.* `tools/call` with the model's validated arguments plus `_squint`:
     `{ run_id, call_id, images: { <image-id>: { path | base64, media_type, width, height, projection } }, frames: { <frame-id>: { root, projection, parent, transform: { id, kind, params }, pixels: { path | base64, media_type, width, height } } }, hints }`.
     `images` holds the canonical images named by `image_args`; `frames` holds every frame named by
     `frame_args` with its full transform chain to the root and its lossless pixels, so a pack can
@@ -1115,13 +1115,13 @@ report records the projection on every call that ran under one.
     a whole evaluation under an exclusive **lease**: a run acquires the lease before its first
     call, and the two runs of a decision lease separately. Lease acquisition has one bounded
     deadline, `startup_timeout_s`, covering everything it may need: waiting for the previous
-    lease's calls to complete, sending `dejaview/reset` and receiving its acknowledgement (which
+    lease's calls to complete, sending `squint/reset` and receiving its acknowledgement (which
     guarantees prior-run tasks and mutable state are gone), or, when any of that fails, bounded
     shutdown and a restart with full initialisation and manifest verification. A process in which
     any call timed out or was cancelled is never reused: cancellation is a notification the
     server may not honour, so quiescence cannot be proven; the process is shut down before the
     next lease. Packs that do not implement reset are restarted per run.
-- The binary can later expose its built-ins as an MCP server (`dejaview tools serve`).
+- The binary can later expose its built-ins as an MCP server (`squint tools serve`).
 
 ### Python tool pack
 
@@ -1132,15 +1132,15 @@ report records the projection on every call that ran under one.
 
 **Provisioning bundle.** Each release of the pack publishes a bundle containing a dedicated
 **provisioning project**: a `pyproject.toml` with `tool.uv.package = false`, an exact dependency
-`dejaview-tools==<version>`, and a `tool.uv.sources` entry pointing at the built wheel included in
+`squint-tools==<version>`, and a `tool.uv.sources` entry pointing at the built wheel included in
 the bundle by relative path; the `uv.lock` generated for that provisioning project; the wheel;
 `MODEL.md`; and `bundle.toml` with the SHA-256 of each file and the declared Python version.
-`dejaview tools setup --config dejaview.toml` downloads the bundle named by
+`squint tools setup --config squint.toml` downloads the bundle named by
 `[tools.packs.<name>] package` and `version` (`--bundle <dir>` installs a local one), verifies
-every digest, unpacks it into `$XDG_DATA_HOME/dejaview/tools/<package>-<version>/`, runs `uv sync --frozen --no-dev` there with
+every digest, unpacks it into `$XDG_DATA_HOME/squint/tools/<package>-<version>/`, runs `uv sync --frozen --no-dev` there with
 the declared Python (Python downloads allowed during setup only), then runs the pack's `fetch`
-entry point to download and verify model artifacts into `$XDG_CACHE_HOME/dejaview/models`. The
-harness launches `<dir>/.venv/bin/dejaview-tools serve` directly with `UV_OFFLINE=1` and
+entry point to download and verify model artifacts into `$XDG_CACHE_HOME/squint/models`. The
+harness launches `<dir>/.venv/bin/squint-tools serve` directly with `UV_OFFLINE=1` and
 `UV_PYTHON_DOWNLOADS=never` in its environment; a missing environment, mismatched digest or
 missing artifact is `error: resolve`. The lock digest is recorded in tool provenance and the
 cache key. The pack's CI builds the bundle, installs it into a clean directory, and verifies the
@@ -1179,9 +1179,9 @@ enabled = ["view", "align", "regions", "classes"]
 order = ["align", "regions", "view", "classes"]
 
 [tools.packs.python]
-package = "dejaview-tools"              # a provisioned bundle, by package and version, or instead:
+package = "squint-tools"              # a provisioned bundle, by package and version, or instead:
 version = "0.1.0"                       # command = "./server", args = []  (an executable to run, for tests)
-env = ["DEJAVIEW_MODEL_DIR"]            # extra variables passed through, credential names refused
+env = ["SQUINT_MODEL_DIR"]            # extra variables passed through, credential names refused
 startup_timeout_s = 120
 shared = false
 
@@ -1202,7 +1202,7 @@ on_unsure = "pass"                      # fail | pass | review ; exit code only
 on_error = "review"
 
 [cache]
-dir = "~/.cache/dejaview"              # caching is off until a dir is set
+dir = "~/.cache/squint"              # caching is off until a dir is set
 read = true
 write = true
 
@@ -1211,7 +1211,7 @@ cloud_calls = true
 account = "anthropic:org-xxxx"
 
 [output]
-dir = "./dejaview-out"
+dir = "./squint-out"
 ```
 
 Loading: parse, validate against the config schema, resolve the profile, check the model in the
@@ -1224,7 +1224,7 @@ report.
 ### Set manifest
 
 An evaluation item is a complete job plus labels. The job part is canonical and runnable by
-`dejaview check --job`; the label part is stored separately so blind sets can ship without it.
+`squint check --job`; the label part is stored separately so blind sets can ship without it.
 
 ```toml
 # evalsets/reference-consistency/pets-v1/set.toml
@@ -1233,7 +1233,7 @@ id = "reference-consistency/pets-v1"
 use_case = "reference-consistency"
 split = "dev"                       # dev | heldout | blind
 licence = "CC-BY-4.0"
-images_repo = "github.com/markhayden/dejaview-evalsets"
+images_repo = "github.com/markhayden/squint-evalsets"
 labels = "labels.toml"              # absent for blind until unsealed; labels_sha256 present instead
 labels_sha256 = "…"
 families = "families.toml"          # subject or scene family per item, for split separation
@@ -1268,11 +1268,11 @@ Rules: a family never appears in more than one split; `dev` tunes prompts and to
 scores confirmation gates; `blind` is labelled by the owner before any model or tool output exists
 on its items, with labels held in owner storage outside both repositories from creation and the
 manifest carrying only `labels_sha256` until the gate is scored, after which the labels are
-published and the set becomes `heldout`. `dejaview sets check` verifies hashes, roles, families,
+published and the set becomes `heldout`. `squint sets check` verifies hashes, roles, families,
 label presence per split, that public manifests and jobs carry no answer labels, and that every
 item's job resolves against the pinned rules.
 
-**Seal.** `dejaview sets seal` writes `seal.toml`: a SHA-256 over the sorted item ids, family
+**Seal.** `squint sets seal` writes `seal.toml`: a SHA-256 over the sorted item ids, family
 assignments, every canonical `job.toml`, every image hash, the rules content and version, and the
 external label file's hash, plus a timestamp. Any change to any component invalidates the seal.
 Prior exposure of the items to a judge or tool cannot be proven by code; the seal records the
@@ -1308,14 +1308,14 @@ comparisons report the items that flipped each way and the bootstrap interval de
 
 ### Runner and arms
 
-`dejaview eval run --matrix matrix.toml --out <dir>` runs every item of the named sets through
+`squint eval run --matrix matrix.toml --out <dir>` runs every item of the named sets through
 every cell of model × arm × decision runs, with `repetitions` per cell, never reading the cache,
 writing an immutable journal and report per item and a summary. Before the first decision it
 writes an **execution descriptor**: every answer-affecting input resolved (matrix, set manifests,
 jobs, image hashes, rules content, prompt bytes, tool manifests and lock digests, profiles,
 catalog version, harness version); a resume refuses any mismatch, and one evaluation directory
 accepts one writer at a time. Budget admission is per decision against the durable remaining cap;
-`dejaview eval estimate` reports the worst-case envelope sum and warns when completion is not
+`squint eval estimate` reports the worst-case envelope sum and warns when completion is not
 guaranteed, but does not refuse. Each attempt's hold is persisted before its request is sent; after
 a restart, attempts that may have been sent without a persisted settlement are charged at their
 bound, settlement happens at most once, and completed errors are kept.
@@ -1367,7 +1367,7 @@ missed failures or errors are higher; `inconclusive` otherwise.
 20 items and yields `admitted (provisional)`, `rejected` or `inconclusive`. The **confirmation**
 stage scores a distinct sealed set of at least 50 items from families disjoint with every earlier
 set, under the identical frozen judging configuration, referencing the initial receipt; it yields
-`admitted (confirmed)` only when both stages are admitted. `dejaview eval gate` verifies the seal
+`admitted (confirmed)` only when both stages are admitted. `squint eval gate` verifies the seal
 against the supplied labels and the results against the frozen matrix identity, refuses to score a
 set twice without a new ADR reference, writes a durable **receipt** (seal hash, matrix identity,
 results hash, stage, outcome, bootstrap seed and interval), and writes the label publication and
@@ -1396,39 +1396,39 @@ cargo build --workspace
 cargo test --workspace                         # unit, fixture replay, golden images; no network
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all -- --check
-DEJAVIEW_LIVE=1 cargo test -p dejaview-providers --test record -- --ignored   # records fixtures, spends money
+SQUINT_LIVE=1 cargo test -p squint-providers --test record -- --ignored   # records fixtures, spends money
 
 # Python tool pack (development)
 cd tools/python && uv sync --frozen            # the one step that may download
-uv run --frozen --offline --no-sync dejaview-tools fetch   # downloads model artifacts only, explicit
+uv run --frozen --offline --no-sync squint-tools fetch   # downloads model artifacts only, explicit
 uv run --frozen --offline --no-sync pytest     # offline; skips segmenter tests if not fetched
 uv run --frozen --offline --no-sync pytest -m segmenter
 uv run --frozen --offline --no-sync ruff check . && uv run --frozen --offline --no-sync ruff format --check .
 
 # The binary
-dejaview tools setup --config dejaview.toml     # provisions bundles and artifacts (network allowed here)
-dejaview check --config dejaview.toml --candidate out.png --ref "pip=refs/pip.jpg" --brief "…"
-dejaview check --config dejaview.toml --job job.toml
-dejaview report view ./dejaview-out/<run-id>
-dejaview report rebuild ./dejaview-out/<run-id>
-dejaview report prune --older-than 30d
-dejaview tools list --config dejaview.toml      # manifests as the model will see them
-dejaview sets check evalsets/
-dejaview sets fetch --set reference-consistency/pets-v1
-dejaview sets seal --set <set> --attest "…"    # writes seal.toml; a blind set's labels move out (--labels-out)
-dejaview sets verify-seal --set <set>
-dejaview eval estimate --matrix matrix.toml      # every envelope, the sum, a cost range; warns over the cap
-dejaview eval run --matrix matrix.toml --out eval-out/<name>
-dejaview eval report --out eval-out/<name>       # regenerate metrics.json and report.md from saved results
-dejaview eval report eval-out/<name>
-dejaview eval gate --matrix matrix.toml --out eval-out/<name> --tool regions --set <sealed set> --stage initial --labels <owner labels>
-dejaview eval gate-table --fixture fixtures/stats/case-1.toml   # the gate table on a synthetic result table
-dejaview eval canary --config dejaview.toml --set <pinned set> --state canary.toml      # clear | suspect | recommend_disable; never disables
-dejaview eval requalify --config dejaview.toml --set <dev set> --state canary.toml --approve "…"   # records the new baseline
-dejaview check --config dejaview.toml --job job.toml --replay fixtures/adapters/anthropic-messages/first-look
-dejaview check --config dejaview.toml --job job.toml --record recordings/first-look
-dejaview catalog show claude-opus-5-5 [--json]
-dejaview catalog list [--json]
+squint tools setup --config squint.toml     # provisions bundles and artifacts (network allowed here)
+squint check --config squint.toml --candidate out.png --ref "pip=refs/pip.jpg" --brief "…"
+squint check --config squint.toml --job job.toml
+squint report view ./squint-out/<run-id>
+squint report rebuild ./squint-out/<run-id>
+squint report prune --older-than 30d
+squint tools list --config squint.toml      # manifests as the model will see them
+squint sets check evalsets/
+squint sets fetch --set reference-consistency/pets-v1
+squint sets seal --set <set> --attest "…"    # writes seal.toml; a blind set's labels move out (--labels-out)
+squint sets verify-seal --set <set>
+squint eval estimate --matrix matrix.toml      # every envelope, the sum, a cost range; warns over the cap
+squint eval run --matrix matrix.toml --out eval-out/<name>
+squint eval report --out eval-out/<name>       # regenerate metrics.json and report.md from saved results
+squint eval report eval-out/<name>
+squint eval gate --matrix matrix.toml --out eval-out/<name> --tool regions --set <sealed set> --stage initial --labels <owner labels>
+squint eval gate-table --fixture fixtures/stats/case-1.toml   # the gate table on a synthetic result table
+squint eval canary --config squint.toml --set <pinned set> --state canary.toml      # clear | suspect | recommend_disable; never disables
+squint eval requalify --config squint.toml --set <dev set> --state canary.toml --approve "…"   # records the new baseline
+squint check --config squint.toml --job job.toml --replay fixtures/adapters/anthropic-messages/first-look
+squint check --config squint.toml --job job.toml --record recordings/first-look
+squint catalog show claude-opus-5-5 [--json]
+squint catalog list [--json]
 ```
 
 Exit codes for `check`: 0 pass, 1 fail, 2 unsure, 3 error or cancelled, 64 usage error, after
@@ -1442,16 +1442,16 @@ dist-workspace.toml             release archives: targets, the archive smoke as 
 .github/workflows/              ci (just check), package (publish dry run, install from the packaged crates, release archive dry run), release (generated), archive-smoke (called by release)
 examples/                       one ready-to-run config per use case
 crates/
-  dejaview-core/                config, obligations, instances, checklist, prompt, state machine, repair, schema, aggregation, decision, journal, report, cache, ledger, frames
+  squint-core/                config, obligations, instances, checklist, prompt, state machine, repair, schema, aggregation, decision, journal, report, cache, ledger, frames
     rules/                      base rule sets and profiles/, embedded at build time
     prompts/                    versioned system prompt templates, embedded
-  dejaview-providers/           Provider trait, adapters, wire schemas, endpoint profiles, catalog, auth schemes, fixtures player
+  squint-providers/           Provider trait, adapters, wire schemas, endpoint profiles, catalog, auth schemes, fixtures player
     catalog.toml                model catalog and the shipped endpoint profiles, embedded
     profiles/*.toml             gateway profiles with upstream contracts, embedded (2.8)
-  dejaview-tools/               Tool trait, built-ins, MCP client, manifest registry, envelope, projections, provisioning
-  dejaview-eval/                set manifests, hashing, sealing, matrix runner, metrics, bootstrap, gates
-  dejaview-cli/                 the binary
-tools/python/                   dejaview-tools uv project (MCP server, segmenter, MODEL.md, uv.lock, bundle build, tests)
+  squint-tools/               Tool trait, built-ins, MCP client, manifest registry, envelope, projections, provisioning
+  squint-eval/                set manifests, hashing, sealing, matrix runner, metrics, bootstrap, gates
+  squint-cli/                 the binary
+tools/python/                   squint-tools uv project (MCP server, segmenter, MODEL.md, uv.lock, bundle build, tests)
 scripts/                        repository checks, the credential scanner, publish, install-from-registry, archive and live smoke scripts
 scripts/sets/                   the set-building toolkit (uv project): plans, generators, construction ops, draft labels
 schemas/                        generated JSON Schemas: submission, envelope, manifest, config, report, tools/
@@ -1461,7 +1461,7 @@ fixtures/
   profiles/<profile>/           recorded conversations per shipped profile, including routing
   images/                       golden images for built-in tools, flat and equirectangular
 evalsets/<use-case>/<set>/      set.toml, labels.toml or labels_sha256, families.toml, seal.toml, items/*/job.toml
-crates/dejaview-cli/viewer/     static report viewer, embedded in the binary (packaging keeps embedded assets inside their crate)
+crates/squint-cli/viewer/     static report viewer, embedded in the binary (packaging keeps embedded assets inside their crate)
 docs/
   brief.md                      untracked, the starting brief
   adr/                          one file per decision, dated
@@ -1512,7 +1512,7 @@ pub fn verdict(rows: &[Row]) -> Verdict {
 Python: `ruff` defaults at line length 100, type hints everywhere, one module per tool, pure
 functions over arrays with the MCP wrapper kept thin.
 
-Naming: crates `dejaview-*`, modules by noun, tool names lower snake case and stable once
+Naming: crates `squint-*`, modules by noun, tool names lower snake case and stable once
 published, obligation ids as above, instance ids `<obligation>@<target>`, checklist ids
 `chk:<kind>:<ref>`, call ids `call:<n>`, frame ids as above.
 
@@ -1539,7 +1539,7 @@ published, obligation ids as above, instance ids `<obligation>@<target>`, checkl
   timestamps, request signatures); thought signatures, signed parts and opaque reasoning payloads
   are byte-exact comparison targets and a replay fails when any is dropped, moved or altered.
   Parsing must yield identical `TurnResponse`s and `ResponseClass`es. Recording is an ignored
-  test behind `DEJAVIEW_LIVE=1` that strips secrets.
+  test behind `SQUINT_LIVE=1` that strips secrets.
 - **Profile conformance** (`cargo test`): one recorded conversation per shipped profile,
   including the routing body and provenance response for gateways.
 - **Built-in tools** (`cargo test`): golden images; crops and perspective views match stored
@@ -1547,7 +1547,7 @@ published, obligation ids as above, instance ids `<obligation>@<target>`, checkl
   bounds; the `visual_only` projection strips what it must.
 - **MCP** (`cargo test`): a fake 2025-11-25 server in the test binary exercises initialize with
   version and capability checks, initialized, paginated listing, manifest validation including
-  the two schemas, the `_dejaview` envelope with images and frames both ways, serial and
+  the two schemas, the `_squint` envelope with images and frames both ways, serial and
   concurrent calls, timeout, cancellation and late-response tombstones, `isError` precedence,
   block correspondence, process death, lease and reset, and shutdown escalation.
 - **End to end offline** (`cargo test`): a scripted fake provider drives every state and exit
@@ -1556,15 +1556,15 @@ published, obligation ids as above, instance ids `<obligation>@<target>`, checkl
   agreement, cancellation, and cache hit, miss and pruned-hit.
 - **Isolation** (`cargo test`): instruction-like text in images, filenames, labels, the brief and
   tool results never alters prompt structure, tool selection or control flow; image and frame ids
-  never resolve outside the registry; `_dejaview` from the model is rejected; packs receive only
+  never resolve outside the registry; `_squint` from the model is rejected; packs receive only
   the allowlisted environment with credentials removed. These prove the harness boundary;
   whether a live model obeys injected image text is measured by an adversarial evaluation set.
 - **Python** (`uv run --frozen --offline --no-sync pytest`): per-tool unit tests on small arrays
   offline; `segmenter`-marked tests run only when the artifact has been fetched and check parity
   with stored outputs; a bundle build test verifies `bundle.toml` digests.
-- **Evaluation** (`dejaview eval run`, at checkpoints, spends money): never in CI.
+- **Evaluation** (`squint eval run`, at checkpoints, spends money): never in CI.
 
-No test touches the network without `DEJAVIEW_LIVE=1`; provisioning and artifact fetching are
+No test touches the network without `SQUINT_LIVE=1`; provisioning and artifact fetching are
 explicit commands.
 
 ## Boundaries
@@ -1588,7 +1588,7 @@ explicit commands.
 
 ## Success criteria
 
-1. `cargo install dejaview` plus one config file and one environment variable produce a report
+1. `cargo install squint-cli` plus one config file and one environment variable produce a report
    and exit code for a job on each of the three direct profiles.
 2. `cargo test --workspace` passes offline in under five minutes with every adapter and profile
    fixture replayed and every state-machine transition, repair case and aggregation row covered.

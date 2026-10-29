@@ -30,9 +30,9 @@
 
    **Section:** M0, Checkpoint M5.
 
-   **Why:** Checking success criteria at M5 cannot substitute for building their deliverables. Nothing creates the `cargo install dejaview` package, release binaries for the three target platforms, or a release workflow. The planned CLI crate name also needs an explicit relationship to the package users install.
+   **Why:** Checking success criteria at M5 cannot substitute for building their deliverables. Nothing creates the `cargo install squint-cli` package, release binaries for the three target platforms, or a release workflow. The planned CLI crate name also needs an explicit relationship to the package users install.
 
-   **Concrete change:** Add S/M tasks for Cargo package naming and publishability, release builds for macOS arm64 and Linux x86_64/arm64, and clean-install verification. Acceptance: “A clean installation exposes `dejaview`; one shipped example config and one environment variable produce a report through each direct profile.” Schedule authorized package publication explicitly, and rerun the complete offline suite under the five-minute limit after all adapter fixtures and tools exist.
+   **Concrete change:** Add S/M tasks for Cargo package naming and publishability, release builds for macOS arm64 and Linux x86_64/arm64, and clean-install verification. Acceptance: “A clean installation exposes `squint`; one shipped example config and one environment variable produce a report through each direct profile.” Schedule authorized package publication explicitly, and rerun the complete offline suite under the five-minute limit after all adapter fixtures and tools exist.
 
 5. **[major] Gate scoring lacks the complete seal-to-confirmation lifecycle**
 
@@ -110,14 +110,14 @@
 
     **Section:** Tasks 0.2, 1.1, 1.6, 1.8, 3.5–3.6, 4.2–4.3, 5.2.
 
-    **Why:** Commands such as `cargo test -p dejaview-core job:: frames::` supply multiple positional filters rather than an executable verification command. A bogus proxy does not prove networking is disabled, and “within tolerance,” “near 0” and “last digit” leave numerical acceptance undefined. The viewer’s localhost-serving option conflicts with an absolute “no network requests” criterion, while an excluded brief normally does not appear as untracked in ordinary status output.
+    **Why:** Commands such as `cargo test -p squint-core job:: frames::` supply multiple positional filters rather than an executable verification command. A bogus proxy does not prove networking is disabled, and “within tolerance,” “near 0” and “last digit” leave numerical acceptance undefined. The viewer’s localhost-serving option conflicts with an absolute “no network requests” criterion, while an excluded brief normally does not appear as untracked in ordinary status output.
 
     **Concrete change:** Use valid separate test commands or a single encompassing filter. Pin numeric tolerances and deterministic bootstrap behavior; assert cost/time totals and medians separately from proportion intervals. Verify runtime offline behavior with enforced network denial, and perform downloads only through explicit provisioning steps. Specify “no external requests; loopback static serving permitted” for the viewer, and verify brief exclusion with ignore/tracked-file checks rather than ordinary status.
 
 ## Coverage gaps
 
 - **Decisions §1; Success criterion 1 →** Cargo publication/install path, three-platform release binaries, release workflow and clean-install smoke tasks.
-- **Commands →** `dejaview tools list --config …`; explicit coverage of the shorthand `check --candidate --ref --brief` invocation.
+- **Commands →** `squint tools list --config …`; explicit coverage of the shorthand `check --candidate --ref --brief` invocation.
 - **Report and journal →** SIGTERM cancellation handling and verification; 1.10 covers SIGINT only.
 - **Report viewer; Success criterion 6 →** Equirectangular/raw-coordinate overlay implementation and verification. Task 3.6 defers it to M4, but no M4 task owns it.
 - **Project structure / boundary schemas →** Generated committed report schema and a check that every boundary type has the required versioning, closed-field behavior and schema derivation.

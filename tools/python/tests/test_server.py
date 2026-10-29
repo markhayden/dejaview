@@ -7,7 +7,7 @@ import json
 import numpy as np
 from PIL import Image
 
-from dejaview_tools import __version__, server, tools
+from squint_tools import __version__, server, tools
 
 
 def run(messages):
@@ -65,7 +65,7 @@ def test_initialize_lists_and_calls():
                     "arguments": {
                         "image": "candidate",
                         "bbox": [0.1, 0.2, 0.3, 0.4],
-                        "_dejaview": context(),
+                        "_squint": context(),
                     },
                 },
             },
@@ -78,8 +78,8 @@ def test_initialize_lists_and_calls():
     tool = listed["result"]["tools"][0]
     assert tool["name"] == "echo_region"
     assert tool["description"] == tools.ECHO_REGION["purpose"]
-    assert tool["annotations"]["dejaview"]["evidence_kind"] == "change_region"
-    assert "_dejaview" in tool["inputSchema"]["required"]
+    assert tool["annotations"]["squint"]["evidence_kind"] == "change_region"
+    assert "_squint" in tool["inputSchema"]["required"]
     envelope = called["result"]["structuredContent"]
     assert called["result"]["isError"] is False
     assert envelope["status"] == "ok"
@@ -127,7 +127,7 @@ def test_the_box_is_cut_from_a_named_frame_and_an_unknown_frame_is_the_models_mi
                     "image": "candidate",
                     "bbox": [0.5, 0.5, 1.0, 1.0],
                     "frame": frame,
-                    "_dejaview": context(frames={"aligned:candidate:t1": aligned}),
+                    "_squint": context(frames={"aligned:candidate:t1": aligned}),
                 },
             },
         }
@@ -151,7 +151,7 @@ def test_a_malformed_context_is_a_protocol_error_not_an_answer():
                 "method": "tools/call",
                 "params": {
                     "name": "echo_region",
-                    "arguments": {"image": "candidate", "bbox": [0, 0, 1, 1], "_dejaview": "nope"},
+                    "arguments": {"image": "candidate", "bbox": [0, 0, 1, 1], "_squint": "nope"},
                 },
             }
         ]
@@ -162,7 +162,7 @@ def test_a_malformed_context_is_a_protocol_error_not_an_answer():
 def test_every_envelope_carries_exactly_the_provenance_the_harness_knows():
     # The harness refuses an envelope with an unknown provenance field, so a pack that annotates
     # its provenance breaks every call; the shape is fixed.
-    from dejaview_tools.envelope import envelope
+    from squint_tools.envelope import envelope
 
     assert set(envelope("x", "ok", "s")["provenance"]) == {
         "tool",
@@ -181,7 +181,7 @@ def test_every_envelope_carries_exactly_the_provenance_the_harness_knows():
                     "arguments": {
                         "image": "candidate",
                         "bbox": [0.1, 0.2, 0.3, 0.4],
-                        "_dejaview": context(),
+                        "_squint": context(),
                     },
                 },
             }
@@ -213,7 +213,7 @@ def test_missing_context_and_bad_arguments_are_invalid_args():
                 "method": "tools/call",
                 "params": {
                     "name": "echo_region",
-                    "arguments": {"image": "nope", "bbox": [0, 0, 1, 1], "_dejaview": context()},
+                    "arguments": {"image": "nope", "bbox": [0, 0, 1, 1], "_squint": context()},
                 },
             },
             {
@@ -225,7 +225,7 @@ def test_missing_context_and_bad_arguments_are_invalid_args():
                     "arguments": {
                         "image": "candidate",
                         "bbox": [1, 0, 0, 1],
-                        "_dejaview": context(),
+                        "_squint": context(),
                     },
                 },
             },
@@ -239,7 +239,7 @@ def test_missing_context_and_bad_arguments_are_invalid_args():
 def test_reset_acknowledges_and_unknown_methods_are_not_found():
     responses = run(
         [
-            {"jsonrpc": "2.0", "id": 1, "method": "dejaview/reset", "params": {}},
+            {"jsonrpc": "2.0", "id": 1, "method": "squint/reset", "params": {}},
             {"jsonrpc": "2.0", "id": 2, "method": "resources/list", "params": {}},
             {"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"requestId": 9}},
         ]
@@ -250,10 +250,10 @@ def test_reset_acknowledges_and_unknown_methods_are_not_found():
 
 
 def test_a_missing_segmenter_is_an_error_reply_and_the_server_goes_on(monkeypatch):
-    from dejaview_tools import regions, segmenter
+    from squint_tools import regions, segmenter
 
     def unavailable():
-        raise segmenter.SegmenterUnavailable("the artifact is missing; run `dejaview-tools fetch`")
+        raise segmenter.SegmenterUnavailable("the artifact is missing; run `squint-tools fetch`")
 
     monkeypatch.setattr(regions.segmenter, "shared", unavailable)
     monkeypatch.setattr(server.segmenter, "shared", unavailable)
@@ -285,7 +285,7 @@ def test_a_missing_segmenter_is_an_error_reply_and_the_server_goes_on(monkeypatc
                     "arguments": {
                         "frame": "aligned:candidate:t1",
                         "against": "raw:source",
-                        "_dejaview": ctx,
+                        "_squint": ctx,
                     },
                 },
             },
@@ -298,7 +298,7 @@ def test_a_missing_segmenter_is_an_error_reply_and_the_server_goes_on(monkeypatc
                     "arguments": {
                         "image": "candidate",
                         "bbox": [0, 0, 0.5, 0.5],
-                        "_dejaview": context(),
+                        "_squint": context(),
                     },
                 },
             },
@@ -328,7 +328,7 @@ def test_unreadable_pixels_are_an_error_reply_not_a_crash():
                     "arguments": {
                         "image": "candidate",
                         "bbox": [0, 0, 0.5, 0.5],
-                        "_dejaview": {**context(), "images": {"candidate": bad}},
+                        "_squint": {**context(), "images": {"candidate": bad}},
                     },
                 },
             }
@@ -338,7 +338,7 @@ def test_unreadable_pixels_are_an_error_reply_not_a_crash():
 
 
 def test_an_unknown_tool_is_a_method_error_and_the_cli_reports_version_and_unknown_commands(capsys):
-    from dejaview_tools import cli
+    from squint_tools import cli
 
     [reply] = run([{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "nope"}}])
     assert reply["error"]["code"] == -32602

@@ -154,7 +154,7 @@
         },
         "package": {
           "default": null,
-          "description": "The provisioned bundle, by package and version (`dejaview tools setup` installs it).",
+          "description": "The provisioned bundle, by package and version (`squint tools setup` installs it).",
           "type": [
             "string",
             "null"
@@ -210,7 +210,7 @@
           "type": "string"
         },
         "cloud_calls": {
-          "description": "Must be true: dejaview sends images and text to the configured provider.",
+          "description": "Must be true: squint sends images and text to the configured provider.",
           "type": "boolean"
         }
       },

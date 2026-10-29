@@ -12,15 +12,15 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 set_id="${1:?usage: sets-publish.sh <use-case>/<set> \"<attestation>\"}"
 attest="${2:?attestation text}"
-owner="${DEJAVIEW_OWNER_DIR:-$HOME/dejaview-owner}"
-clone="${DEJAVIEW_EVALSETS_DIR:-$(cd .. && pwd)/dejaview-evalsets}"
+owner="${SQUINT_OWNER_DIR:-$HOME/squint-owner}"
+clone="${SQUINT_EVALSETS_DIR:-$(cd .. && pwd)/squint-evalsets}"
 build="$owner/build/evalsets/$set_id"
 draft="$owner/$set_id/labels-draft.toml"
 [ -d "$build" ] || { echo "no built set at $build" >&2; exit 1; }
 [ -d "$clone/.git" ] || { echo "no evalsets clone at $clone" >&2; exit 1; }
 today="$(date +%F)"
 sed -i.bak "s/status = \"draft\"/status = \"confirmed\"/g; s/adjudicated_on = \"\"/adjudicated_on = \"$today\"/g" "$draft" && rm -f "$draft.bak"
-(cd scripts/sets && uv run --frozen --offline --no-sync dejaview-sets promote --draft "$draft" --set "$build")
+(cd scripts/sets && uv run --frozen --offline --no-sync squint-sets promote --draft "$draft" --set "$build")
 # Images into the evalsets clone, committed there.
 mkdir -p "$clone/$set_id"
 (cd "$build" && find . -name '*.png' | while IFS= read -r f; do mkdir -p "$clone/$set_id/$(dirname "$f")"; cp "$f" "$clone/$set_id/$f"; done)
@@ -37,14 +37,14 @@ line = f'images_rev = "{sys.argv[2]}"\n'
 if "images_rev" in s:
     s = "\n".join(line.rstrip("\n") if l.startswith("images_rev") else l for l in s.splitlines()) + "\n"
 else:
-    s = s.replace('images_repo = "github.com/markhayden/dejaview-evalsets"\n', 'images_repo = "github.com/markhayden/dejaview-evalsets"\n' + line)
+    s = s.replace('images_repo = "github.com/markhayden/squint-evalsets"\n', 'images_repo = "github.com/markhayden/squint-evalsets"\n' + line)
 p.write_text(s)
 PY
 if grep -q '^split = "blind"' "evalsets/$set_id/set.toml"; then
-  cargo run -q -p dejaview -- sets seal --set "evalsets/$set_id" --attest "$attest" --labels-out "$owner/$set_id"
+  cargo run -q -p squint-cli -- sets seal --set "evalsets/$set_id" --attest "$attest" --labels-out "$owner/$set_id"
 else
-  cargo run -q -p dejaview -- sets seal --set "evalsets/$set_id" --attest "$attest"
+  cargo run -q -p squint-cli -- sets seal --set "evalsets/$set_id" --attest "$attest"
 fi
-cargo run -q -p dejaview -- sets check evalsets
-cargo run -q -p dejaview -- sets verify-seal --set "evalsets/$set_id"
+cargo run -q -p squint-cli -- sets check evalsets
+cargo run -q -p squint-cli -- sets verify-seal --set "evalsets/$set_id"
 echo "published $set_id at $rev; push the evalsets clone, add the row to evalsets/README.md, commit here"

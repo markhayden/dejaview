@@ -9,7 +9,7 @@ just check                                      # what every commit must pass
 ```
 
 `just check` runs `cargo fmt --all -- --check`, Clippy with `-D warnings` in both feature
-configurations (default, and `--features dejaview/testkit`), `cargo test --workspace` in both
+configurations (default, and `--features squint-cli/testkit`), `cargo test --workspace` in both
 configurations, `cargo deny check licenses bans sources` (advisories need the network and run in
 CI as `just deny-advisories`), `scripts/check-crate-graph.sh`, `scripts/check-packaging.sh`
 (every asset a crate embeds sits inside that crate and in the file list `cargo package` ships),
@@ -24,7 +24,7 @@ refuses a message that carries agent attribution (a `Co-Authored-By` trailer nam
 a "Generated with" line or an assistant's no-reply address): the repository shows no agent
 association, in its history or its files.
 
-The `testkit` feature of the `dejaview` package enables the scripted fake provider and the
+The `testkit` feature of the `squint` package enables the scripted fake provider and the
 `--provider-script` flag for tests and debugging. Release builds never enable it.
 
 Toolchain: `rust-toolchain.toml` pins an exact stable version (bumped deliberately, since `just
@@ -32,23 +32,23 @@ check` runs Clippy with `-D warnings`) with `clippy` and `rustfmt`; rustup insta
 
 ## Package names
 
-The six package names (`dejaview`, `dejaview-core`, `dejaview-providers`, `dejaview-tools`,
-`dejaview-eval`, `dejaview-testkit`) were all unregistered on crates.io on 2026-10-26, so no
+The six package names (`squint`, `squint-core`, `squint-providers`, `squint-tools`,
+`squint-eval`, `squint-testkit`) were all unregistered on crates.io on 2026-10-26, so no
 fallback name is needed.
 
 ## Publishing
 
 The shipped rule sets, prompt template and model catalog live inside the crates that embed them
-(`crates/dejaview-core/rules/`, `crates/dejaview-core/prompts/`,
-`crates/dejaview-providers/catalog.toml`), so a published crate builds from its own files. The core
+(`crates/squint-core/rules/`, `crates/squint-core/prompts/`,
+`crates/squint-providers/catalog.toml`), so a published crate builds from its own files. The core
 crate's dev-dependency on the testkit is path-only (no version): `cargo publish` drops it, which
 breaks the cycle between the two crates.
 
 - `just publish-dry-run` (`scripts/publish.sh --dry-run`) packages and verifies every crate as
   `cargo publish --workspace` would, uploading nothing. The real publication is the owner's:
   `scripts/publish.sh` from a clean checkout whose `HEAD` carries the tag `v<version>`, after
-  `cargo login`. Cargo orders the crates itself: core, testkit, providers, tools, eval, dejaview.
-- `just registry-install-test` (`scripts/registry-install-test.sh`) installs `dejaview` from the
+  `cargo login`. Cargo orders the crates itself: core, testkit, providers, tools, eval, squint.
+- `just registry-install-test` (`scripts/registry-install-test.sh`) installs `squint` from the
   packaged `.crate` files in a scratch directory outside the repository, with the sibling crates
   supplied from the extracted packages the way crates.io would supply them, then runs the offline
   smoke. The stage is removed on exit; `REGISTRY_STAGE_DIR` may name it, and must then be new or
@@ -57,7 +57,7 @@ breaks the cycle between the two crates.
   `--version`, `tools list`, `rules show`, and a `check` without a credential that must stop with
   `auth:` and exit 64 before anything leaves the machine.
 
-The `package` workflow runs all three on every push. `dejaview --version` prints the short commit;
+The `package` workflow runs all three on every push. `squint --version` prints the short commit;
 a packaged crate has no repository, so the build script reads the commit `cargo package` records
 in `.cargo_vcs_info.json` instead.
 
@@ -81,7 +81,7 @@ stale. The `package` workflow runs the same check.
   builds the archives as workflow artifacts without releasing.
 - Locally, `just archive-build` builds this machine's archive into `target/distrib/` (`dist build`
   for the host target; the other targets cross-compile only on their runners) and
-  `just archive-smoke target/distrib/dejaview-<target>.tar.xz` smokes it, verifying the checksum
+  `just archive-smoke target/distrib/squint-cli-<target>.tar.xz` smokes it, verifying the checksum
   file when one sits beside the archive. CI sets `REQUIRE_CHECKSUM=1`, so a missing checksum file
   fails there.
 - `just live-smoke <binary>` (`scripts/live-smoke.sh`) is the paid smoke behind owner decision 4:
@@ -110,7 +110,7 @@ not reproduce.
 
 ## Credentials
 
-dejaview reads API keys from the environment only and never writes them to disk. Keep them in a
+squint reads API keys from the environment only and never writes them to disk. Keep them in a
 `.env` file (git ignores it; `.env.example` lists the names) and load it into the shell before a
 live run:
 
@@ -118,6 +118,6 @@ live run:
 set -a; source .env; set +a
 ```
 
-The `DEJAVIEW_*_ACCOUNT` entries feed the `[privacy] account` attestation through `${…}` expansion
-in the config, for example `account = "anthropic:${DEJAVIEW_ANTHROPIC_ACCOUNT}"`.
+The `SQUINT_*_ACCOUNT` entries feed the `[privacy] account` attestation through `${…}` expansion
+in the config, for example `account = "anthropic:${SQUINT_ANTHROPIC_ACCOUNT}"`.
 

@@ -1,0 +1,25 @@
+[package]
+name = "squint-tools"
+description = "squint built-in tools and MCP client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+squint-core = { workspace = true }
+image = { workspace = true }
+jsonschema = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+toml = { workspace = true }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+squint-testkit = { workspace = true }
+tokio = { workspace = true }

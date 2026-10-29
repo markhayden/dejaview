@@ -10,7 +10,7 @@ appear in it.
 
 ## Decision
 
-`dejaview.toml`, one per use case or job type, with sections `[provider]`, `[images]`, `[rules]`,
+`squint.toml`, one per use case or job type, with sections `[provider]`, `[images]`, `[rules]`,
 `[tools]`, `[budget]`, `[cache]`, `[privacy]`, `[output]`. CLI flags override single values.
 Secrets come only from the environment, expanded with `${VAR}`. The resolved config, redacted, is
 written into every report.

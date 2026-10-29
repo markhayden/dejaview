@@ -16,7 +16,7 @@ stderr captured; `initialize` requiring exactly `2025-11-25` and the `tools` cap
 paginated `tools/list` frozen into manifests; `tools/call` with one id per call for the process
 lifetime, concurrent only when declared; a per-call deadline after which the client sends
 `notifications/cancelled`, tombstones the id and never reuses the process; a custom
-`dejaview/reset` request; exclusive leases across runs with one acquisition deadline; shutdown
+`squint/reset` request; exclusive leases across runs with one acquisition deadline; shutdown
 escalation; and a synchronous surface, because the `Tool` trait the run drives is synchronous.
 
 `rmcp` 3.8.0 (Apache-2.0, crates.io, checked 2026-10-28) is the official SDK. It knows
@@ -27,7 +27,7 @@ async service with `futures`, `tokio-util`, `tracing` and friends as dependencie
 
 ## Decision
 
-Keep the in-house client (`crates/dejaview-tools/src/mcp/`, about nine hundred lines with the
+Keep the in-house client (`crates/squint-tools/src/mcp/`, about nine hundred lines with the
 pack, and as many again of tests): a synchronous, multiplexed JSON-RPC client over the child's
 stdio.
 
@@ -48,7 +48,7 @@ stdio.
 - **`rmcp`.** Its transport, versioning and typed messages are sound, and it would track the
   protocol as it moves. Against it here: the harness would run a tokio runtime inside a
   synchronous `Tool` call on a thread of its own (the run already drives tool calls on threads,
-  with cancellation listened for beside them); the contract's custom request (`dejaview/reset`),
+  with cancellation listened for beside them); the contract's custom request (`squint/reset`),
   its lease and taint rules, its exact-blocks rule and its one-deadline acquisition would all
   still be written here, around the SDK; and the SDK's dependency tree is large for a binary
   whose MCP needs fit in a few hundred lines. The client is small enough to read in one sitting,
@@ -60,7 +60,7 @@ stdio.
 ## Consequences
 
 - The client's surface is the harness's own: additions follow the spec, not an SDK's release
-  notes, and the fake server (`dejaview-testkit-mcp`) grows a flag for every misbehaviour the
+  notes, and the fake server (`squint-testkit-mcp`) grows a flag for every misbehaviour the
   tests need (`--page-size`, `--loop-cursor`, `--concurrent`, `--extra-measurement`,
   `--text-block`, beside the lifecycle flags of 1.13).
 - A batch of calls whose tools all declare `concurrent = true` is dispatched together by the run

@@ -11,8 +11,8 @@ Nothing runs in a browser except a static report viewer. The ML tools stay Pytho
 
 ## Decision
 
-Rust, stable, edition 2024. A Cargo workspace: `dejaview-core` (library), `dejaview-providers`,
-`dejaview-tools`, `dejaview-eval`, `dejaview-cli` (thin binary). Server and Lambda crates are
+Rust, stable, edition 2024. A Cargo workspace: `squint-core` (library), `squint-providers`,
+`squint-tools`, `squint-eval`, `squint-cli` (thin binary). Server and Lambda crates are
 added later as further thin consumers of the core. Release binaries for macOS arm64 and Linux
 x86_64 and arm64, plus `cargo install`. Pure-Rust dependencies (`rustls`, `image`) so cross
 compilation stays painless.

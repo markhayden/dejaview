@@ -38,19 +38,19 @@ model = "claude-sonnet-5-5"
 [[matrix.models]]
 profile = "google-ai-studio"
 model = "gemini-3.8-flash"
-account = "google:${DEJAVIEW_GOOGLE_ACCOUNT}"
+account = "google:${SQUINT_GOOGLE_ACCOUNT}"
 
 [[matrix.models]]
 profile = "google-ai-studio"
 model = "gemini-4-argon"
-account = "google:${DEJAVIEW_GOOGLE_ACCOUNT}"
+account = "google:${SQUINT_GOOGLE_ACCOUNT}"
 
 [[matrix.models]]
 profile = "openai"
 model = "gpt-6.1-terra"
-account = "openai:${DEJAVIEW_OPENAI_ACCOUNT}"
+account = "openai:${SQUINT_OPENAI_ACCOUNT}"
 
 [[matrix.models]]
 profile = "openai"
 model = "gpt-6.1-sol"
-account = "openai:${DEJAVIEW_OPENAI_ACCOUNT}"
+account = "openai:${SQUINT_OPENAI_ACCOUNT}"

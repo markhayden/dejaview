@@ -4,7 +4,7 @@ import io
 
 from PIL import Image
 
-from dejaview_sets import ops
+from squint_sets import ops
 
 
 def png(w=64, h=48, colour=(200, 40, 40)):

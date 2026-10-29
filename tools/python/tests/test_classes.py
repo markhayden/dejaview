@@ -15,16 +15,16 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from dejaview_tools import classes, models, server
-from dejaview_tools.context import Context
+from squint_tools import classes, models, server
+from squint_tools.context import Context
 
 FIXTURES = Path(__file__).parent / "fixtures" / "classes"
-MODELS = Path(os.environ["DEJAVIEW_MODELS"]) if os.environ.get("DEJAVIEW_MODELS") else None
+MODELS = Path(os.environ["SQUINT_MODELS"]) if os.environ.get("SQUINT_MODELS") else None
 RECORD = models.Record.load()
 PRESENT = models.artifact_path(RECORD, MODELS).is_file()
 needs_model = pytest.mark.skipif(
     not PRESENT,
-    reason=f"the segmenter is not under {models.artifact_path(RECORD, MODELS).parent}: run `dejaview-tools fetch`",
+    reason=f"the segmenter is not under {models.artifact_path(RECORD, MODELS).parent}: run `squint-tools fetch`",
 )
 
 
@@ -85,7 +85,7 @@ class FakeSegmenter:
         self.bands = bands
 
     def segment(self, images):
-        from dejaview_tools.segmenter import prepare, semantic_map  # noqa: F401
+        from squint_tools.segmenter import prepare, semantic_map  # noqa: F401
 
         out = []
         for rgb in images:
@@ -196,6 +196,6 @@ def test_the_server_lists_classes_as_a_class_difference_tool():
         io.StringIO(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}) + "\n"), out
     )
     listed = {t["name"]: t for t in json.loads(out.getvalue())["result"]["tools"]}
-    note = listed["classes"]["annotations"]["dejaview"]
+    note = listed["classes"]["annotations"]["squint"]
     assert note["evidence_kind"] == "class_difference" and note["requires"] == ["align"]
-    assert listed["classes"]["inputSchema"]["required"] == ["frame", "against", "bbox", "_dejaview"]
+    assert listed["classes"]["inputSchema"]["required"] == ["frame", "against", "bbox", "_squint"]

@@ -55,8 +55,8 @@ defect.
    item in the manifest's construction notes and in the evalsets repository README. The weights
    licence (Apache 2.0 for klein) and the vendors' terms above permit this for all three; the
    OpenAI clause is confirmed by the owner from the terms page.
-5. **Where things live.** Images in the public `dejaview-evalsets` repository, cloned beside the
-   harness at `../dejaview-evalsets`; manifests, jobs and confirmed labels in this repository under
+5. **Where things live.** Images in the public `squint-evalsets` repository, cloned beside the
+   harness at `../squint-evalsets`; manifests, jobs and confirmed labels in this repository under
    `evalsets/`; construction records, drafts, contact sheets and blind labels in owner storage.
 
 ## Dry run (2026-10-27)
@@ -69,7 +69,7 @@ region landed on the bicycle (x 0.19 to 0.45, y 0.78 to 0.97 of the frame) and t
 reported one secondary change, a strip along the top edge (roofline and sky, y 0 to 0.13) the
 generator altered unasked, with sparse pixel noise over the rest of the image. That is the drift
 the owner's review exists to catch; the draft label names it so the reviewer looks there. The
-whole run cost a few cents. `dejaview sets check` accepted the built set after every draft label
+whole run cost a few cents. `squint sets check` accepted the built set after every draft label
 was confirmed. The same plan runs offline with the fake generator as the toolkit's self-test.
 
 ## Alternatives

@@ -1,7 +1,7 @@
 [project]
-name = "dejaview-tools"
+name = "squint-tools"
 version = "0.0.1"
-description = "dejaview Python tool pack: an MCP server of evidence tools"
+description = "squint Python tool pack: an MCP server of evidence tools"
 requires-python = ">=3.12"
 license = "Apache-2.0"
 dependencies = [
@@ -11,7 +11,7 @@ dependencies = [
 ]
 
 [project.scripts]
-dejaview-tools = "dejaview_tools.cli:main"
+squint-tools = "squint_tools.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.0,<0.13.0"]

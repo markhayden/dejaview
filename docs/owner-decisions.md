@@ -31,7 +31,7 @@ A blank entry blocks the task named in its row. Dates are when the owner decided
   exports afresh and records provenance. Golden panoramas for the equirectangular path are
   generated or taken from CC-licensed sources.
 - **12.** M6 is funded; `regions` can reach confirmed admission in this release.
-- **3 to 9.** Spend caps are set when each paid task is about to run, against `dejaview eval
+- **3 to 9.** Spend caps are set when each paid task is about to run, against `squint eval
   estimate` where it exists; the task refuses to start without its cap entry.
 
 ## Open questions for 3.2a

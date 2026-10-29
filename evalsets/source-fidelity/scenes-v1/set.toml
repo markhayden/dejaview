@@ -1,10 +1,10 @@
-# Built by dejaview-sets; labels confirmed by the owner.
+# Built by squint-sets; labels confirmed by the owner.
 [set]
 id = "source-fidelity/scenes-v1"
 use_case = "source-fidelity"
 split = "dev"
 licence = "CC-BY-4.0"
-images_repo = "github.com/markhayden/dejaview-evalsets"
+images_repo = "github.com/markhayden/squint-evalsets"
 images_rev = "eefad1b9964920fa865656792d30cf2548663193"
 labels = "labels.toml"
 families = "families.toml"

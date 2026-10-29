@@ -92,7 +92,7 @@
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "A tool's self-description. `model_schema` is what the provider receives; `input_schema` is\n`model_schema` plus the required `_dejaview` context; `output_schema` names the measurements\nthe tool may return (the envelope shape itself is fixed).",
+  "description": "A tool's self-description. `model_schema` is what the provider receives; `input_schema` is\n`model_schema` plus the required `_squint` context; `output_schema` names the measurements\nthe tool may return (the envelope shape itself is fixed).",
   "properties": {
     "accepts_hints": {
       "default": [],

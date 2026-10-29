@@ -12,15 +12,15 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from dejaview_tools import models, regions, server
-from dejaview_tools.context import Context
+from squint_tools import models, regions, server
+from squint_tools.context import Context
 
-MODELS = Path(os.environ["DEJAVIEW_MODELS"]) if os.environ.get("DEJAVIEW_MODELS") else None
+MODELS = Path(os.environ["SQUINT_MODELS"]) if os.environ.get("SQUINT_MODELS") else None
 RECORD = models.Record.load()
 PRESENT = models.artifact_path(RECORD, MODELS).is_file()
 needs_model = pytest.mark.skipif(
     not PRESENT,
-    reason=f"the segmenter is not under {models.artifact_path(RECORD, MODELS).parent}: run `dejaview-tools fetch`",
+    reason=f"the segmenter is not under {models.artifact_path(RECORD, MODELS).parent}: run `squint-tools fetch`",
 )
 
 
@@ -187,7 +187,7 @@ def test_the_server_lists_regions_with_its_dependencies():
         io.StringIO(json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}) + "\n"), out
     )
     listed = {t["name"]: t for t in json.loads(out.getvalue())["result"]["tools"]}
-    note = listed["regions"]["annotations"]["dejaview"]
+    note = listed["regions"]["annotations"]["squint"]
     assert note["requires"] == ["align"] and note["frame_args"] == ["frame", "against"]
     assert note["accepts_hints"] == ["regions"] and note["returns"]["max_regions"] == 12
 
@@ -196,7 +196,7 @@ class FakeSegmenter:
     """Every pixel one class, so the photometric passes are tested on their own."""
 
     def segment(self, images):
-        from dejaview_tools.segmenter import prepare
+        from squint_tools.segmenter import prepare
 
         out = []
         for rgb in images:

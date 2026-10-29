@@ -1,8 +1,8 @@
 # Writing and extending rules
 
 Rules and job requirements share one model, the **obligation** (`SPEC.md`, "Obligations"). This
-page is the practical version. Code: `crates/dejaview-core/src/obligations.rs`; shipped sets:
-`crates/dejaview-core/rules/`, embedded in the binary at build time.
+page is the practical version. Code: `crates/squint-core/src/obligations.rs`; shipped sets:
+`crates/squint-core/rules/`, embedded in the binary at build time.
 
 ## An obligation
 
@@ -64,5 +64,5 @@ image that no mandatory obligation consults is an error.
 | `brief-compliance` | candidate | text_region, class_difference |
 | `product-fidelity` | candidate, reference | subject_match, text_region, change_region |
 
-Inspect the merged result for a config and job with `dejaview rules show --config … --job …`, and
-the rendered Obligations section with `dejaview check … --dry-run`.
+Inspect the merged result for a config and job with `squint rules show --config … --job …`, and
+the rendered Obligations section with `squint check … --dry-run`.

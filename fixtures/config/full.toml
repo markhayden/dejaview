@@ -20,9 +20,9 @@ enabled = ["view", "align", "regions", "classes"]
 order = ["align", "regions", "view", "classes"]
 
 [tools.packs.python]
-package = "dejaview-tools"
+package = "squint-tools"
 version = "0.1.0"
-env = ["DEJAVIEW_MODEL_DIR"]
+env = ["SQUINT_MODEL_DIR"]
 startup_timeout_s = 120
 shared = false
 
@@ -43,13 +43,13 @@ on_unsure = "pass"
 on_error = "review"
 
 [cache]
-dir = "~/.cache/dejaview"
+dir = "~/.cache/squint"
 read = true
 write = true
 
 [privacy]
 cloud_calls = true
-account = "fake:${DEJAVIEW_TEST_ACCOUNT}"
+account = "fake:${SQUINT_TEST_ACCOUNT}"
 
 [output]
-dir = "./dejaview-out"
+dir = "./squint-out"

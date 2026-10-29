@@ -1,7 +1,7 @@
 # Evaluation sets
 
 An evaluation item is a complete job plus labels. The job is canonical and runnable by
-`dejaview check --job`; the labels live in a separate file so blind sets ship without them. The
+`squint check --job`; the labels live in a separate file so blind sets ship without them. The
 contract is `SPEC.md` under "Evaluation" ("Set manifest", "Seal"); this page is how the sets are
 laid out and handled. How public sets are generated, labelled from construction records and
 reviewed image by image arrives with task 3.2a.
@@ -31,7 +31,7 @@ tests mutate.
 
 ## Commands
 
-- `dejaview sets check <root or set directory>` loads every set under `<root>` (or the one set)
+- `squint sets check <root or set directory>` loads every set under `<root>` (or the one set)
   and fails on the first problem: a set not at its id's path; an unknown or wrongly versioned
   rules base, or one for another use case; an item whose job has another use case or does not
   resolve against the pinned rules (a missing required role, for instance); an undeclared family;
@@ -40,13 +40,13 @@ tests mutate.
   set has no label file and carries `labels_sha256`); a region with the wrong geometry; and,
   across sets of one use case, a family in more than one split. Exit 0, or 1 with the reason on
   stderr; 64 when the root holds no set.
-- `dejaview sets fetch --set <id or path> [--root evalsets]` places every pinned image beside the
+- `squint sets fetch --set <id or path> [--root evalsets]` places every pinned image beside the
   manifest from `images_repo`: `github.com/<owner>/<repo>` serves the file raw at `images_rev`,
   an `https://` base serves it at `<base>/<set id>/<path>`, and anything else is a directory
   relative to the set with the same `<set id>/<path>` layout. A download whose hash differs from
   the pin is refused and leaves nothing behind; an image already in place with the right hash is
   left alone.
-- `dejaview sets seal --set <id or path> --attest "<text>" [--labels-out <dir>]` checks the set,
+- `squint sets seal --set <id or path> --attest "<text>" [--labels-out <dir>]` checks the set,
   then writes `seal.toml`: one SHA-256 per component (sorted item ids, family assignments, every
   canonical job, every image file, the pinned rules' name, version and content, the label file or
   its external hash) and one over all of them, with the time and the owner's attestation that no
@@ -55,7 +55,7 @@ tests mutate.
   lies inside any git repository); the manifest's
   `labels = …` line becomes `labels_sha256 = …`. The timestamp and attestation are outside the
   hash, so re-sealing unchanged content reproduces it.
-- `dejaview sets verify-seal --set <id or path>` recomputes every component and names the ones
+- `squint sets verify-seal --set <id or path>` recomputes every component and names the ones
   that changed. Exit 0, or 1 with the components on stderr.
 
 The seal records the owner's attestation; prior exposure of the items to a judge or tool cannot
@@ -63,7 +63,7 @@ be proven by code, and gate scoring treats journal searches as supporting eviden
 
 ## Building a set (task 3.2a, ADR 0013)
 
-`scripts/sets/` is a small Python toolkit (`uv run dejaview-sets …` from that directory). A
+`scripts/sets/` is a small Python toolkit (`uv run squint-sets …` from that directory). A
 **plan** names the set and its families; each family is one scene or subject with one generator
 (`fal` for FLUX.2 klein, `openai` for gpt-image-2, `gemini` for Gemini 3.1 Flash Image, or
 `fake`), a source prompt and seed, the protected subjects, a brief, and its items, each made from
@@ -104,11 +104,11 @@ offline self-test with the fake generator); the sets themselves are under `evals
 
 ```
 cd scripts/sets
-uv run dejaview-sets build --plan <plan.toml> --out evalsets/<use-case>/<set> --owner <owner storage>
+uv run squint-sets build --plan <plan.toml> --out evalsets/<use-case>/<set> --owner <owner storage>
 # review <owner storage>/<set id>/contact-<family>.png and labels-draft.toml:
 # set each label's status to "confirmed" or "struck", fill adjudicated_on
-uv run dejaview-sets promote --draft <owner storage>/<set id>/labels-draft.toml --set evalsets/<use-case>/<set>
-dejaview sets check evalsets/
+uv run squint-sets promote --draft <owner storage>/<set id>/labels-draft.toml --set evalsets/<use-case>/<set>
+squint sets check evalsets/
 ```
 
 `rebuild --item <id> [--seed-offset N]` regenerates one item from the family's images already on
@@ -123,9 +123,9 @@ images, the family's source stored once under `families/`) and, to owner storage
 construction record (generator, model, prompt, seed, every edit instruction, hashes, dates), the
 draft labels and a contact sheet per family. `promote` publishes the confirmed labels as
 `labels.toml` and removes struck items from the set; a draft still unreviewed is refused. The
-owner then pushes the images to the `dejaview-evalsets` repository and commits the manifest,
+owner then pushes the images to the `squint-evalsets` repository and commits the manifest,
 jobs and labels here. `just sets-check` lints and tests the toolkit and runs the offline dry run
-through `dejaview sets check`; the live dry run of 2026-10-27 is recorded in ADR 0013.
+through `squint sets check`; the live dry run of 2026-10-27 is recorded in ADR 0013.
 
 **Blind sets** (task 5.5) differ in two ways. The plan lives in owner storage, never in a
 repository, because an item's construction gives away its label: `source-fidelity/blind-v1` was

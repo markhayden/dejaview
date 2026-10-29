@@ -2,7 +2,7 @@
 
 Owner decision 4 (2026-10-27): the standing $25 per vendor applies. Run on 2026-10-27 with
 `scripts/live-smoke.sh` from the binary inside the release archive built by `dist` on this machine
-(`dejaview-aarch64-apple-darwin.tar.xz`, built from the 2.10a commit), after
+(`squint-cli-aarch64-apple-darwin.tar.xz`, built from the 2.10a commit), after
 `scripts/archive-smoke.sh` had verified the checksum file and passed the offline smoke on the same
 archive. The Linux x86_64 and arm64 archives are built and smoked by the `archive` job of the
 `package` workflow and, on a tag, by the `archive-smoke` workflow before the release is created.

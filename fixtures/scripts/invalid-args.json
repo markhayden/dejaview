@@ -6,7 +6,7 @@
         "name": "fake_regions",
         "arguments": {
           "image": "candidate",
-          "_dejaview": {}
+          "_squint": {}
         }
       }
     ],

@@ -5,7 +5,7 @@ import random
 
 from PIL import Image
 
-from dejaview_sets import regions
+from squint_sets import regions
 
 
 def png(im):

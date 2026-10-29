@@ -1,4 +1,4 @@
-# Implementation plan: dejaview harness
+# Implementation plan: squint harness
 
 Status: draft 4, 2026-10-26, written from `SPEC.md` draft 5 (approved) and revised against Codex
 plan reviews 1 to 3 (`docs/reviews/plan-review-*.md`). Review 3 judged draft 3 ready with
@@ -20,7 +20,7 @@ called admitted.
 | Milestone | Delivers | Tag |
 |---|---|---|
 | M0 Scaffold | workspace, tool bootstrap, CI, lint, docs skeleton, README sections, owner readiness | `m0` |
-| M1 Skeleton | `dejaview check` end to end against a scripted fake provider, every state, offline; minimal MCP client, minimal provisioning proof, frozen statistics | `m1` |
+| M1 Skeleton | `squint check` end to end against a scripted fake provider, every state, offline; minimal MCP client, minimal provisioning proof, frozen statistics | `m1` |
 | M2 Adapters | privacy enforcement; Anthropic, Gemini, OpenAI adapters with fixtures; catalog; image prep; live smoke; packaging and distribution | `m2` |
 | M3 Sets and baseline | set tooling, five public dev sets plus five adversarial sets, eval runner with execution descriptor and durable ledger, metrics, gate lifecycle, viewer, arm A baseline | `m3` |
 | M4 Built-in tools | alignment spike, Tool registry, `view`/`align`/`resize`/`edge_similarity`/`change_map`, full MCP client, arm C, MODEL.md | `m4` |
@@ -28,35 +28,35 @@ called admitted.
 | M6 Confirmation | a distinct sealed set of at least 50 items, confirmation gate, admission record | `m6` |
 
 Deferred past M6 with their own ADRs: server mode, Bedrock and Vertex profiles, the ChatGPT-plan
-OAuth scheme, `dejaview tools serve`, scheduled canaries in CI, Vercel and Cloudflare profiles if
+OAuth scheme, `squint tools serve`, scheduled canaries in CI, Vercel and Cloudflare profiles if
 their fixtures do not pass during M2.
 
 ## Crate dependency graph
 
 ```
-dejaview-core        no dependency on other workspace crates; owns job, images, frames, obligations,
+squint-core        no dependency on other workspace crates; owns job, images, frames, obligations,
                      checklist, prompt, state machine, submission, aggregation, decision, journal,
                      report, ledger, cache, and the Provider and Tool traits with their request,
                      response, manifest and envelope types
-dejaview-providers   depends on core; adapters, wire schemas, profiles, catalog, auth, fixtures player
-dejaview-tools       depends on core; built-ins, MCP client, provisioning, projections
-dejaview-eval        depends on core, providers, tools; sets, seal, matrix, descriptor, eval ledger,
+squint-providers   depends on core; adapters, wire schemas, profiles, catalog, auth, fixtures player
+squint-tools       depends on core; built-ins, MCP client, provisioning, projections
+squint-eval        depends on core, providers, tools; sets, seal, matrix, descriptor, eval ledger,
                      metrics, bootstrap, gates
-dejaview-testkit     depends on core; scripted fake provider, fake tool, fake MCP server binary
-dejaview (package)   directory crates/dejaview-cli; package name and binary name are both `dejaview`;
-                     every selector in this plan is `-p dejaview`; depends on core, providers, tools,
+squint-testkit     depends on core; scripted fake provider, fake tool, fake MCP server binary
+squint (package)   directory crates/squint-cli; package name and binary name are both `squint`;
+                     every selector in this plan is `-p squint-cli`; depends on core, providers, tools,
                      eval; optional dependency on testkit behind the non-default feature `testkit`
 ```
 
 The `testkit` feature is the one declared production edge from the CLI to testkit, because an
-optional dependency is still a dependency for publication: `dejaview-testkit` is a published
-package, and the publication order is `dejaview-core`, `dejaview-testkit`, `dejaview-providers`,
-`dejaview-tools`, `dejaview-eval`, `dejaview`. Ordinary and release builds do not enable the
+optional dependency is still a dependency for publication: `squint-testkit` is a published
+package, and the publication order is `squint-core`, `squint-testkit`, `squint-providers`,
+`squint-tools`, `squint-eval`, `squint`. Ordinary and release builds do not enable the
 feature and reject `--provider-script` as an unknown flag; that rejection is tested against a
 separately built feature-off executable, since a feature-on binary cannot prove it. Dev-dependency
 edges (every crate's tests may use testkit) are declared separately from production edges, and the
 crate-graph check runs with all features enabled. `just check` runs both feature configurations:
-`cargo test --workspace` and `cargo test --workspace --features dejaview/testkit`, plus Clippy in
+`cargo test --workspace` and `cargo test --workspace --features squint-cli/testkit`, plus Clippy in
 both; every filtered test invocation in this plan must enumerate and execute at least one test
 (`--list` compared in the `just` recipe). Availability of all six package names on crates.io is
 confirmed in 0.1 and a fallback recorded by ADR if needed.
@@ -113,7 +113,7 @@ run locally with `just ci-local` before any push.
 **Commits.** Conventional Commits with a scope. Every commit on a milestone branch leaves
 `just check` green, which runs `cargo fmt --all -- --check`, `cargo clippy --workspace
 --all-targets -- -D warnings` in both feature configurations, `cargo test --workspace`,
-`cargo test --workspace --features dejaview/testkit` and `cargo deny check`; a commit that cannot
+`cargo test --workspace --features squint-cli/testkit` and `cargo deny check`; a commit that cannot
 is not made. `Cargo.lock` is committed. The
 spec, plan, README and docs are updated in the same commit as the change they describe.
 Attribution lines follow the repository's conventions. Secrets, private images and
@@ -154,7 +154,7 @@ or `main.rs`, a crate-level `thiserror` enum and one trivial test; `rust-toolcha
 stable with the `clippy` and `rustfmt` components; `docs/bootstrap.md` giving the one manual step
 (`cargo install just --version <pinned>`), then `just bootstrap` installing pinned `cargo-deny`
 and `cargo-dist` (and `uv` if absent) and `just check` running fmt, Clippy in both feature
-configurations, `cargo test --workspace`, `cargo test --workspace --features dejaview/testkit`,
+configurations, `cargo test --workspace`, `cargo test --workspace --features squint-cli/testkit`,
 deny, the crate-graph check with all features, and a `--list` check that every named filtered
 suite executes at least one test; `deny.toml` with the allowed-licence list; the `testkit` feature
 wiring; availability of all six package names on crates.io checked and recorded (ADR 0012 if a
@@ -164,7 +164,7 @@ fallback is needed).
 - [ ] After the documented `just` install, `just bootstrap && just check` passes on a clean clone.
 - [ ] The crate-graph check distinguishes production and dev edges and fails CI on any edge
       outside the graph.
-- [ ] `cargo run -p dejaview -- --version` prints version and short commit; a separately built
+- [ ] `cargo run -p squint-cli -- --version` prints version and short commit; a separately built
       feature-off executable rejects `--provider-script`; the feature-on build lists it.
 
 **Verification.** `cargo install just --version <pinned> && just bootstrap && just check`.
@@ -180,7 +180,7 @@ and refuses staged content matching credential-shaped patterns (full-shape regex
 `sk-ant-[A-Za-z0-9_-]{24,}`, `AIza[0-9A-Za-z_-]{35}`, `sk-proj-[A-Za-z0-9_-]{24,}`,
 `AKIA[0-9A-Z]{16}`, `ghp_[A-Za-z0-9]{36}`). No file is exempt; instead `scripts/synthetic-tokens.txt`
 enumerates the exact synthetic token values the fixtures and the hook test use, and only those
-values are allowed anywhere. `.gitignore` for `target/`, `eval-out/`, `dejaview-out/`,
+values are allowed anywhere. `.gitignore` for `target/`, `eval-out/`, `squint-out/`,
 `*.local.toml`, `.venv/`.
 
 **Acceptance.**
@@ -238,22 +238,22 @@ Generators and licence are deferred to 3.2a. Blank entries name the task they bl
 **Description.** The thinnest valid end-to-end path: a job with a candidate and a source by path,
 decoded without bounds checks (1.2 adds them); one hard-coded mandatory obligation `SF2` with
 scope `candidate` resolving to one instance; a one-item checklist; a minimal system prompt; the
-`Provider` trait exactly as the spec writes it with a scripted fake in `dejaview-testkit`
+`Provider` trait exactly as the spec writes it with a scripted fake in `squint-testkit`
 returning a `submit_verdict` whose single item is `held` or `violation`; schema-light validation;
 aggregation of that one row; a journal with `resolved`, `turn_sent`, `turn_received`,
 `submission`, `verdict`; a minimal `report.json`; exit codes 0 and 1; the `testkit` feature and
 `--provider-script` flag.
 
-**CLI scenario.** `cargo run -p dejaview --features testkit -- check --config fixtures/config/minimal.toml --job fixtures/jobs/pair.toml --provider-script fixtures/scripts/held.json` exits 0; with `violation.json` exits 1; both write a journal and report; a build without the feature rejects the flag.
+**CLI scenario.** `cargo run -p squint-cli --features testkit -- check --config fixtures/config/minimal.toml --job fixtures/jobs/pair.toml --provider-script fixtures/scripts/held.json` exits 0; with `violation.json` exits 1; both write a journal and report; a build without the feature rejects the flag.
 
 **Acceptance.**
 - [ ] Both scenarios and the feature-off rejection pass in tests; the report shows the instance,
       disposition and row; the journal is append-only JSONL and the report is derived from it.
 
-**Verification.** `cargo test -p dejaview --features testkit --test walking_slice`.
+**Verification.** `cargo test -p squint-cli --features testkit --test walking_slice`.
 
-**Dependencies.** 0.1. **Files.** `crates/dejaview-core/src/{job,provider,run,journal,report}.rs`,
-`crates/dejaview-testkit/src/provider.rs`, `crates/dejaview-cli/src/main.rs`, fixtures.
+**Dependencies.** 0.1. **Files.** `crates/squint-core/src/{job,provider,run,journal,report}.rs`,
+`crates/squint-testkit/src/provider.rs`, `crates/squint-cli/src/main.rs`, fixtures.
 **Size.** M. Tag `m1.1`.
 
 ### Task 1.2: Canonical images and frames registry
@@ -271,14 +271,14 @@ hashes equal to `shasum -a 256`; a 60 MP image is refused with `error: resolve` 
       enforced by a table test; crop-to-raw round trip within 1e-6; wholly outside is an error and
       partly outside is flagged.
 
-**Verification.** `cargo test -p dejaview-core -- image frames`.
+**Verification.** `cargo test -p squint-core -- image frames`.
 
-**Dependencies.** 1.1. **Files.** `crates/dejaview-core/src/{image,frames}.rs`, `fixtures/images/`.
+**Dependencies.** 1.1. **Files.** `crates/squint-core/src/{image,frames}.rs`, `fixtures/images/`.
 **Size.** M.
 
 ### Task 1.3: Config loading, validation and the shorthand job
 
-**Description.** The full `dejaview.toml` schema, `schemas/config-v1.json`, `${VAR}` from the
+**Description.** The full `squint.toml` schema, `schemas/config-v1.json`, `${VAR}` from the
 environment only, CLI overrides as repeatable `--set path=value`, credential-name refusal in pack
 `env`, the `cloud_calls` gate,
 redacted resolved config in the report, a built-in `fake` profile for tests, and the shorthand
@@ -294,9 +294,9 @@ byte-identical resolved-job sections in their reports.
       test equals the committed one; a secret in the environment appears in no output path;
       shorthand equivalence fixture passes.
 
-**Verification.** `cargo test -p dejaview-core -- config` and `cargo test -p dejaview --features testkit --test shorthand`.
+**Verification.** `cargo test -p squint-core -- config` and `cargo test -p squint-cli --features testkit --test shorthand`.
 
-**Dependencies.** 1.1. **Files.** `crates/dejaview-core/src/config.rs`, `crates/dejaview-cli/src/args.rs`,
+**Dependencies.** 1.1. **Files.** `crates/squint-core/src/config.rs`, `crates/squint-cli/src/args.rs`,
 `schemas/config-v1.json`. **Size.** M.
 
 ### Task 1.4a: Obligation model, merge and validation
@@ -305,17 +305,17 @@ byte-identical resolved-job sections in their reports.
 files, job requirements, merge order, every validation rule in the spec except those needing the
 tool registry (evidence-kind existence is checked in 1.5b).
 
-**CLI scenario.** `dejaview rules show --config …` prints the merged list with provenance; a
+**CLI scenario.** `squint rules show --config …` prints the merged list with provenance; a
 consumer file with a bad `waives` id fails naming the rule.
 
 **Acceptance.**
 - [ ] Table test with one failing fixture per validation rule; the spec's generic and
       architectural files merge to the documented result.
 
-**Verification.** `cargo test -p dejaview-core -- obligations`.
+**Verification.** `cargo test -p squint-core -- obligations`.
 
-**Dependencies.** 1.3. **Files.** `crates/dejaview-core/src/obligations.rs`,
-`crates/dejaview-cli/src/rules.rs`. **Size.** M.
+**Dependencies.** 1.3. **Files.** `crates/squint-core/src/obligations.rs`,
+`crates/squint-cli/src/rules.rs`. **Size.** M.
 
 ### Task 1.4b: Instances, rendering and shipped rule sets
 
@@ -331,29 +331,29 @@ the instance list.
 - [ ] Each error case tested; rendering snapshots committed and byte-stable; all six shipped
       files load and validate.
 
-**Verification.** `cargo test -p dejaview-core -- instances render`.
+**Verification.** `cargo test -p squint-core -- instances render`.
 
 **Dependencies.** 1.4a, 1.2 (the Pip job uses a base64 source). **Files.**
-`crates/dejaview-core/src/{instances,render}.rs`, `rules/`. **Size.** M.
+`crates/squint-core/src/{instances,render}.rs`, `rules/`. **Size.** M.
 
 ### Task 1.5a: Manifest and envelope types
 
-**Description.** The `Tool` trait, manifest type, model schema versus input schema, `_dejaview`
+**Description.** The `Tool` trait, manifest type, model schema versus input schema, `_squint`
 type, result envelope with `returns` bounds, evidence kinds, projection type, and a scripted fake
-tool in `dejaview-testkit`; `dejaview tools list`.
+tool in `squint-testkit`; `squint tools list`.
 
-**CLI scenario.** `dejaview tools list --config …` prints the fake tool's manifest as the model
+**CLI scenario.** `squint tools list --config …` prints the fake tool's manifest as the model
 will see it.
 
 **Acceptance.**
 - [ ] Manifest missing a required field refused; envelope over any bound is `error: tool`; model
-      argument containing `_dejaview` is `invalid_args`; `schemas/{manifest,envelope}-v1.json`
+      argument containing `_squint` is `invalid_args`; `schemas/{manifest,envelope}-v1.json`
       regenerated equal committed.
 
-**Verification.** `cargo test -p dejaview-core -- manifest envelope`.
+**Verification.** `cargo test -p squint-core -- manifest envelope`.
 
-**Dependencies.** 1.1. **Files.** `crates/dejaview-core/src/tool/{manifest,envelope}.rs`,
-`crates/dejaview-testkit/src/tool.rs`, `crates/dejaview-cli/src/tools.rs`. **Size.** M.
+**Dependencies.** 1.1. **Files.** `crates/squint-core/src/tool/{manifest,envelope}.rs`,
+`crates/squint-testkit/src/tool.rs`, `crates/squint-cli/src/tools.rs`. **Size.** M.
 
 ### Task 1.5b: Checklist and evidence binding
 
@@ -370,9 +370,9 @@ dependencies.
       for empty dependencies, two presented as items; the 25th region is `error: budget`; overlap
       cross-reference rendered.
 
-**Verification.** `cargo test -p dejaview-core -- checklist`.
+**Verification.** `cargo test -p squint-core -- checklist`.
 
-**Dependencies.** 1.2, 1.4b, 1.5a. **Files.** `crates/dejaview-core/src/checklist.rs`. **Size.** M.
+**Dependencies.** 1.2, 1.4b, 1.5a. **Files.** `crates/squint-core/src/checklist.rs`. **Size.** M.
 
 ### Task 1.6a: Submission schema and semantic validation
 
@@ -389,9 +389,9 @@ first failure is terminal until 1.8).
       location, inapplicable exemption, `observed` citing a mandatory id, evidence from a failed
       call, wrong location kind for the projection, mapping wholly outside).
 
-**Verification.** `cargo test -p dejaview-core -- submission validate`.
+**Verification.** `cargo test -p squint-core -- submission validate`.
 
-**Dependencies.** 1.5b. **Files.** `crates/dejaview-core/src/{submission,validate}.rs`,
+**Dependencies.** 1.5b. **Files.** `crates/squint-core/src/{submission,validate}.rs`,
 `schemas/submission-v1.json`. **Size.** M.
 
 ### Task 1.6b: Aggregation and decision tables
@@ -407,9 +407,9 @@ item exits 2 with both runs in the report.
       table row by row; all 16 decision pairs tested; matching eligibility, ordering and the
       `held` exception tested.
 
-**Verification.** `cargo test -p dejaview-core -- aggregate decision`.
+**Verification.** `cargo test -p squint-core -- aggregate decision`.
 
-**Dependencies.** 1.6a. **Files.** `crates/dejaview-core/src/{aggregate,decision}.rs`. **Size.** M.
+**Dependencies.** 1.6a. **Files.** `crates/squint-core/src/{aggregate,decision}.rs`. **Size.** M.
 
 ### Task 1.7a: State machine: tool turns
 
@@ -429,9 +429,9 @@ one dropped) then a submission shows both turns, all calls and two evidence item
       request-level controls change only as the catalog permits; tool definitions identical on
       every request.
 
-**Verification.** `cargo test -p dejaview-core -- run::tool_turns`.
+**Verification.** `cargo test -p squint-core -- run::tool_turns`.
 
-**Dependencies.** 1.6b. **Files.** `crates/dejaview-core/src/{run,prompt}.rs`, `prompts/v1.md`.
+**Dependencies.** 1.6b. **Files.** `crates/squint-core/src/{run,prompt}.rs`, `prompts/v1.md`.
 **Size.** M.
 
 ### Task 1.7b: State machine: final turn and terminal states
@@ -449,9 +449,9 @@ whose tool crashes and then submits validly still ends `error: tool`.
       `provider`, `budget` stub, `no_submission`, `submission_invalid` as single failure) has a
       scripted path; journal order asserted. Classes added by later tasks are tested there.
 
-**Verification.** `cargo test -p dejaview-core -- run::final_turn run::errors`.
+**Verification.** `cargo test -p squint-core -- run::final_turn run::errors`.
 
-**Dependencies.** 1.7a. **Files.** `crates/dejaview-core/src/run.rs`. **Size.** M. Tag `m1.2`.
+**Dependencies.** 1.7a. **Files.** `crates/squint-core/src/run.rs`. **Size.** M. Tag `m1.2`.
 
 ### Task 1.8: Repair protocol and retries
 
@@ -471,9 +471,9 @@ one exits 0 with one repair.
       provider history); retries on a mocked clock (429 with `retry-after: 2` waits 2 s; stops
       after `retries`; 400 fails immediately).
 
-**Verification.** `cargo test -p dejaview-core -- repair retry`.
+**Verification.** `cargo test -p squint-core -- repair retry`.
 
-**Dependencies.** 1.7b. **Files.** `crates/dejaview-core/src/{repair,retry}.rs`. **Size.** M.
+**Dependencies.** 1.7b. **Files.** `crates/squint-core/src/{repair,retry}.rs`. **Size.** M.
 
 ### Task 1.9: Cost ledger
 
@@ -490,9 +490,9 @@ request; the report shows the envelope.
       returns the difference; unknown usage charges the bound; release at the end; two concurrent
       decisions against one shared ledger cannot overshoot (barrier test).
 
-**Verification.** `cargo test -p dejaview-core -- ledger`.
+**Verification.** `cargo test -p squint-core -- ledger`.
 
-**Dependencies.** 1.8. **Files.** `crates/dejaview-core/src/ledger.rs`. **Size.** M.
+**Dependencies.** 1.8. **Files.** `crates/squint-core/src/ledger.rs`. **Size.** M.
 
 ### Task 1.10a: Journal and artifact durability
 
@@ -507,15 +507,15 @@ state reached.
       test); every referenced artifact exists before its event (crash test with an injected fault
       between write and append).
 
-**Verification.** `cargo test -p dejaview-core -- journal artifacts`.
+**Verification.** `cargo test -p squint-core -- journal artifacts`.
 
-**Dependencies.** 1.9. **Files.** `crates/dejaview-core/src/{journal,artifacts}.rs`. **Size.** M.
+**Dependencies.** 1.9. **Files.** `crates/squint-core/src/{journal,artifacts}.rs`. **Size.** M.
 
 ### Task 1.10b: Report, schema, rebuild and prune
 
 **Description.** `report.json` with every spec field, `schemas/report-v1.json`, a test that every
 boundary type derives the three traits with `deny_unknown_fields` and a version field,
-`dejaview report rebuild` from a partial journal, `dejaview report prune`.
+`squint report rebuild` from a partial journal, `squint report prune`.
 
 **CLI scenario.** `report rebuild` on the cancelled run from 1.10a yields terminal status
 `cancelled`; `report prune --older-than 0s` removes it.
@@ -524,10 +524,10 @@ boundary type derives the three traits with `deny_unknown_fields` and a version 
 - [ ] Rebuild from each truncation point of a journal yields a report with the right terminal
       status; boundary-type test passes; prune respects age.
 
-**Verification.** `cargo test -p dejaview-core -- report` and `cargo test -p dejaview --features testkit --test report_cli`.
+**Verification.** `cargo test -p squint-core -- report` and `cargo test -p squint-cli --features testkit --test report_cli`.
 
-**Dependencies.** 1.10a. **Files.** `crates/dejaview-core/src/report.rs`, `schemas/report-v1.json`,
-`crates/dejaview-cli/src/report.rs`. **Size.** S.
+**Dependencies.** 1.10a. **Files.** `crates/squint-core/src/report.rs`, `schemas/report-v1.json`,
+`crates/squint-cli/src/report.rs`. **Size.** S.
 
 ### Task 1.11: Cache at the decision boundary
 
@@ -541,14 +541,14 @@ pruned-hit miss, evaluation mode never reads.
 - [ ] Table test flips each key input and each excluded input; cache spy for decision-boundary
       semantics; pruned artifacts make a miss.
 
-**Verification.** `cargo test -p dejaview-core -- cache`.
+**Verification.** `cargo test -p squint-core -- cache`.
 
-**Dependencies.** 1.10b. **Files.** `crates/dejaview-core/src/cache.rs`. **Size.** S.
+**Dependencies.** 1.10b. **Files.** `crates/squint-core/src/cache.rs`. **Size.** S.
 
 ### Task 1.12: Isolation, environment filter and exit codes
 
 **Description.** The pure environment-allowlist function, adversarial fixtures (instruction text
-in pixels, filenames, labels, brief, tool results), registry-only id resolution, `_dejaview` from
+in pixels, filenames, labels, brief, tool results), registry-only id resolution, `_squint` from
 the model rejected, the exit code matrix including 64.
 
 **CLI scenario.** `check` on the adversarial job produces a prompt whose sections and tool list
@@ -559,25 +559,25 @@ filesystem access.
 - [ ] Prompt structure comparison per fixture; path-traversal test; environment filter table test
       (declared credential names still removed); exit codes 0, 1, 2, 3, 64 each produced.
 
-**Verification.** `cargo test -p dejaview --features testkit --test isolation --test exit_codes`.
+**Verification.** `cargo test -p squint-cli --features testkit --test isolation --test exit_codes`.
 
-**Dependencies.** 1.11. **Files.** `crates/dejaview-core/src/env.rs`, `crates/dejaview-cli/tests/`,
+**Dependencies.** 1.11. **Files.** `crates/squint-core/src/env.rs`, `crates/squint-cli/tests/`,
 `fixtures/adversarial/`. **Size.** M.
 
 ### Task 1.13: Minimal MCP client against a fake server
 
 **Description.** An MCP 2025-11-25 stdio client proving the lifecycle contract: spawn with the
 environment filter; `initialize` with exact version and `tools` capability check;
-`notifications/initialized`; single-page `tools/list`; `tools/call` with `_dejaview`; per-call
+`notifications/initialized`; single-page `tools/list`; `tools/call` with `_squint`; per-call
 deadline; `notifications/cancelled` with tombstones; the exclusive lease whose single
-`startup_timeout_s` deadline covers waiting for quiescence, `dejaview/reset` and its
+`startup_timeout_s` deadline covers waiting for quiescence, `squint/reset` and its
 acknowledgement, or shutdown and reinitialisation; no reuse after a cancelled call; shutdown
 escalation. Pagination, concurrency, image blocks, `isError` precedence and the `rmcp` decision
 are 4.4a/b.
 
 **CLI scenario.** `check` with `[tools.packs.fake] command = "<path>"` lists and calls the fake
 tool through MCP, where `<path>` is the executable built from the testkit target declared as
-`[[bin]] name = "dejaview-testkit-mcp", path = "src/bin/mcp.rs"`; a test helper builds that
+`[[bin]] name = "squint-testkit-mcp", path = "src/bin/mcp.rs"`; a test helper builds that
 target and reads its absolute path from Cargo's JSON output, so no test depends on `PATH` or a
 previous build.
 
@@ -587,38 +587,38 @@ reset support is restarted per run; timeout cancels, tombstones, marks the proce
 the next lease replaces it; the total acquisition deadline is honoured when reset hangs (one
 clock); shutdown escalates on a server ignoring stdin close.
 
-**Verification.** `cargo test -p dejaview-tools -- mcp::minimal`.
+**Verification.** `cargo test -p squint-tools -- mcp::minimal`.
 
-**Dependencies.** 1.12, 1.5a. **Files.** `crates/dejaview-tools/src/mcp/`,
-`crates/dejaview-testkit/src/bin/mcp.rs`. **Size.** M.
+**Dependencies.** 1.12, 1.5a. **Files.** `crates/squint-tools/src/mcp/`,
+`crates/squint-testkit/src/bin/mcp.rs`. **Size.** M.
 
 ### Task 1.14: Minimal provisioning bundle proof
 
 **Description.** A tiny `tools/python/` uv project with one MCP tool (`echo_region`) and the
-provisioning layout from the spec; `dejaview tools setup` (verify digests, unpack,
+provisioning layout from the spec; `squint tools setup` (verify digests, unpack,
 `uv sync --frozen --no-dev` with the declared Python); offline launch with `UV_OFFLINE=1` and
 `UV_PYTHON_DOWNLOADS=never`. Two separate verifications: provisioning, which uses the network and
-runs only under `DEJAVIEW_LIVE=1` or against a pre-built local bundle and a pre-seeded uv cache;
+runs only under `SQUINT_LIVE=1` or against a pre-built local bundle and a pre-seeded uv cache;
 and runtime network denial, proven in the Linux CI job by launching the pack inside
 `unshare -rn` (no network namespace) and asserting a successful call, with the pack-side
 socket-failing test mode kept as a development aid, not proof.
 
-**CLI scenario.** `dejaview tools setup --bundle tools/python/dist/bundle-0.0.1/` into an empty
+**CLI scenario.** `squint tools setup --bundle tools/python/dist/bundle-0.0.1/` into an empty
 `XDG_DATA_HOME`, then `check` with the pack enabled calls `echo_region` over MCP.
 
 **Acceptance.**
 - [ ] Clean-directory install yields a working executable whose installed versions match the
       lock; tampered digest fails; the `unshare -rn` launch succeeds in CI.
 
-**Verification.** `cargo test -p dejaview-tools --test provisioning -- --ignored` (pre-seeded
+**Verification.** `cargo test -p squint-tools --test provisioning -- --ignored` (pre-seeded
 bundle in CI); `cd tools/python && uv run --frozen --offline --no-sync pytest`.
 
 **Dependencies.** 1.13. **Files.** `tools/python/`, `scripts/build-bundle.sh`,
-`crates/dejaview-tools/src/provision.rs`, `.github/workflows/python.yml`. **Size.** M.
+`crates/squint-tools/src/provision.rs`, `.github/workflows/python.yml`. **Size.** M.
 
 ### Task 1.15: Statistics contract frozen
 
-**Description.** In `dejaview-eval`: the paired bootstrap with a pinned RNG (ChaCha20 via
+**Description.** In `squint-eval`: the paired bootstrap with a pinned RNG (ChaCha20 via
 `rand_chacha`, dependency by ADR 0016, seed as a 64-bit unsigned decimal in the matrix), canonical
 ordering (families sorted by id, items sorted by id within family), integer sampling by
 `rand::Rng::gen_range` over the family index, a stored resample-index fixture for a small case
@@ -626,7 +626,7 @@ with unequal family sizes, type-7 quantiles, the detection-indicator family pred
 Bonferroni-adjusted endpoints and insufficient-tail rule, Wilson intervals, each against
 hand-computed fixtures.
 
-**CLI scenario.** `dejaview eval gate-table --fixture fixtures/stats/case-1.toml` prints the interval
+**CLI scenario.** `squint eval gate-table --fixture fixtures/stats/case-1.toml` prints the interval
 and outcome for a synthetic result table.
 
 **Acceptance.**
@@ -634,9 +634,9 @@ and outcome for a synthetic result table.
       differing families yield `inconclusive`; a tail with fewer than 20 resamples yields
       `inconclusive`; Wilson matches a reference table to 1e-9.
 
-**Verification.** `cargo test -p dejaview-eval -- stats`.
+**Verification.** `cargo test -p squint-eval -- stats`.
 
-**Dependencies.** 0.1. **Files.** `crates/dejaview-eval/src/{bootstrap,wilson,gate_rules}.rs`,
+**Dependencies.** 0.1. **Files.** `crates/squint-eval/src/{bootstrap,wilson,gate_rules}.rs`,
 `fixtures/stats/`, `docs/adr/0016-rng.md`. **Size.** M.
 
 ### Checkpoint M1
@@ -652,15 +652,15 @@ and outcome for a synthetic result table.
 
 **Description.** `providers/catalog.toml` with every spec field; values read from provider
 documentation and model lists with `verified` date and source URL; resolve-time rejection of
-unsupported settings; `dejaview catalog show`. Models: the owner's initial subset from 0.4 first.
+unsupported settings; `squint catalog show`. Models: the owner's initial subset from 0.4 first.
 
 **Acceptance.** Catalog self-test: every entry complete with sources; unsupported-setting
 rejections tested; `catalog show` prints an entry.
 
-**Verification.** `cargo test -p dejaview-providers -- catalog`.
+**Verification.** `cargo test -p squint-providers -- catalog`.
 
 **Dependencies.** 1.3, 0.4. **Files.** `providers/catalog.toml`,
-`crates/dejaview-providers/src/catalog.rs`. **Size.** M.
+`crates/squint-providers/src/catalog.rs`. **Size.** M.
 
 ### Task 2.2: Wire schema transformations
 
@@ -671,9 +671,9 @@ representability check; snapshot fixtures.
 payload violating a removed constraint still fails canonical validation; an unsupported construct
 is refused with the reason.
 
-**Verification.** `cargo test -p dejaview-providers -- wire`.
+**Verification.** `cargo test -p squint-providers -- wire`.
 
-**Dependencies.** 1.6a, 2.1. **Files.** `crates/dejaview-providers/src/wire.rs`, `fixtures/schemas/`.
+**Dependencies.** 1.6a, 2.1. **Files.** `crates/squint-providers/src/wire.rs`, `fixtures/schemas/`.
 **Size.** M.
 
 ### Task 2.3: Image preparation and preflight
@@ -684,9 +684,9 @@ the whole provider history including tool images.
 **Acceptance.** Identical bytes on repeat; exact native size; PNG kept with alpha; no EXIF or XMP;
 a scripted conversation reaching the many-image threshold fails preflight before sending.
 
-**Verification.** `cargo test -p dejaview-providers -- prepare preflight`.
+**Verification.** `cargo test -p squint-providers -- prepare preflight`.
 
-**Dependencies.** 1.2, 2.1. **Files.** `crates/dejaview-providers/src/prepare.rs`. **Size.** M.
+**Dependencies.** 1.2, 2.1. **Files.** `crates/squint-providers/src/prepare.rs`. **Size.** M.
 
 ### Task 2.4: Privacy enforcement before any live call
 
@@ -699,10 +699,10 @@ a fixture-directory test that greps every recorded request for paths and EXIF ma
 **Acceptance.** Run refused without `account`; redirect to another host is `error: provider`;
 missing key is `error: auth`; the fixture grep test exists and runs on every fixture directory.
 
-**Verification.** `cargo test -p dejaview-providers -- privacy`.
+**Verification.** `cargo test -p squint-providers -- privacy`.
 
-**Dependencies.** 1.3, 1.10a. **Files.** `crates/dejaview-providers/src/{http,privacy}.rs`,
-`crates/dejaview-core/src/report.rs`, `docs/provider-data.md`. **Size.** S.
+**Dependencies.** 1.3, 1.10a. **Files.** `crates/squint-providers/src/{http,privacy}.rs`,
+`crates/squint-core/src/report.rs`, `docs/provider-data.md`. **Size.** S.
 
 ### Task 2.5a: Anthropic adapter implementation and replay harness
 
@@ -714,24 +714,24 @@ volatile transport fields; opaque payloads byte-exact).
 **Acceptance.** Replay harness tested with hand-written fixtures; dropping a thinking block fails
 replay; changing a volatile header passes.
 
-**Verification.** `cargo test -p dejaview-providers -- anthropic replay`.
+**Verification.** `cargo test -p squint-providers -- anthropic replay`.
 
-**Dependencies.** 2.2, 2.3, 2.4, 1.8. **Files.** `crates/dejaview-providers/src/anthropic/`,
-`crates/dejaview-providers/src/replay.rs`, `providers/profiles/anthropic.toml`. **Size.** M.
+**Dependencies.** 2.2, 2.3, 2.4, 1.8. **Files.** `crates/squint-providers/src/anthropic/`,
+`crates/squint-providers/src/replay.rs`, `providers/profiles/anthropic.toml`. **Size.** M.
 
 ### Task 2.5b: Anthropic recordings
 
-**Description.** Record live fixtures under `DEJAVIEW_LIVE=1` on the account named in 0.4 for
+**Description.** Record live fixtures under `SQUINT_LIVE=1` on the account named in 0.4 for
 every capability combination: first look, parallel batch with two same-name calls, tool error,
 multimodal tool result, each repair case in both forms, final-turn transition with a stray call
 under each supported mechanism, the largest permitted image conversation; strip secrets; commit;
 replay. One recording designated the profile-conformance fixture. Spend recorded against the 0.4
 cap.
 
-**Acceptance.** Every listed fixture exists and replays; live `dejaview check` on a trivial job
+**Acceptance.** Every listed fixture exists and replays; live `squint check` on a trivial job
 returns a verdict with resolved model, API version, usage and cost.
 
-**Verification.** `cargo test -p dejaview-providers -- anthropic`; `DEJAVIEW_LIVE=1 cargo test -p dejaview-providers --test record -- --ignored anthropic`.
+**Verification.** `cargo test -p squint-providers -- anthropic`; `SQUINT_LIVE=1 cargo test -p squint-providers --test record -- --ignored anthropic`.
 
 **Dependencies.** 2.5a. **Files.** `fixtures/adapters/anthropic/`, `fixtures/profiles/anthropic/`.
 **Size.** M; real money. Tag `m2.1`.
@@ -744,9 +744,9 @@ a replay test that a moved or altered thought signature fails.
 
 **Acceptance.** As 2.5a plus the signature test.
 
-**Verification.** `cargo test -p dejaview-providers -- gemini`.
+**Verification.** `cargo test -p squint-providers -- gemini`.
 
-**Dependencies.** 2.5a. **Files.** `crates/dejaview-providers/src/gemini/`,
+**Dependencies.** 2.5a. **Files.** `crates/squint-providers/src/gemini/`,
 `providers/profiles/google-ai-studio.toml`. **Size.** M.
 
 ### Task 2.6b: Gemini recordings
@@ -764,9 +764,9 @@ a replay test that a moved or altered thought signature fails.
 
 **Acceptance.** As 2.5a plus the `store = false` test.
 
-**Verification.** `cargo test -p dejaview-providers -- openai`.
+**Verification.** `cargo test -p squint-providers -- openai`.
 
-**Dependencies.** 2.5a. **Files.** `crates/dejaview-providers/src/openai/`,
+**Dependencies.** 2.5a. **Files.** `crates/squint-providers/src/openai/`,
 `providers/profiles/openai.toml`. **Size.** M.
 
 ### Task 2.7b: OpenAI recordings
@@ -786,7 +786,7 @@ owner holds accounts for; spend against the 0.4 gateway-smoke entry. Nothing dep
 **Acceptance.** Each shipped gateway profile has a routing and provenance fixture; a disallowed
 upstream fails; unshipped candidates are refused by `check` with the reason.
 
-**Verification.** `cargo test -p dejaview-providers -- profiles`.
+**Verification.** `cargo test -p squint-providers -- profiles`.
 
 **Dependencies.** 2.5b, 2.6b. **Files.** `providers/profiles/`, `fixtures/profiles/`. **Size.** M.
 
@@ -803,15 +803,15 @@ and any shipped gateway, with citations; a test that every shipped profile id ap
 that exist by M2 (rules, prompts, profiles, catalog, schemas) packaged with the crates that embed
 them, verified by `cargo package` and a test that lists every embedded asset from the packaged
 crate (the viewer is added to this check in 3.6); a publication script in the order `core`,
-`testkit`, `providers`, `tools`, `eval`, `dejaview` that the owner runs; a CI job that packages
-every crate, stages the `.crate` files in a temporary local registry, and installs `dejaview` from
+`testkit`, `providers`, `tools`, `eval`, `squint` that the owner runs; a CI job that packages
+every crate, stages the `.crate` files in a temporary local registry, and installs `squint` from
 that registry in a clean container without the repository tree, then runs the offline smoke
-(`dejaview --version`, `tools list`, `rules show`, `check` without a key yielding `error: auth`).
+(`squint --version`, `tools list`, `rules show`, `check` without a key yielding `error: auth`).
 The workspace-level publish dry run supported by the pinned Cargo version runs in CI.
 
 **Acceptance.** Staged-registry install smoke passes in CI; the workspace publish dry run passes.
 After the owner's first real publication (scheduled at the M5 checkpoint), from outside the
-repository `cargo install dejaview --version <released> --locked` succeeds and passes the smoke.
+repository `cargo install squint-cli --version <released> --locked` succeeds and passes the smoke.
 
 **Verification.** `.github/workflows/package.yml`; `scripts/publish.sh --dry-run`;
 `scripts/registry-install-test.sh`.
@@ -856,10 +856,10 @@ owner attestation text; `sets verify-seal`.
       seal component in turn (membership, a family, a job field, an image, rules, labels) and
       `verify-seal` rejects each.
 
-**Verification.** `cargo test -p dejaview-eval -- sets seal`.
+**Verification.** `cargo test -p squint-eval -- sets seal`.
 
-**Dependencies.** 1.4b. **Files.** `crates/dejaview-eval/src/{sets,seal}.rs`,
-`crates/dejaview-cli/src/sets.rs`, `fixtures/evalsets/`. **Size.** M.
+**Dependencies.** 1.4b. **Files.** `crates/squint-eval/src/{sets,seal}.rs`,
+`crates/squint-cli/src/sets.rs`, `fixtures/evalsets/`. **Size.** M.
 
 ### Task 3.2a: Set-building toolkit and ADR 0013
 
@@ -867,7 +867,7 @@ owner attestation text; `sets verify-seal`.
 models, plant defects by construction, write `job.toml`, draft labels and regions from the
 construction record only, write the owner's worksheet (`labels-draft.toml` plus contact sheet) to
 owner storage outside the repository, record generator and licence per item. ADR 0013 names
-generators, licence and the review procedure. Create the `dejaview-evalsets` repository.
+generators, licence and the review procedure. Create the `squint-evalsets` repository.
 `docs/evalsets.md` documents the procedure.
 
 **Acceptance.** A two-item dry run yields a valid set directory and an external worksheet; ADR
@@ -925,9 +925,9 @@ send, settlement and completion marking each recover to a consistent ledger; a c
 refuses resume; two writers are refused; cumulative spend across restarts never exceeds the cap;
 the admission record round-trips.
 
-**Verification.** `cargo test -p dejaview-eval -- descriptor eval_ledger admissions`.
+**Verification.** `cargo test -p squint-eval -- descriptor eval_ledger admissions`.
 
-**Dependencies.** 1.9, 1.11, 3.1. **Files.** `crates/dejaview-eval/src/{matrix,descriptor,eval_ledger,admissions}.rs`.
+**Dependencies.** 1.9, 1.11, 3.1. **Files.** `crates/squint-eval/src/{matrix,descriptor,eval_ledger,admissions}.rs`.
 **Size.** M.
 
 ### Task 3.4b: Matrix runner, arms and resume
@@ -944,13 +944,13 @@ and marks partial items; arm membership and prompt-equivalence tests pass; again
 synthetic admission records, a `provisional` tool is excluded from D and a `confirmed` one
 included.
 
-**Verification.** `cargo test -p dejaview-eval -- runner arms`.
+**Verification.** `cargo test -p squint-eval -- runner arms`.
 
-**Dependencies.** 3.4a. **Files.** `crates/dejaview-eval/src/{runner,arms}.rs`. **Size.** M.
+**Dependencies.** 3.4a. **Files.** `crates/squint-eval/src/{runner,arms}.rs`. **Size.** M.
 
 ### Task 3.4c: Pre-run estimate
 
-**Description.** `dejaview eval estimate --matrix …` prints decisions, per-decision envelopes,
+**Description.** `squint eval estimate --matrix …` prints decisions, per-decision envelopes,
 their sum and a cost range, and warns when the sum exceeds the cap (completion not guaranteed);
 it never refuses, because admission is per decision.
 
@@ -958,23 +958,23 @@ it never refuses, because admission is per decision.
 decision on a fake run; totals equal their sum; a matrix whose sum exceeds the cap can still
 complete when settled costs permit (test).
 
-**Dependencies.** 3.4b. **Files.** `crates/dejaview-eval/src/estimate.rs`. **Size.** S.
+**Dependencies.** 3.4b. **Files.** `crates/squint-eval/src/estimate.rs`. **Size.** S.
 
 ### Task 3.5a: Metrics, localisation and report regeneration
 
 **Description.** Confusion, missed and detected failures under the frozen policy, false rejects,
 unsure and error rates, localisation with eligibility rules, cost totals and medians, wall time
 totals and medians, Wilson intervals from 1.15, headline numbers from repetition 1 only,
-`dejaview eval report` regenerating the Markdown summary from saved results.
+`squint eval report` regenerating the Markdown summary from saved results.
 
 **Acceptance.** Hand-computed fixtures match to 1e-9 for proportions and exactly for counts,
 totals and medians; localisation fixtures cover each eligibility rule; a fixture where later
 repetitions reverse the apparent winner leaves the headline unchanged; `eval report` on saved
 results reproduces the stored Markdown byte for byte.
 
-**Verification.** `cargo test -p dejaview-eval -- metrics summary`.
+**Verification.** `cargo test -p squint-eval -- metrics summary`.
 
-**Dependencies.** 3.4b, 1.15. **Files.** `crates/dejaview-eval/src/{metrics,summary}.rs`. **Size.** M.
+**Dependencies.** 3.4b, 1.15. **Files.** `crates/squint-eval/src/{metrics,summary}.rs`. **Size.** M.
 
 ### Task 3.5b: Gate lifecycle
 
@@ -993,14 +993,14 @@ missing initial receipt, fewer than 50 items, a family overlapping any earlier s
 judging configuration; interrupted scoring resumes; written admission records are read back by
 the 3.4a reader.
 
-**Verification.** `cargo test -p dejaview-eval -- gate`.
+**Verification.** `cargo test -p squint-eval -- gate`.
 
-**Dependencies.** 3.5a, 3.1. **Files.** `crates/dejaview-eval/src/gate.rs`. **Size.** M.
+**Dependencies.** 3.5a, 3.1. **Files.** `crates/squint-eval/src/gate.rs`. **Size.** M.
 
 ### Task 3.6: Static report viewer
 
-**Description.** `crates/dejaview-cli/viewer/` (embedded; the packaging check keeps assets inside
-their crate) with no build step; `dejaview report view <run-dir>` serves on loopback; shows images, tool results, checklist, flat locations in raw
+**Description.** `crates/squint-cli/viewer/` (embedded; the packaging check keeps assets inside
+their crate) with no build step; `squint report view <run-dir>` serves on loopback; shows images, tool results, checklist, flat locations in raw
 coordinates, aggregation rows and decision table; declares supported `report_version`s; no
 requests except to loopback.
 
@@ -1008,9 +1008,9 @@ requests except to loopback.
 crop-frame location is drawn at the stored overlay position (pixel compare); the viewer assets are
 added to the 2.10a embedded-asset packaging check and the staged-registry smoke opens a report.
 
-**Verification.** Browser devtools script; `cargo test -p dejaview --features testkit --test viewer_serve`.
+**Verification.** Browser devtools script; `cargo test -p squint-cli --features testkit --test viewer_serve`.
 
-**Dependencies.** 1.10b. **Files.** `crates/dejaview-cli/viewer/`, `crates/dejaview-cli/src/{viewer,report}.rs`, `docs/viewer.md`.
+**Dependencies.** 1.10b. **Files.** `crates/squint-cli/viewer/`, `crates/squint-cli/src/{viewer,report}.rs`, `docs/viewer.md`.
 **Size.** M.
 
 ### Task 3.7: Canary and requalify
@@ -1023,7 +1023,7 @@ baseline on owner approval.
 **Acceptance.** Fake-provider tests for `clear`, `suspect`, `recommend_disable` and baseline
 reset after requalification.
 
-**Dependencies.** 3.4b. **Files.** `crates/dejaview-eval/src/canary.rs`. **Size.** S.
+**Dependencies.** 3.4b. **Files.** `crates/squint-eval/src/canary.rs`. **Size.** S.
 
 ### Task 3.8: Arm A baseline and publication
 
@@ -1062,13 +1062,13 @@ committed.
 ### Task 4.1: Registry in production
 
 **Description.** Built-in registration, `[tools] enabled` and `order`, Tools section with
-`requires` ordering, projection mechanism applied before the checklist, `dejaview tools list` over
+`requires` ordering, projection mechanism applied before the checklist, `squint tools list` over
 real built-ins.
 
 **Acceptance.** Ordering and `requires` tests; byte-stable rendering snapshot; projection applied
 before the checklist sees the envelope.
 
-**Dependencies.** 1.5a, 1.7a. **Files.** `crates/dejaview-tools/src/{registry,projection}.rs`.
+**Dependencies.** 1.5a, 1.7a. **Files.** `crates/squint-tools/src/{registry,projection}.rs`.
 **Size.** S.
 
 ### Task 4.2a: `view`, `resize` and equirectangular geometry
@@ -1081,10 +1081,10 @@ prototype's projection, verified against stored views); one image or two; `crop`
 grey levels of the stored view; view-to-raw round trip within 0.5 px at 2048 width;
 seam-straddling bbox refused; `fov = 130` is `invalid_args`.
 
-**Verification.** `cargo test -p dejaview-tools -- view resize` and `cargo test -p dejaview-core -- frames::sphere`.
+**Verification.** `cargo test -p squint-tools -- view resize` and `cargo test -p squint-core -- frames::sphere`.
 
-**Dependencies.** 4.1, 1.2. **Files.** `crates/dejaview-tools/src/builtin/{view,resize}.rs`,
-`crates/dejaview-core/src/frames.rs`. **Size.** M.
+**Dependencies.** 4.1, 1.2. **Files.** `crates/squint-tools/src/builtin/{view,resize}.rs`,
+`crates/squint-core/src/frames.rs`. **Size.** M.
 
 ### Task 4.2b: Viewer equirectangular overlay
 
@@ -1103,7 +1103,7 @@ integrity measurements, `not_applicable` for unrelated pairs, the `visual_only` 
 **Acceptance.** Synthetic transforms recovered within ADR tolerances; unrelated pair is
 `not_applicable`; `visual_only` strips `quality`, `measurements`, `regions` and fixes `summary`.
 
-**Dependencies.** 4.0, 4.1. **Files.** `crates/dejaview-tools/src/builtin/align.rs`. **Size.** M.
+**Dependencies.** 4.0, 4.1. **Files.** `crates/squint-tools/src/builtin/align.rs`. **Size.** M.
 
 ### Task 4.3b: `align` for equirectangular pairs
 
@@ -1111,7 +1111,7 @@ integrity measurements, `not_applicable` for unrelated pairs, the `visual_only` 
 
 **Acceptance.** Known rotations recovered within ADR tolerances on stored panoramas.
 
-**Dependencies.** 4.3a, 4.2a. **Files.** `crates/dejaview-tools/src/builtin/align_sphere.rs`.
+**Dependencies.** 4.3a, 4.2a. **Files.** `crates/squint-tools/src/builtin/align_sphere.rs`.
 **Size.** M.
 
 ### Task 4.3c: `edge_similarity` and `change_map`
@@ -1122,18 +1122,18 @@ one image and no regions.
 **Acceptance.** Identical images give 1.0 within 1e-6; blank versus textured gives below 0.05;
 the change map for a fixture pair equals the stored golden image within 1 grey level.
 
-**Dependencies.** 4.3a. **Files.** `crates/dejaview-tools/src/builtin/compare.rs`.
+**Dependencies.** 4.3a. **Files.** `crates/squint-tools/src/builtin/compare.rs`.
 **Size.** S. Tag `m4.1`.
 
 ### Task 4.4a: Full MCP client: ADR 0015, pagination, concurrency, images
 
 **Description.** ADR deciding `rmcp` versus the in-house client after a bounded spike; paginated
-`tools/list`; concurrent calls where declared; frames in `_dejaview`; image content blocks with
+`tools/list`; concurrent calls where declared; frames in `_squint`; image content blocks with
 exact correspondence; `isError` precedence as an exhaustive truth table; `outputSchema` validation.
 
 **Acceptance.** Fake-server tests for each; the truth table test enumerates every combination.
 
-**Dependencies.** 1.13, 4.1. **Files.** `docs/adr/0015-mcp-client.md`, `crates/dejaview-tools/src/mcp/`.
+**Dependencies.** 1.13, 4.1. **Files.** `docs/adr/0015-mcp-client.md`, `crates/squint-tools/src/mcp/`.
 **Size.** M.
 
 ### Task 4.4b: MCP failure modes
@@ -1144,8 +1144,8 @@ contention between two decisions.
 
 **Acceptance.** One fake-server test per mode; lease contention shows exclusive access.
 
-**Dependencies.** 4.4a. **Files.** `crates/dejaview-tools/src/mcp/`,
-`crates/dejaview-testkit/src/bin/mcp.rs`. **Size.** M.
+**Dependencies.** 4.4a. **Files.** `crates/squint-tools/src/mcp/`,
+`crates/squint-testkit/src/bin/mcp.rs`. **Size.** M.
 
 ### Task 4.5: Arm C on the dev sets
 
@@ -1186,14 +1186,14 @@ hash; the asset downloads and matches.
 
 ### Task 5.1: Python pack skeleton and MCP server
 
-**Description.** Grow the 1.14 pack into the real server: `_dejaview` images and frames, envelope
-as `structuredContent` plus image blocks, `dejaview/reset`, `fetch` entry point, offline pytest
+**Description.** Grow the 1.14 pack into the real server: `_squint` images and frames, envelope
+as `structuredContent` plus image blocks, `squint/reset`, `fetch` entry point, offline pytest
 and ruff.
 
 **Acceptance.** Rust client calls `echo_region` with an image and an aligned frame and receives a
 valid envelope with one image block; offline tests pass.
 
-**Dependencies.** 4.4b, 1.14. **Files.** `tools/python/src/dejaview_tools/`. **Size.** M.
+**Dependencies.** 4.4b, 1.14. **Files.** `tools/python/src/squint_tools/`. **Size.** M.
 
 ### Task 5.3: Segmenter fetch and parity
 
@@ -1202,7 +1202,7 @@ parity test against stored golden outputs within the documented tolerance.
 
 **Acceptance.** Parity passes; `fetch` refuses a hash mismatch.
 
-**Dependencies.** 4.6, 5.1. **Files.** `tools/python/src/dejaview_tools/segmenter.py`. **Size.** S.
+**Dependencies.** 4.6, 5.1. **Files.** `tools/python/src/squint_tools/segmenter.py`. **Size.** S.
 
 ### Task 5.4a: `regions` tool
 
@@ -1215,7 +1215,7 @@ image, the prototype's decision tables stripped to high-recall pointers; manifes
 found with IoU above 0.3 and at most `max_regions` are returned; the manifest passes all three
 adapters' wire transformations.
 
-**Dependencies.** 5.3. **Files.** `tools/python/src/dejaview_tools/regions.py`. **Size.** M.
+**Dependencies.** 5.3. **Files.** `tools/python/src/squint_tools/regions.py`. **Size.** M.
 
 ### Task 5.4b: `classes` tool
 
@@ -1225,7 +1225,7 @@ adapters' wire transformations.
 **Acceptance.** Named fixtures return the exact expected class lists; manifest passes wire
 transformations.
 
-**Dependencies.** 5.3. **Files.** `tools/python/src/dejaview_tools/classes.py`. **Size.** S.
+**Dependencies.** 5.3. **Files.** `tools/python/src/squint_tools/classes.py`. **Size.** S.
 
 ### Task 5.2: Provisioning bundle for the real pack
 
@@ -1273,7 +1273,7 @@ split files); the owner reviews and commits the publication; publish
       minutes with every fixture and tool present.
 - [ ] Final artifacts rebuilt from the final sources: Rust packages (staged-registry install
       smoke), platform archives (architecture smoke), Python bundle (clean install); the owner
-      publishes to crates.io and `cargo install dejaview --version <released> --locked` passes
+      publishes to crates.io and `cargo install squint-cli --version <released> --locked` passes
       from outside the repository.
 - [ ] README "How it is built" updated with measured results and links.
 - [ ] Review and test skills (or checklist); owner review; merge; tag `m5`.

@@ -1,7 +1,7 @@
 name: package
 
 # Proves the crates publish and install as crates.io would serve them: a workspace publish dry run
-# (package, verify, no upload) and an install of `dejaview` from the packaged .crate files in a
+# (package, verify, no upload) and an install of `squint` from the packaged .crate files in a
 # scratch directory outside the checkout, followed by the offline smoke. The `archive` job is the
 # release dry run: on each release architecture, build the archive exactly as the release workflow
 # does and run the offline smoke on the binary inside it; nothing is tagged or released.
@@ -69,6 +69,6 @@ jobs:
         shell: bash
         run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.33.1/cargo-dist-installer.sh | sh
       - run: dist build --artifacts=local --target=${{ matrix.target }}
-      - run: scripts/archive-smoke.sh "target/distrib/dejaview-${{ matrix.target }}.tar.xz"
+      - run: scripts/archive-smoke.sh "target/distrib/squint-cli-${{ matrix.target }}.tar.xz"
         env:
           REQUIRE_CHECKSUM: "1"

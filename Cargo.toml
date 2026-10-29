@@ -1,19 +1,19 @@
 [workspace]
 resolver = "3"
 members = [
-  "crates/dejaview-core",
-  "crates/dejaview-providers",
-  "crates/dejaview-tools",
-  "crates/dejaview-eval",
-  "crates/dejaview-testkit",
-  "crates/dejaview-cli",
+  "crates/squint-core",
+  "crates/squint-providers",
+  "crates/squint-tools",
+  "crates/squint-eval",
+  "crates/squint-testkit",
+  "crates/squint-cli",
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
 license = "Apache-2.0"
-repository = "https://github.com/markhayden/dejaview"
+repository = "https://github.com/markhayden/squint"
 rust-version = "1.99"
 
 # The dependency list from SPEC.md "Tech stack". Entries no crate uses yet are declared here so a
@@ -21,11 +21,11 @@ rust-version = "1.99"
 # needs an ADR. Versions are the crates.io releases current on 2026-10-26; entries no crate uses yet
 # are not in Cargo.lock until first use.
 [workspace.dependencies]
-dejaview-core = { path = "crates/dejaview-core", version = "0.1.0" }
-dejaview-providers = { path = "crates/dejaview-providers", version = "0.1.0" }
-dejaview-tools = { path = "crates/dejaview-tools", version = "0.1.0" }
-dejaview-eval = { path = "crates/dejaview-eval", version = "0.1.0" }
-dejaview-testkit = { path = "crates/dejaview-testkit", version = "0.1.0" }
+squint-core = { path = "crates/squint-core", version = "0.1.0" }
+squint-providers = { path = "crates/squint-providers", version = "0.1.0" }
+squint-tools = { path = "crates/squint-tools", version = "0.1.0" }
+squint-eval = { path = "crates/squint-eval", version = "0.1.0" }
+squint-testkit = { path = "crates/squint-testkit", version = "0.1.0" }
 
 clap = { version = "4.6", features = ["derive"] }
 thiserror = "2.0"

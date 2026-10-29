@@ -16,7 +16,7 @@ list.
   core has no I/O it was not given.
 - **Security.** No credential in any output path; image and frame ids resolve only through the
   registry; untrusted text stays in data blocks; pack environments filtered; no network in tests
-  without `DEJAVIEW_LIVE=1`.
+  without `SQUINT_LIVE=1`.
 - **Performance.** `cargo test --workspace` under five minutes offline; no image decoded twice;
   bounded decode sizes.
 

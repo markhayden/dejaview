@@ -20,7 +20,7 @@ not what it assumes.
 
 ## Decision
 
-Direct intensity registration, implemented in `crates/dejaview-tools/src/align/` with no
+Direct intensity registration, implemented in `crates/squint-tools/src/align/` with no
 dependency beyond `image`:
 
 - Each image becomes a luminance pyramid (halving by 2×2 means to a smaller side of 24 px). When
@@ -56,7 +56,7 @@ dependency beyond `image`:
 ## Measured
 
 Synthetic scenes rendered analytically under the true transform (no resampling in the ground
-truth; `dejaview_testkit::images`), release build, `cargo test -p dejaview-tools --release
+truth; `squint_testkit::images`), release build, `cargo test -p squint-tools --release
 --test align measure_tolerances -- --ignored --nocapture`. Errors are pixel displacement at the
 image centre and at the worst corner, and the rotation angle from the linear part.
 
@@ -123,6 +123,6 @@ degenerate case generated on the fly.
 - Appearance changes that invert local contrast (a negative, a strong colour-to-luminance swap)
   defeat the normalisation and register as `not_registered`; that is the honest answer for a
   format that is not intact.
-- The synthetic scene and sphere generators live in `dejaview_testkit::images` for every later
+- The synthetic scene and sphere generators live in `squint_testkit::images` for every later
   geometry test; the analytical rendering gives exact ground truth, which the resampled real
   image cannot.

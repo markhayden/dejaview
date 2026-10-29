@@ -1,18 +1,18 @@
 # Report viewer
 
-The static viewer under `crates/dejaview-cli/viewer/` (`index.html`, `viewer.js`, `geometry.js`, `viewer.css`):
+The static viewer under `crates/squint-cli/viewer/` (`index.html`, `viewer.js`, `geometry.js`, `viewer.css`):
 plain HTML and vanilla JavaScript, no build step, embedded in the binary so an installed
-`dejaview` carries it. Equirectangular overlays arrive in task 4.2b.
+`squint` carries it. Equirectangular overlays arrive in task 4.2b.
 
 ## Serving a run
 
 ```
-dejaview report view <decision dir> [--port 0] [--open]
+squint report view <decision dir> [--port 0] [--open]
 ```
 
 Binds `127.0.0.1:<port>` (0 picks a free port), prints the URL, and serves until stopped. With
 `--open` the system browser is launched on it. The directory must hold `report.json`
-(`dejaview report rebuild` makes one from the journals).
+(`squint report rebuild` makes one from the journals).
 
 The server answers `GET` and `HEAD` only, for exactly these paths:
 
@@ -72,7 +72,7 @@ location lands at the mapped position on the candidate.
 
 ## Tests
 
-`cargo test -p dejaview --features testkit --test viewer_serve` runs a decision with a returned
+`cargo test -p squint-cli --features testkit --test viewer_serve` runs a decision with a returned
 crop frame and checks the server's routes, types and refusals. The offline smoke
 (`scripts/offline-smoke.sh`, run on every packaged and released binary) starts `report view` on a
 minimal directory and fetches the page and the report. The embedded assets are covered by

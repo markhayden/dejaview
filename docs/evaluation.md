@@ -24,7 +24,7 @@ controls = { effort = "low" }              # optional, validated against the cat
 [[matrix.models]]
 profile = "google-ai-studio"
 model = "gemini-3.8-flash"
-account = "google:${DEJAVIEW_GOOGLE_ACCOUNT}"   # the consent for this profile when the base config's is another vendor's; the reference is hashed, the value expanded at run time and redacted
+account = "google:${SQUINT_GOOGLE_ACCOUNT}"   # the consent for this profile when the base config's is another vendor's; the reference is hashed, the value expanded at run time and redacted
 
 [matrix.gate]                              # required by `eval gate`; frozen with the identity
 seed = 20261101                            # the bootstrap seed
@@ -78,14 +78,14 @@ stage = "provisional"            # provisional | confirmed
 receipt = "rcpt-…"               # the gate receipt that produced the record
 ```
 
-Written by `dejaview eval gate`; read by the runner, where arm D includes only the tools whose
+Written by `squint eval gate`; read by the runner, where arm D includes only the tools whose
 stage is `confirmed`. One record per tool and use case. `fixtures/evalsets/admissions.toml`
 holds the synthetic records the tests use.
 
 ## Running a matrix
 
 ```
-dejaview eval run --matrix matrix.toml --out eval-out/<name> [--evalsets-root evalsets] [--admissions evalsets/admissions.toml]
+squint eval run --matrix matrix.toml --out eval-out/<name> [--evalsets-root evalsets] [--admissions evalsets/admissions.toml]
 ```
 
 The runner takes the writer lock, loads and checks every set, forms each arm's tool selection
@@ -118,7 +118,7 @@ once the tools arrive in M4.
 Every run ends by writing `metrics.json` and `report.md` next to `summary.json`, and
 
 ```
-dejaview eval report --out eval-out/<name> [--evalsets-root evalsets]
+squint eval report --out eval-out/<name> [--evalsets-root evalsets]
 ```
 
 regenerates both from the saved results alone (`--sets a,b` instead prints the Markdown over those
@@ -180,9 +180,9 @@ keeps one entry per run: the question, the headline numbers and what changed bec
 ## The gate
 
 ```
-dejaview eval gate --matrix matrix.toml --out eval-out/<name> --tool <tool> --set <use-case>/<set> --stage initial --labels <owner labels> [--model <profile>:<model>] [--adr "<ref>"] [--evalsets-root evalsets] [--admissions evalsets/admissions.toml] [--json]
-dejaview eval gate --matrix matrix.toml --out eval-out/<name> --tool <tool> --set <use-case>/<set> --stage confirmation --initial-receipt <id>
-dejaview eval gate-table --fixture fixtures/stats/case-1.toml      # the gate table alone, on a synthetic result table
+squint eval gate --matrix matrix.toml --out eval-out/<name> --tool <tool> --set <use-case>/<set> --stage initial --labels <owner labels> [--model <profile>:<model>] [--adr "<ref>"] [--evalsets-root evalsets] [--admissions evalsets/admissions.toml] [--json]
+squint eval gate --matrix matrix.toml --out eval-out/<name> --tool <tool> --set <use-case>/<set> --stage confirmation --initial-receipt <id>
+squint eval gate-table --fixture fixtures/stats/case-1.toml      # the gate table alone, on a synthetic result table
 ```
 
 A gate scores one hypothesis, one tool under one model on one sealed set, from a finished
@@ -226,8 +226,8 @@ interval). Receipts are public material: hashes and counts, no labels.
 ## Canary and requalification
 
 ```
-dejaview eval requalify --config dejaview.toml --set <use-case>/<set> --state canary.toml [--approve "<words>"] [--evalsets-root evalsets] [--out eval-out/canary] [--json]
-dejaview eval canary    --config dejaview.toml --set <use-case>/<set> --state canary.toml [--evalsets-root evalsets] [--out eval-out/canary] [--json]
+squint eval requalify --config squint.toml --set <use-case>/<set> --state canary.toml [--approve "<words>"] [--evalsets-root evalsets] [--out eval-out/canary] [--json]
+squint eval canary    --config squint.toml --set <use-case>/<set> --state canary.toml [--evalsets-root evalsets] [--out eval-out/canary] [--json]
 ```
 
 Drift (SPEC "Drift") is watched by rerunning a pinned set under the configuration as deployed,
@@ -260,7 +260,7 @@ settings are left out.
 ## Estimating first
 
 ```
-dejaview eval estimate --matrix matrix.toml [--evalsets-root evalsets] [--json]
+squint eval estimate --matrix matrix.toml [--evalsets-root evalsets] [--json]
 ```
 
 Prints every decision's envelope exactly as the ledger would reserve it (the same setup and

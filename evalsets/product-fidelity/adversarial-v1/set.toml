@@ -1,10 +1,10 @@
-# Built by dejaview-sets; labels confirmed by the owner.
+# Built by squint-sets; labels confirmed by the owner.
 [set]
 id = "product-fidelity/adversarial-v1"
 use_case = "product-fidelity"
 split = "dev"
 licence = "CC-BY-4.0"
-images_repo = "github.com/markhayden/dejaview-evalsets"
+images_repo = "github.com/markhayden/squint-evalsets"
 images_rev = "91e3f6e4f1e050601f53d6cfc6d9950d7e1d2149"
 labels = "labels.toml"
 families = "families.toml"

@@ -1,0 +1,29 @@
+[package]
+name = "squint-core"
+description = "squint core: jobs, obligations, checklist, run loop, verdict (library)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+image = { workspace = true }
+sha2 = { workspace = true }
+schemars = { workspace = true }
+jsonschema = { workspace = true }
+tokio = { workspace = true }
+rand = { workspace = true }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+sha2 = { workspace = true }
+# Path only, no version: the testkit depends on this crate, and a dev-dependency without a version
+# is dropped from the published manifest, which is what breaks the cycle for `cargo publish`.
+squint-testkit = { path = "../squint-testkit" }

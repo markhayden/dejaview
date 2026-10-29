@@ -1,0 +1,36 @@
+[package]
+name = "squint-cli"
+description = "Agentic harness for evaluating the integrity of images"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+build = "build.rs"
+
+[[bin]]
+name = "squint"
+path = "src/main.rs"
+
+[features]
+default = []
+# Enables the scripted fake provider and the `--provider-script` flag for tests and debugging.
+# Never enabled in release builds.
+testkit = ["dep:squint-testkit"]
+
+[dependencies]
+squint-core = { workspace = true }
+squint-providers = { workspace = true }
+squint-tools = { workspace = true }
+squint-eval = { workspace = true }
+squint-testkit = { workspace = true, optional = true }
+clap = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+serde_json = "1"

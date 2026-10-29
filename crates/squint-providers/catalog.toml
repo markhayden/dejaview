@@ -1,0 +1,399 @@
+# The model catalog (SPEC "Model catalog", ADR 0008). Every value was read from the provider's
+# documentation on the `verified` date; `sources` are the pages read. Settings a model does not
+# support are rejected at resolve time (`squint-providers::catalog`). The catalog is part of the
+# cache key. Preview models are excluded. Fields the documentation does not state are listed under
+# `unverified` and recorded in docs/provider-data.md; they are re-verified when fixtures are
+# recorded (tasks 2.5b, 2.6b, 2.7b).
+catalog_version = 1
+
+# ---- endpoint profiles shipped at first release (API-key schemes only) -------------------------
+[profiles.anthropic]
+account = "anthropic"
+adapter = "anthropic-messages"
+base_url = "https://api.anthropic.com"
+path = "/v1/messages"
+auth = { scheme = "api-key-header", header = "x-api-key", env = "ANTHROPIC_API_KEY" }
+headers = { anthropic-version = "2023-06-01" }
+
+[profiles.google-ai-studio]
+account = "google"
+adapter = "gemini-generate-content"
+base_url = "https://generativelanguage.googleapis.com"
+path = "/v1beta/models/{model}:generateContent"
+auth = { scheme = "api-key-header", header = "x-goog-api-key", env = "GEMINI_API_KEY" }
+headers = {}
+
+[profiles.openai]
+account = "openai"
+adapter = "openai-responses"
+base_url = "https://api.openai.com"
+path = "/v1/responses"
+auth = { scheme = "bearer", header = "Authorization", env = "OPENAI_API_KEY" }
+headers = {}
+
+# ---- Anthropic -------------------------------------------------------------------------------
+
+[models."claude-opus-5-5"]
+adapter = "anthropic-messages"
+vendor = "anthropic"
+display = "Claude Opus 5.5"
+status = "stable"
+context_tokens = 1000000
+max_output_tokens = 128000
+verified = "2026-10-26"
+sources = [
+  "https://platform.claude.com/docs/en/about-claude/models/overview",
+  "https://platform.claude.com/docs/en/about-claude/pricing",
+  "https://platform.claude.com/docs/en/build-with-claude/vision",
+  "https://platform.claude.com/docs/en/models/opus-5-5/migration-guide",
+  "https://platform.claude.com/docs/en/build-with-claude/structured-outputs",
+  "https://platform.claude.com/docs/en/build-with-claude/preserved-thinking",
+]
+unverified = []
+
+[models."claude-opus-5-5".prices]
+input_per_million = 4.0
+output_per_million = 20.0
+cached_input_per_million = 0.20
+cache_write_per_million = 5.0
+per_image = 0.0
+
+[models."claude-opus-5-5".images]
+formats = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+max_dimension_px = 8000
+max_bytes = 10000000
+native_long_edge_px = 2576
+max_per_request = 600
+many_image_threshold = 20
+many_image_max_dimension_px = 2000
+max_request_bytes = 33554432
+tokens = { kind = "patch", patch_px = 28, max_tokens = 4784, multiplier = 1.0 }
+
+[models."claude-opus-5-5".capabilities]
+forced_tool_choice = false
+strict_tools = true
+strict_unsupported_keywords = ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength", "maxItems", "uniqueItems", "minProperties", "maxProperties", "contains", "minContains", "maxContains"]
+function_call_ids = true
+parallel_tools = true
+system_messages_in_history = true
+final_turn = ["refuse", "tool_removal"]
+sampling = false
+prefill = false
+
+[models."claude-opus-5-5".controls]
+effort = { values = ["low", "medium", "high", "xhigh", "max"], default = "medium" }
+
+[models."claude-opus-5-5".betas]
+thinking_binding = "thinking-binding-controls-2026-08-01"
+tool_changes = "inline-tools-2026-09-15"
+
+[models."claude-sonnet-5-5"]
+adapter = "anthropic-messages"
+vendor = "anthropic"
+display = "Claude Sonnet 5.5"
+status = "stable"
+context_tokens = 1000000
+max_output_tokens = 128000
+verified = "2026-10-26"
+sources = [
+  "https://platform.claude.com/docs/en/about-claude/models/overview",
+  "https://platform.claude.com/docs/en/about-claude/pricing",
+  "https://platform.claude.com/docs/en/build-with-claude/vision",
+  "https://platform.claude.com/docs/en/build-with-claude/structured-outputs",
+  "https://platform.claude.com/docs/en/build-with-claude/preserved-thinking",
+]
+unverified = []
+
+[models."claude-sonnet-5-5".prices]
+input_per_million = 2.0
+output_per_million = 10.0
+cached_input_per_million = 0.10
+cache_write_per_million = 2.5
+per_image = 0.0
+
+[models."claude-sonnet-5-5".images]
+formats = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+max_dimension_px = 8000
+max_bytes = 10000000
+native_long_edge_px = 2576
+max_per_request = 600
+many_image_threshold = 20
+many_image_max_dimension_px = 2000
+max_request_bytes = 33554432
+tokens = { kind = "patch", patch_px = 28, max_tokens = 4784, multiplier = 1.0 }
+
+[models."claude-sonnet-5-5".capabilities]
+forced_tool_choice = false
+strict_tools = true
+strict_unsupported_keywords = ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength", "maxItems", "uniqueItems", "minProperties", "maxProperties", "contains", "minContains", "maxContains"]
+function_call_ids = true
+parallel_tools = true
+system_messages_in_history = true
+final_turn = ["refuse", "tool_removal"]
+sampling = false
+prefill = false
+
+[models."claude-sonnet-5-5".controls]
+effort = { values = ["low", "medium", "high", "xhigh", "max"], default = "high" }
+
+[models."claude-sonnet-5-5".betas]
+thinking_binding = "thinking-binding-controls-2026-08-01"
+tool_changes = "inline-tools-2026-09-15"
+
+[models."claude-haiku-5-5"]
+adapter = "anthropic-messages"
+vendor = "anthropic"
+display = "Claude Haiku 5.5"
+status = "stable"
+context_tokens = 1000000
+max_output_tokens = 128000
+verified = "2026-10-26"
+sources = [
+  "https://platform.claude.com/docs/en/about-claude/models/overview",
+  "https://platform.claude.com/docs/en/about-claude/pricing",
+  "https://platform.claude.com/docs/en/build-with-claude/vision",
+  "https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide",
+  "https://platform.claude.com/docs/en/build-with-claude/structured-outputs",
+]
+unverified = []
+
+[models."claude-haiku-5-5".prices]
+input_per_million = 0.10
+output_per_million = 0.50
+cached_input_per_million = 0.01
+cache_write_per_million = 0.125
+per_image = 0.0
+long_prompt = { threshold_tokens = 100000, input_per_million = 0.50, output_per_million = 2.50, cached_input_per_million = 0.05 }
+
+[models."claude-haiku-5-5".images]
+formats = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+max_dimension_px = 8000
+max_bytes = 10000000
+native_long_edge_px = 2576
+max_per_request = 600
+many_image_threshold = 20
+many_image_max_dimension_px = 2000
+max_request_bytes = 33554432
+tokens = { kind = "patch", patch_px = 28, max_tokens = 4784, multiplier = 1.0 }
+
+[models."claude-haiku-5-5".capabilities]
+forced_tool_choice = true
+strict_tools = true
+strict_unsupported_keywords = ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minLength", "maxLength", "maxItems", "uniqueItems", "minProperties", "maxProperties", "contains", "minContains", "maxContains"]
+function_call_ids = true
+parallel_tools = true
+system_messages_in_history = true
+final_turn = ["refuse", "forced", "tool_removal"]
+sampling = false
+prefill = false
+
+[models."claude-haiku-5-5".controls]
+effort = { values = ["low", "medium", "high", "xhigh", "max"], default = "medium" }
+
+[models."claude-haiku-5-5".betas]
+thinking_binding = "thinking-binding-controls-2026-08-01"
+tool_changes = "inline-tools-2026-09-15"
+
+# ---- Google ----------------------------------------------------------------------------------
+
+[models."gemini-4-argon"]
+adapter = "gemini-generate-content"
+vendor = "google"
+display = "Gemini 4 Argon"
+status = "stable"
+context_tokens = 1048576
+max_output_tokens = 65536
+verified = "2026-10-26"
+sources = [
+  "https://ai.google.dev/gemini-api/docs/models/gemini-4-argon",
+  "https://ai.google.dev/gemini-api/docs/pricing",
+  "https://ai.google.dev/gemini-api/docs/image-understanding",
+  "https://ai.google.dev/gemini-api/docs/media-resolution",
+  "https://ai.google.dev/api/caching",
+  "https://ai.google.dev/gemini-api/docs/structured-output",
+]
+# Introductory prices to 2026-11-30; $4 / $20 / $0.20 from 2026-12-01 (re-pin then).
+unverified = ["images.max_dimension_px", "capabilities.function_call_ids", "capabilities.strict_unsupported_keywords"]
+
+[models."gemini-4-argon".prices]
+input_per_million = 2.0
+output_per_million = 10.0
+cached_input_per_million = 0.10
+per_image = 0.0
+
+[models."gemini-4-argon".images]
+formats = ["image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"]
+max_bytes = 20000000
+native_long_edge_px = 1536
+max_per_request = 3600
+max_request_bytes = 20000000
+detail_control = "media_resolution"
+tokens = { kind = "tile", tile_px = 768, tokens_per_tile = 258, small_px = 384, max_tokens = 1120 }
+
+[models."gemini-4-argon".capabilities]
+forced_tool_choice = true
+strict_tools = false
+strict_unsupported_keywords = ["minLength", "maxLength", "minProperties", "maxProperties", "uniqueItems", "contains", "minContains", "maxContains"]
+function_call_ids = false
+parallel_tools = true
+system_messages_in_history = false
+final_turn = ["refuse", "forced"]
+sampling = true
+prefill = false
+
+[models."gemini-4-argon".controls]
+thinking_level = { values = ["low", "medium", "high"], default = "medium" }
+media_resolution = { values = ["low", "medium", "high", "ultra_high"], default = "high" }
+
+[models."gemini-3.8-flash"]
+adapter = "gemini-generate-content"
+vendor = "google"
+display = "Gemini 3.8 Flash"
+status = "stable"
+context_tokens = 1048576
+max_output_tokens = 65536
+verified = "2026-10-26"
+sources = [
+  "https://ai.google.dev/gemini-api/docs/models/gemini-3.8-flash",
+  "https://ai.google.dev/gemini-api/docs/pricing",
+  "https://ai.google.dev/gemini-api/docs/image-understanding",
+  "https://ai.google.dev/gemini-api/docs/media-resolution",
+  "https://ai.google.dev/api/caching",
+  "https://ai.google.dev/gemini-api/docs/structured-output",
+]
+# Introductory prices to 2026-12-31; $1.50 / $7.50 / $0.15 from 2027-01-01 (re-pin then).
+unverified = ["images.max_dimension_px", "capabilities.function_call_ids", "capabilities.strict_unsupported_keywords"]
+
+[models."gemini-3.8-flash".prices]
+input_per_million = 0.75
+output_per_million = 3.75
+cached_input_per_million = 0.075
+per_image = 0.0
+
+[models."gemini-3.8-flash".images]
+formats = ["image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"]
+max_bytes = 20000000
+native_long_edge_px = 1536
+max_per_request = 3600
+max_request_bytes = 20000000
+detail_control = "media_resolution"
+tokens = { kind = "tile", tile_px = 768, tokens_per_tile = 258, small_px = 384, max_tokens = 1120 }
+
+[models."gemini-3.8-flash".capabilities]
+forced_tool_choice = true
+strict_tools = false
+strict_unsupported_keywords = ["minLength", "maxLength", "minProperties", "maxProperties", "uniqueItems", "contains", "minContains", "maxContains"]
+function_call_ids = false
+parallel_tools = true
+system_messages_in_history = false
+final_turn = ["refuse", "forced"]
+sampling = true
+prefill = false
+
+[models."gemini-3.8-flash".controls]
+thinking_level = { values = ["low", "medium", "high"], default = "medium" }
+media_resolution = { values = ["low", "medium", "high", "ultra_high"], default = "high" }
+
+# ---- OpenAI (owner decision 1, confirmed 2026-10-26: mid-tier and low-tier) ------------------
+
+[models."gpt-6.1-terra"]
+adapter = "openai-responses"
+vendor = "openai"
+display = "GPT-6.1 Terra"
+status = "stable"
+context_tokens = 1050000
+max_output_tokens = 128000
+verified = "2026-10-26"
+sources = [
+  "https://developers.openai.com/api/docs/models/gpt-6.1-terra",
+  "https://developers.openai.com/api/docs/pricing",
+  "https://developers.openai.com/api/docs/guides/images-vision",
+  "https://developers.openai.com/api/docs/guides/function-calling",
+  "https://developers.openai.com/api/docs/guides/structured-outputs",
+  "https://developers.openai.com/api/docs/guides/reasoning",
+]
+# The vision guide's sizing table names gpt-5.6-terra, not gpt-6.1-terra; the gpt-5.6 family values are
+# carried over until recordings confirm them.
+unverified = ["images.max_bytes", "images.native_long_edge_px", "images.tokens", "capabilities.sampling", "capabilities.system_messages_in_history"]
+
+[models."gpt-6.1-terra".prices]
+input_per_million = 1.0
+output_per_million = 5.0
+cached_input_per_million = 0.05
+per_image = 0.0
+
+[models."gpt-6.1-terra".images]
+formats = ["image/png", "image/jpeg", "image/webp", "image/gif"]
+max_dimension_px = 65535
+max_bytes = 536870912
+native_long_edge_px = 2048
+max_per_request = 1500
+max_request_bytes = 536870912
+detail_control = "image_detail"
+tokens = { kind = "patch", patch_px = 32, max_patches = 2500, reject_patches = 30000, multiplier = 1.2 }
+
+[models."gpt-6.1-terra".capabilities]
+forced_tool_choice = true
+strict_tools = true
+strict_unsupported_keywords = ["minLength", "maxLength", "uniqueItems", "minProperties", "maxProperties", "contains", "minContains", "maxContains"]
+function_call_ids = true
+parallel_tools = true
+system_messages_in_history = true
+final_turn = ["refuse", "forced"]
+sampling = false
+prefill = false
+
+[models."gpt-6.1-terra".controls]
+reasoning_effort = { values = ["none", "low", "medium", "high", "xhigh", "max"], default = "medium" }
+image_detail = { values = ["low", "high", "original", "auto"], default = "high" }
+
+[models."gpt-6.1-sol"]
+adapter = "openai-responses"
+vendor = "openai"
+display = "GPT-6.1 Sol"
+status = "stable"
+context_tokens = 1050000
+max_output_tokens = 128000
+verified = "2026-10-26"
+sources = [
+  "https://developers.openai.com/api/docs/models/gpt-6.1-sol",
+  "https://developers.openai.com/api/docs/pricing",
+  "https://developers.openai.com/api/docs/guides/images-vision",
+  "https://developers.openai.com/api/docs/guides/function-calling",
+  "https://developers.openai.com/api/docs/guides/structured-outputs",
+  "https://developers.openai.com/api/docs/guides/reasoning",
+]
+# The vision guide's sizing table names gpt-5.6-sol, not gpt-6.1-sol; the gpt-5.6 family values are
+# carried over until recordings confirm them.
+unverified = ["images.max_bytes", "images.native_long_edge_px", "images.tokens", "capabilities.sampling", "capabilities.system_messages_in_history"]
+
+[models."gpt-6.1-sol".prices]
+input_per_million = 2.0
+output_per_million = 10.0
+cached_input_per_million = 0.10
+per_image = 0.0
+
+[models."gpt-6.1-sol".images]
+formats = ["image/png", "image/jpeg", "image/webp", "image/gif"]
+max_dimension_px = 65535
+max_bytes = 536870912
+native_long_edge_px = 2048
+max_per_request = 1500
+max_request_bytes = 536870912
+detail_control = "image_detail"
+tokens = { kind = "patch", patch_px = 32, max_patches = 2500, reject_patches = 30000, multiplier = 1.2 }
+
+[models."gpt-6.1-sol".capabilities]
+forced_tool_choice = true
+strict_tools = true
+strict_unsupported_keywords = ["minLength", "maxLength", "uniqueItems", "minProperties", "maxProperties", "contains", "minContains", "maxContains"]
+function_call_ids = true
+parallel_tools = true
+system_messages_in_history = true
+final_turn = ["refuse", "forced"]
+sampling = false
+prefill = false
+
+[models."gpt-6.1-sol".controls]
+reasoning_effort = { values = ["low", "medium", "high", "xhigh", "max"], default = "medium" }
+image_detail = { values = ["low", "high", "original", "auto"], default = "high" }

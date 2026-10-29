@@ -1,7 +1,7 @@
 # The base config of the regions gate matrix (evalsets/matrix/gate-regions.toml). The runner sets
 # the provider, model, rules base, decision runs and tools per cell; what stays is the per-decision
 # cap, the policy, the account and the Python pack the `regions` tool comes from: the installed
-# bundle (`dejaview tools setup --bundle tools/python/dist/bundle-0.0.1 --models-from
+# bundle (`squint tools setup --bundle tools/python/dist/bundle-0.0.1 --models-from
 # tools/python/dist/segmenter` until the segmenter is published), one process for the whole
 # evaluation.
 [provider]
@@ -16,12 +16,12 @@ spend_cap_usd = 10.00
 
 [privacy]
 cloud_calls = true
-account = "google:${DEJAVIEW_GOOGLE_ACCOUNT}"
+account = "google:${SQUINT_GOOGLE_ACCOUNT}"
 
 [tools.packs.python]
-package = "dejaview-tools"
+package = "squint-tools"
 version = "0.0.1"
 shared = true
 
 [output]
-dir = "./dejaview-out"
+dir = "./squint-out"

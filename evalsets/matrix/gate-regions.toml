@@ -22,4 +22,4 @@ hypotheses = 1
 [[matrix.models]]
 profile = "google-ai-studio"
 model = "gemini-4-argon"
-account = "google:${DEJAVIEW_GOOGLE_ACCOUNT}"
+account = "google:${SQUINT_GOOGLE_ACCOUNT}"

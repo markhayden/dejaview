@@ -299,101 +299,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4583a4551df46e2792f82ceeac45e850d2e2d5debba0b91f102385cda5b11f06"
 
 [[package]]
-name = "dejaview"
-version = "0.1.0"
-dependencies = [
- "clap",
- "dejaview-core",
- "dejaview-eval",
- "dejaview-providers",
- "dejaview-testkit",
- "dejaview-tools",
- "serde_json",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "dejaview-core"
-version = "0.1.0"
-dependencies = [
- "dejaview-testkit",
- "image",
- "jsonschema",
- "rand",
- "schemars",
- "serde",
- "serde_json",
- "sha2",
- "thiserror",
- "tokio",
- "toml",
-]
-
-[[package]]
-name = "dejaview-eval"
-version = "0.1.0"
-dependencies = [
- "dejaview-core",
- "dejaview-providers",
- "dejaview-testkit",
- "rand",
- "rand_chacha",
- "serde",
- "serde_json",
- "sha2",
- "thiserror",
- "tokio",
- "toml",
-]
-
-[[package]]
-name = "dejaview-providers"
-version = "0.1.0"
-dependencies = [
- "dejaview-core",
- "dejaview-testkit",
- "image",
- "jsonschema",
- "reqwest",
- "rustls",
- "serde",
- "serde_json",
- "sha2",
- "thiserror",
- "tokio",
- "toml",
-]
-
-[[package]]
-name = "dejaview-testkit"
-version = "0.1.0"
-dependencies = [
- "dejaview-core",
- "image",
- "serde",
- "serde_json",
- "thiserror",
- "toml",
-]
-
-[[package]]
-name = "dejaview-tools"
-version = "0.1.0"
-dependencies = [
- "dejaview-core",
- "dejaview-testkit",
- "image",
- "jsonschema",
- "serde",
- "serde_json",
- "sha2",
- "thiserror",
- "tokio",
- "toml",
-]
-
-[[package]]
 name = "digest"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1691,6 +1596,101 @@ checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "squint-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "serde_json",
+ "squint-core",
+ "squint-eval",
+ "squint-providers",
+ "squint-testkit",
+ "squint-tools",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "squint-core"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "jsonschema",
+ "rand",
+ "schemars",
+ "serde",
+ "serde_json",
+ "sha2",
+ "squint-testkit",
+ "thiserror",
+ "tokio",
+ "toml",
+]
+
+[[package]]
+name = "squint-eval"
+version = "0.1.0"
+dependencies = [
+ "rand",
+ "rand_chacha",
+ "serde",
+ "serde_json",
+ "sha2",
+ "squint-core",
+ "squint-providers",
+ "squint-testkit",
+ "thiserror",
+ "tokio",
+ "toml",
+]
+
+[[package]]
+name = "squint-providers"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "jsonschema",
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
+ "sha2",
+ "squint-core",
+ "squint-testkit",
+ "thiserror",
+ "tokio",
+ "toml",
+]
+
+[[package]]
+name = "squint-testkit"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "serde",
+ "serde_json",
+ "squint-core",
+ "thiserror",
+ "toml",
+]
+
+[[package]]
+name = "squint-tools"
+version = "0.1.0"
+dependencies = [
+ "image",
+ "jsonschema",
+ "serde",
+ "serde_json",
+ "sha2",
+ "squint-core",
+ "squint-testkit",
+ "thiserror",
+ "tokio",
+ "toml",
 ]
 
 [[package]]

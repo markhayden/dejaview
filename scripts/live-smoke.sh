@@ -7,9 +7,9 @@
 # anything else fails the smoke. Spends a few cents per vendor.
 #
 #   set -a; source .env; set +a
-#   scripts/live-smoke.sh /path/to/dejaview
+#   scripts/live-smoke.sh /path/to/squint
 set -euo pipefail
-bin="${1:?usage: live-smoke.sh <dejaview binary>}"
+bin="${1:?usage: live-smoke.sh <squint binary>}"
 bin="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")"
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 out="$(mktemp -d)"
@@ -51,9 +51,9 @@ PY
   echo "$profile ($model): verdict=$verdict exit=$code cost_usd=$cost"
 }
 
-smoke anthropic claude-haiku-5-5 ANTHROPIC_API_KEY DEJAVIEW_ANTHROPIC_ACCOUNT anthropic
-smoke google-ai-studio gemini-3.8-flash GEMINI_API_KEY DEJAVIEW_GOOGLE_ACCOUNT google
-smoke openai gpt-6.1-terra OPENAI_API_KEY DEJAVIEW_OPENAI_ACCOUNT openai
+smoke anthropic claude-haiku-5-5 ANTHROPIC_API_KEY SQUINT_ANTHROPIC_ACCOUNT anthropic
+smoke google-ai-studio gemini-3.8-flash GEMINI_API_KEY SQUINT_GOOGLE_ACCOUNT google
+smoke openai gpt-6.1-terra OPENAI_API_KEY SQUINT_OPENAI_ACCOUNT openai
 
 [ "$ran" -gt 0 ] || { echo "live smoke ran nothing: no vendor credentials in the environment" >&2; exit 1; }
 [ "$failed" -eq 0 ] || { echo "live smoke: $failed vendor(s) failed" >&2; exit 1; }

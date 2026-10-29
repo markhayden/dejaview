@@ -56,7 +56,7 @@ cp scripts/scan-secrets.sh scripts/synthetic-tokens.txt "$work/scripts/"
 cp scripts/hooks/pre-commit scripts/hooks/commit-msg "$work/scripts/hooks/"
 cp scripts/check-attribution.sh "$work/scripts/"
 git -C "$work" config core.hooksPath scripts/hooks
-export DEJAVIEW_HOOK_SKIP_CARGO=1
+export SQUINT_HOOK_SKIP_CARGO=1
 
 commit_ok ()  { if git -C "$work" commit -q -m "$1" >/dev/null 2>&1; then ok; else bad "hook should accept: $1"; fi; }
 commit_bad () { if git -C "$work" commit -q -m "$1" >/dev/null 2>&1; then bad "hook should reject: $1"; else ok; git -C "$work" reset -q; fi; }
@@ -84,7 +84,7 @@ ${generated}Some Tool](https://example.invalid)"
 git -C "$work" add plain.txt; commit_ok "a change
 
 Co-Authored-By: A Person <person@example.invalid>"
-unset DEJAVIEW_HOOK_SKIP_CARGO
+unset SQUINT_HOOK_SKIP_CARGO
 
 echo "hook tests: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

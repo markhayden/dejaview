@@ -13,7 +13,7 @@ spend_cap_usd = 5.0
 
 [privacy]
 cloud_calls = true
-account = "anthropic:${DEJAVIEW_ANTHROPIC_ACCOUNT}"
+account = "anthropic:${SQUINT_ANTHROPIC_ACCOUNT}"
 
 [output]
-dir = "./dejaview-out"
+dir = "./squint-out"

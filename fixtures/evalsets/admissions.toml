@@ -1,5 +1,5 @@
 # Synthetic admission records for tests (3.4a): a provisional tool is excluded from arm D, a
-# confirmed one included. Real records are written by `dejaview eval gate` (3.5b).
+# confirmed one included. Real records are written by `squint eval gate` (3.5b).
 admissions_version = 1
 
 [[admission]]

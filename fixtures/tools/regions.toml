@@ -33,12 +33,12 @@ description = "An aligned frame id of the source relative to `image`."
 [tool.input_schema]
 type = "object"
 additionalProperties = false
-required = ["image", "against", "_dejaview"]
+required = ["image", "against", "_squint"]
 [tool.input_schema.properties.image]
 type = "string"
 [tool.input_schema.properties.against]
 type = "string"
-[tool.input_schema.properties._dejaview]
+[tool.input_schema.properties._squint]
 type = "object"
 
 [tool.output_schema]

@@ -9,15 +9,15 @@ alignment) and ML tools that stay Python (segmenter-based region finder, class l
 OCR, subject matching, hand checks). The segmenter loads 1.26 GB of weights, so an external tool
 process must live for a whole run or evaluation. The model never calls a tool directly: the
 harness validates arguments against the tool's schema, runs it, and returns text plus images.
-dejaview ships complete with its own tools; no consumer's tooling shapes this.
+squint ships complete with its own tools; no consumer's tooling shapes this.
 
 ## Decision
 
-One registry, two transports. Built-ins implement a `Tool` trait in `dejaview-tools`. External
+One registry, two transports. Built-ins implement a `Tool` trait in `squint-tools`. External
 packs are MCP servers over stdio, started by a configured command, one long-lived process per
 pack per run or evaluation, with `initialize`, `tools/list` and `tools/call`. Images pass by local
 path when the pack declares it accepts paths, by base64 otherwise; results may carry image
-content blocks. The Python pack is published to PyPI as `dejaview-tools` and launched with `uvx`
+content blocks. The Python pack is published to PyPI as `squint-tools` and launched with `uvx`
 at a version pinned in config and hashed into the cache key.
 
 ## Alternatives
@@ -38,12 +38,12 @@ at a version pinned in config and hashed into the cache key.
 
 - MCP revision pinned to `2025-11-25`; later revisions are separate implementations.
 - Two argument schemas per tool: the model schema the provider sees and the input schema with a
-  required `_dejaview` object the harness injects (images, named frames with transform chains and
+  required `_squint` object the harness injects (images, named frames with transform chains and
   lossless pixels, hints). Results are a validated envelope as `structuredContent` plus image
   blocks in exact correspondence.
 - Tools receive canonical full-resolution lossless images, never provider-prepared ones.
 - The Python pack is distributed as a provisioning bundle (provisioning project, lock, wheel,
-  digests), installed once by `dejaview tools setup`, launched offline; `uvx` at runtime was
+  digests), installed once by `squint tools setup`, launched offline; `uvx` at runtime was
   dropped because it can download.
 - Shared processes are leased per run with a bounded acquisition deadline and a reset contract; a
   process with a timed-out or cancelled call is never reused.

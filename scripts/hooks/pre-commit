@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pre-commit hook: credential scan of every staged blob first (cheap and the gate that matters),
 # then formatting, then clippy in both feature configurations. Install with `just hooks`.
-# DEJAVIEW_HOOK_SKIP_CARGO=1 skips the cargo steps; scripts/test-hooks.sh uses it to test the
+# SQUINT_HOOK_SKIP_CARGO=1 skips the cargo steps; scripts/test-hooks.sh uses it to test the
 # scan path end to end in a scratch repository.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -17,9 +17,9 @@ if ! scripts/scan-secrets.sh < "$scan_input"; then
   exit 1
 fi
 
-if [ "${DEJAVIEW_HOOK_SKIP_CARGO:-0}" = "1" ]; then
+if [ "${SQUINT_HOOK_SKIP_CARGO:-0}" = "1" ]; then
   exit 0
 fi
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo clippy --workspace --all-targets --features dejaview/testkit -- -D warnings
+cargo clippy --workspace --all-targets --features squint-cli/testkit -- -D warnings

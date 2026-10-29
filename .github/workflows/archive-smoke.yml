@@ -39,6 +39,6 @@ jobs:
           pattern: artifacts-*
           path: artifacts
           merge-multiple: true
-      - run: scripts/archive-smoke.sh "artifacts/dejaview-${{ matrix.target }}.tar.xz"
+      - run: scripts/archive-smoke.sh "artifacts/squint-cli-${{ matrix.target }}.tar.xz"
         env:
           REQUIRE_CHECKSUM: "1"

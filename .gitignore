@@ -1,7 +1,7 @@
 # build and run outputs
 /target/
 eval-out/
-dejaview-out/
+squint-out/
 *.local.toml
 .venv/
 __pycache__/
@@ -17,7 +17,7 @@ docs/brief.md
 # built provisioning bundles
 tools/python/dist/
 
-# evaluation-set images live in the dejaview-evalsets repository and are fetched by hash
+# evaluation-set images live in the squint-evalsets repository and are fetched by hash
 /evalsets/**/*.png
 /evalsets/**/*.jpg
 /evalsets/**/*.jpeg

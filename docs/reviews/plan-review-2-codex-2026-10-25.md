@@ -60,9 +60,9 @@
 
    **Section:** Crate graph, 0.1, 1.1; CLI verification commands.
 
-   **Why:** With `package.name = "dejaview"`, `cargo ... -p dejaview-cli` does not select that package merely because its directory or conceptual crate is called `dejaview-cli`. Cargo package selection uses package identity. Separately, the CLI imports scripted support behind a feature while the graph declares testkit exclusively a dev-dependency; “enabled for tests and debug builds” does not itself define Cargo feature activation. [Cargo package selection](https://doc.rust-lang.org/cargo/commands/cargo-pkgid.html), [Cargo features](https://doc.rust-lang.org/cargo/reference/features.html).
+   **Why:** With `package.name = "squint"`, `cargo ... -p squint-cli` does not select that package merely because its directory or conceptual crate is called `squint-cli`. Cargo package selection uses package identity. Separately, the CLI imports scripted support behind a feature while the graph declares testkit exclusively a dev-dependency; “enabled for tests and debug builds” does not itself define Cargo feature activation. [Cargo package selection](https://doc.rust-lang.org/cargo/commands/cargo-pkgid.html), [Cargo features](https://doc.rust-lang.org/cargo/reference/features.html).
 
-   **Concrete change:** State: “Directory `crates/dejaview-cli`; package and binary `dejaview`; all package selectors use `-p dejaview`.” Resolve name availability in 0.1. Define the scripted CLI build explicitly—such as a non-default `testkit` feature enabling an optional testkit dependency—and add the necessary graph exception and feature-enabled test command; verify ordinary release builds reject `--provider-script`.
+   **Concrete change:** State: “Directory `crates/squint-cli`; package and binary `squint`; all package selectors use `-p squint-cli`.” Resolve name availability in 0.1. Define the scripted CLI build explicitly—such as a non-default `testkit` feature enabling an optional testkit dependency—and add the necessary graph exception and feature-enabled test command; verify ordinary release builds reject `--provider-script`.
 
 5. **[major] The dependency lists still permit impossible execution orders**
 
@@ -95,7 +95,7 @@
 
    **Concrete change:** Define initial and confirmation gate stages. Require confirmation to reference the initial receipt, match its frozen judging configuration, use at least 50 untouched items from disjoint families, and produce confirmed admission only when the required initial and confirmation outcomes pass. Have scoring produce a durable receipt and reviewable label/split changes; publication is a separate owner-controlled step. Test interrupted scoring/publication recovery without rescoring, and define a versioned admission record consumed by arm D.
 
-8. **[major] Release checks can pass while `cargo install dejaview` remains impossible**
+8. **[major] Release checks can pass while `cargo install squint-cli` remains impossible**
 
    **Section:** 2.10; checkpoint M5.
 
@@ -109,7 +109,7 @@
 
    **Why:** Task 1.13 tests a bounded wait and reset failure, but not that the entire wait/reset/shutdown/reinitialisation sequence shares one deadline or that prior-run work is gone before reuse. Task 1.14’s pack-controlled socket failure mode does not establish that child processes cannot use networking, and its ignored installation test can download without the spec’s live-test guard. These tasks remain substantial proofs, while journal/rebuild/prune and geometry/viewer work are also grouped into large nominal M tasks.
 
-   **Concrete change:** Add lifecycle fixtures for successful reset with no surviving prior work, missing reset support, cancellation-driven process replacement and the total acquisition deadline. Separate explicit online provisioning from an externally network-denied runtime test; guard any network-using test with `DEJAVIEW_LIVE=1`, or pre-provision outside the test. Split 1.10 into journal/artifact durability and report/rebuild/prune, and 4.2 into tool/frame geometry and viewer integration, each with its own acceptance criteria.
+   **Concrete change:** Add lifecycle fixtures for successful reset with no surviving prior work, missing reset support, cancellation-driven process replacement and the total acquisition deadline. Separate explicit online provisioning from an externally network-denied runtime test; guard any network-using test with `SQUINT_LIVE=1`, or pre-provision outside the test. Split 1.10 into journal/artifact durability and report/rebuild/prune, and 4.2 into tool/frame geometry and viewer integration, each with its own acceptance criteria.
 
 10. **[major] The adversarial set does not fit the approved set schema**
 

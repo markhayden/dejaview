@@ -1,12 +1,12 @@
 # Reality checks: extra or missing limbs, fused fingers, impossible shadows, garbled text.
 #
-# Run:  dejaview check --config examples/reality-checks.toml --use-case reality-checks --candidate render.png
+# Run:  squint check --config examples/reality-checks.toml --use-case reality-checks --candidate render.png
 # Credentials come from the environment only (ANTHROPIC_API_KEY, GEMINI_API_KEY or OPENAI_API_KEY);
 # the account line expands the attestation that `[privacy] cloud_calls` binds to the profile.
 # To point this config at another direct profile without editing it:
-#   --set provider.profile=google-ai-studio --set provider.model=gemini-3.8-flash --set privacy.account=google:${DEJAVIEW_GOOGLE_ACCOUNT}
-#   --set provider.profile=openai --set provider.model=gpt-6.1-terra --set privacy.account=openai:${DEJAVIEW_OPENAI_ACCOUNT}
-# Model controls are per model (`dejaview catalog show <model>`), for example
+#   --set provider.profile=google-ai-studio --set provider.model=gemini-3.8-flash --set privacy.account=google:${SQUINT_GOOGLE_ACCOUNT}
+#   --set provider.profile=openai --set provider.model=gpt-6.1-terra --set privacy.account=openai:${SQUINT_OPENAI_ACCOUNT}
+# Model controls are per model (`squint catalog show <model>`), for example
 #   controls = { effort = "low" }                  # claude-*
 #   controls = { thinking_level = "low" }          # gemini-*
 #   controls = { reasoning_effort = "low" }        # gpt-*
@@ -26,7 +26,7 @@ spend_cap_usd = 2.00
 
 [privacy]
 cloud_calls = true
-account = "anthropic:${DEJAVIEW_ANTHROPIC_ACCOUNT}"
+account = "anthropic:${SQUINT_ANTHROPIC_ACCOUNT}"
 
 [output]
-dir = "./dejaview-out"
+dir = "./squint-out"

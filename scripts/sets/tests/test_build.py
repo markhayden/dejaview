@@ -4,9 +4,9 @@ import hashlib
 import tomllib
 from pathlib import Path
 
-from dejaview_sets import build
-from dejaview_sets import plan as plan_mod
-from dejaview_sets.generators import FakeGenerator
+from squint_sets import build
+from squint_sets import plan as plan_mod
+from squint_sets.generators import FakeGenerator
 
 PLAN = """
 [set]
@@ -14,7 +14,7 @@ id = "source-fidelity/houses-v1"
 use_case = "source-fidelity"
 split = "dev"
 licence = "CC-BY-4.0"
-images_repo = "github.com/markhayden/dejaview-evalsets"
+images_repo = "github.com/markhayden/squint-evalsets"
 rules = { base = "source-fidelity", version = 1 }
 
 [[family]]

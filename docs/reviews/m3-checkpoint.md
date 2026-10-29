@@ -8,7 +8,7 @@ fixed on the branch or recorded here with where it is tracked.
 
 The pass found the set checks, the seal, blind-label handling, the gate stages, the metrics and
 localisation in line with the spec, the viewer's path handling tight, and no account id or key in
-any tracked file (accounts appear only as `${DEJAVIEW_*_ACCOUNT}` references). Its findings:
+any tracked file (accounts appear only as `${SQUINT_*_ACCOUNT}` references). Its findings:
 
 | Severity | Finding | Resolution |
 |---|---|---|
@@ -33,7 +33,7 @@ any tracked file (accounts appear only as `${DEJAVIEW_*_ACCOUNT}` references). I
 | Suggestion | `DecisionResult`, `Summary`, `Estimate` and `Matrix` lack `JsonSchema`. | Recorded in tasks/todo.md for the checkpoint follow-ups. |
 | Suggestion | One thread per viewer connection, unbounded. | Recorded (local single-user tool) in tasks/todo.md. |
 | Suggestion | `results-doc.py`: the shebang failed on Linux, the published `summary.json` carried raw error text, the adversarial sets were told by suffix. | Fixed: `env -S`; error text withheld from the published copy; the suffix stays as the naming convention the sets follow and the test checks. |
-| Suggestion | `dejaview-eval` declared `dejaview-tools` without using it. | Fixed: dropped, and the crate graph with it. |
+| Suggestion | `squint-eval` declared `squint-tools` without using it. | Fixed: dropped, and the crate graph with it. |
 | Suggestion | No test that an environment-expanded matrix account reaches the report as `[redacted]`. | Recorded in tasks/todo.md (the test would have to set a process variable). |
 
 ## Test coverage

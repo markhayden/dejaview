@@ -107,8 +107,10 @@ impl Bundle {
     }
 
     /// Verifies, copies the bundle into its install directory (replacing any previous install),
-    /// verifies the copy, and runs `uv sync --frozen --no-dev` with the declared Python.
-    pub fn install(&self, data_home: &Path) -> Result<Installed> {
+    /// verifies the copy, runs `uv sync --frozen --no-dev` with the declared Python, then the
+    /// pack's `fetch` entry point as `fetch` says, so the model artifacts are in place before
+    /// the first run (SPEC "Python tool pack").
+    pub fn install(&self, data_home: &Path, fetch: &Fetch) -> Result<Installed> {
         self.verify()?;
         let dir = install_dir(data_home, &self.header.package, &self.header.version);
         if dir.exists() {
@@ -121,7 +123,45 @@ impl Bundle {
         std::fs::copy(self.dir.join(BUNDLE_FILE), dir.join(BUNDLE_FILE))?;
         Bundle::load(&dir)?.verify()?;
         uv_sync(&dir, &self.header.python)?;
-        Installed::locate(data_home, &self.header.package, &self.header.version)
+        let installed = Installed::locate(data_home, &self.header.package, &self.header.version)?;
+        installed.fetch(fetch)?;
+        Ok(installed)
+    }
+}
+
+/// Where the pack's `fetch` entry point takes its model artifacts from after the sync.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Fetch {
+    /// The release the pack's record names (network).
+    Release,
+    /// A directory holding the files, for example the export's output before publication; and
+    /// where to put them, the pack's default (`$XDG_CACHE_HOME/dejaview/models`) when `None`.
+    From {
+        dir: PathBuf,
+        models: Option<PathBuf>,
+    },
+    /// Do not run `fetch`: the pack's tools that need an artifact report it missing until it is.
+    Skip,
+}
+
+impl Fetch {
+    /// The arguments after `fetch`, or `None` when nothing is to run.
+    pub fn args(&self) -> Option<Vec<String>> {
+        match self {
+            Fetch::Release => Some(vec!["fetch".into()]),
+            Fetch::From { dir, models } => {
+                let mut args = vec![
+                    "fetch".to_string(),
+                    "--from".into(),
+                    dir.display().to_string(),
+                ];
+                if let Some(models) = models {
+                    args.extend(["--models".to_string(), models.display().to_string()]);
+                }
+                Some(args)
+            }
+            Fetch::Skip => None,
+        }
     }
 }
 
@@ -243,6 +283,35 @@ impl Installed {
         })
     }
 
+    /// Runs the installed pack's `fetch` entry point as `fetch` says, with the same environment
+    /// the server gets. A refusal (a hash mismatch, an unreachable source) is `error: resolve`
+    /// carrying the pack's own words.
+    pub fn fetch(&self, fetch: &Fetch) -> Result<()> {
+        let Some(args) = fetch.args() else {
+            return Ok(());
+        };
+        let spawn = self.spawn(vec![]);
+        let output = Command::new(&self.executable)
+            .args(&args)
+            .envs(spawn.extra_env.iter().cloned())
+            .output()
+            .map_err(|e| {
+                resolve(format!(
+                    "cannot run {} fetch: {e}",
+                    self.executable.display()
+                ))
+            })?;
+        if !output.status.success() {
+            return Err(resolve(format!(
+                "{} {} failed:\n{}",
+                self.header.package,
+                args.join(" "),
+                String::from_utf8_lossy(&output.stderr).trim()
+            )));
+        }
+        Ok(())
+    }
+
     /// How the harness launches the pack: offline, no Python downloads, the lock digest exposed.
     pub fn spawn(&self, declared_env: Vec<String>) -> Spawn {
         Spawn {
@@ -261,6 +330,34 @@ impl Installed {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn fetch_arguments_name_the_source_or_nothing_to_run() {
+        use super::Fetch;
+        assert_eq!(Fetch::Release.args(), Some(vec!["fetch".to_string()]));
+        assert_eq!(
+            Fetch::From {
+                dir: "/exports/segmenter".into(),
+                models: None
+            }
+            .args(),
+            Some(vec![
+                "fetch".to_string(),
+                "--from".to_string(),
+                "/exports/segmenter".to_string()
+            ])
+        );
+        assert_eq!(
+            Fetch::From {
+                dir: "/exports/segmenter".into(),
+                models: Some("/cache/models".into())
+            }
+            .args()
+            .unwrap()[3..],
+            ["--models".to_string(), "/cache/models".to_string()]
+        );
+        assert_eq!(Fetch::Skip.args(), None);
+    }
+
     use super::*;
 
     fn synthetic(tag: &str) -> PathBuf {

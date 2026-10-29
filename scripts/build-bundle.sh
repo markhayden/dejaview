@@ -6,7 +6,9 @@ set -euo pipefail
 cd "$(dirname "$0")/../tools/python"
 
 version=$(uv version --short)
-rm -rf dist
+# Only this script's outputs are replaced: dist/ also holds the segmenter export (dist/segmenter),
+# which is not rebuilt here and must not be removed.
+rm -rf dist/wheel "dist/bundle-$version"
 uv build --wheel --out-dir dist/wheel >/dev/null
 wheel=$(ls dist/wheel/*.whl)
 wheel_name=$(basename "$wheel")

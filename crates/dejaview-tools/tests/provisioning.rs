@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use dejaview_core::tool::Status;
 use dejaview_tools::mcp::{Pack, Timeouts};
-use dejaview_tools::provision::{Bundle, Installed};
+use dejaview_tools::provision::{Bundle, Fetch, Installed};
 use serde_json::json;
 
 fn repo() -> PathBuf {
@@ -41,7 +41,9 @@ fn clean_install_serves_echo_region_offline_with_versions_matching_the_lock() {
     let bundle = Bundle::load(&bundle_dir()).unwrap();
     bundle.verify().unwrap();
     let data_home = tempdir("install");
-    let installed = bundle.install(&data_home).unwrap();
+    // No fetch here: the artifact is 1.2 GB and lives behind the network; the pack's tools that
+    // need it report it missing, which is their own test's business.
+    let installed = bundle.install(&data_home, &Fetch::Skip).unwrap();
     assert!(installed.executable.is_file());
     assert_eq!(installed.header.version, "0.0.1");
 
@@ -81,7 +83,12 @@ fn clean_install_serves_echo_region_offline_with_versions_matching_the_lock() {
         std::env::vars(),
     )
     .unwrap();
-    assert_eq!(pack.manifests()[0].name, "echo_region");
+    let names: Vec<&str> = pack.manifests().iter().map(|m| m.name.as_str()).collect();
+    assert_eq!(names, ["echo_region", "regions", "classes"]);
+    let candidate = data_home.join("raw_candidate.png");
+    image::RgbImage::from_pixel(8, 6, image::Rgb([90, 90, 90]))
+        .save(&candidate)
+        .unwrap();
     let envelope = pack
         .call(
             "run-1",
@@ -89,13 +96,14 @@ fn clean_install_serves_echo_region_offline_with_versions_matching_the_lock() {
             "echo_region",
             json!({
                 "image": "candidate",
-                "bbox": [0.1, 0.2, 0.3, 0.4],
-                "_dejaview": { "run_id": "run-1", "call_id": "call:1", "images": { "candidate": { "media_type": "image/png", "width": 1, "height": 1, "projection": "flat" } }, "frames": {}, "hints": {} },
+                "bbox": [0.0, 0.0, 0.5, 0.5],
+                "_dejaview": { "run_id": "run-1", "call_id": "call:1", "images": { "candidate": { "media_type": "image/png", "width": 8, "height": 6, "projection": "flat", "path": candidate } }, "frames": {}, "hints": {} },
             }),
         )
         .unwrap();
-    assert_eq!(envelope.status, Status::Ok);
+    assert_eq!(envelope.status, Status::Ok, "{}", envelope.summary);
     assert_eq!(envelope.regions.len(), 1);
+    assert_eq!(envelope.images.len(), 1);
     assert_eq!(
         envelope.provenance.lock_digest.as_deref(),
         Some(installed.lock_digest.as_str())
@@ -117,12 +125,72 @@ fn a_tampered_bundle_is_refused_before_anything_is_installed() {
     let data_home = tempdir("tampered-home");
     let err = Bundle::load(&copy)
         .unwrap()
-        .install(&data_home)
+        .install(&data_home, &Fetch::Skip)
         .unwrap_err();
     assert_eq!(err.class(), "resolve");
     assert!(err.to_string().contains("digest mismatch"), "{err}");
     assert!(
         !data_home.join("dejaview").exists(),
         "nothing was installed"
+    );
+}
+
+#[test]
+#[ignore = "needs uv, a built bundle and the export's output in tools/python/dist/segmenter"]
+fn setup_fetches_the_segmenter_from_a_directory_into_the_models_cache() {
+    let export = repo().join("tools/python/dist/segmenter");
+    assert!(
+        export.join("record.json").is_file(),
+        "no export under {}: run the export script first",
+        export.display()
+    );
+    let bundle = Bundle::load(&bundle_dir()).unwrap();
+    let data_home = tempdir("fetch-home");
+    let cache_home = tempdir("fetch-cache");
+    let models = cache_home.join("dejaview/models");
+    bundle
+        .install(
+            &data_home,
+            &Fetch::From {
+                dir: export,
+                models: Some(models.clone()),
+            },
+        )
+        .unwrap();
+    let artifact = cache_home.join("dejaview/models/segmenter-v1/eomt-large-ade20k-512.onnx");
+    assert!(artifact.is_file(), "{} was fetched", artifact.display());
+    assert_eq!(artifact.metadata().unwrap().len(), 1_264_419_839);
+    for n in 0..4 {
+        assert!(
+            cache_home
+                .join(format!("dejaview/models/segmenter-v1/golden-{n}.npz"))
+                .is_file()
+        );
+    }
+    // A tampered copy is refused and nothing of it is kept.
+    let tampered = tempdir("fetch-tampered");
+    std::fs::write(
+        tampered.join("eomt-large-ade20k-512.onnx"),
+        b"not the model",
+    )
+    .unwrap();
+    let cache_two = tempdir("fetch-cache-two");
+    let err = Bundle::load(&bundle_dir())
+        .unwrap()
+        .install(
+            &tempdir("fetch-home-two"),
+            &Fetch::From {
+                dir: tampered,
+                models: Some(cache_two.join("dejaview/models")),
+            },
+        )
+        .unwrap_err();
+    assert_eq!(err.class(), "resolve");
+    assert!(err.to_string().contains("is not the recorded"), "{err}");
+    assert!(
+        std::fs::read_dir(cache_two.join("dejaview/models/segmenter-v1"))
+            .map(|d| d.count() == 0)
+            .unwrap_or(true),
+        "nothing kept"
     );
 }

@@ -31,17 +31,17 @@ description = "[left, top, right, bottom] as fractions of the frame, for a crop.
 type = "number"
 minimum = -180
 exclusiveMaximum = 180
-description = "Degrees from the centre column of a panorama, increasing to the right. With pitch and fov."
+description = "Panoramas only, together with pitch and fov: degrees from the centre column, increasing to the right. A flat frame takes bbox instead."
 [tool.model_schema.properties.pitch]
 type = "number"
 minimum = -90
 maximum = 90
-description = "Degrees above the horizon of a panorama."
+description = "Panoramas only, with yaw and fov: degrees above the horizon."
 [tool.model_schema.properties.fov]
 type = "number"
 minimum = 10
 maximum = 120
-description = "Horizontal field of view in degrees of the square perspective view."
+description = "Panoramas only, with yaw and pitch: horizontal field of view in degrees of the square perspective view."
 
 [tool.input_schema]
 type = "object"

@@ -1,0 +1,48 @@
+{
+  "descriptor_version": 1,
+  "harness_version": "0.1.0 (a6dde9e2e)",
+  "matrix_identity": "7f1852fd00c6a30c0f3e39687ee8b7cd09d04fc1dc3758662fd61bccd9b7dc0c",
+  "matrix_sha256": "51e6c8bf71e7964b40ffc2755acd749927da9ea8521c5ffb6f5ba24d4cd7287b",
+  "config_sha256": "68706f879fbf071fcd61585b676c1b445c0e6270a01d7c1fb362b1dc0b5f30dd",
+  "prompt_version": "v1",
+  "prompt_sha256": "4c5297e8d5829cafb4be5b9d5763a83bbc9a6c181ed103959c0c412279b05de7",
+  "catalog_version": 1,
+  "catalog_sha256": "1b20a00b1c7f830f306c77b437a7266628a975fd6207e8a1965f62a7b6012da9",
+  "profiles": [
+    "google-ai-studio"
+  ],
+  "sets": {
+    "source-fidelity/blind-v1": {
+      "items": "418a2eb510f22118dce429ff750831871856891bee32328623da0ece195e635d",
+      "families": "79be55259d5d4410ec337d7fc408cb6777707d448afb365708079d92557baaac",
+      "jobs": "9275c32d501e5904a4b50047242a0de09104649891ccefaa0d0a24bad902b9c1",
+      "images": "2a682f4d702ce6697ed5cb19e80207e645da25a44e79cbcc0cccc23ffaa3d846",
+      "rules": "5c89a8178b5d389648013f543b02f2933be306ff72f7b27de3168ca47288ec56",
+      "labels": "22c1dfcd126ea8b57e1d80e82c6032a5518f19b13771210a86e0ce66bdbb799e"
+    }
+  },
+  "tools": {
+    "align": {
+      "manifest_sha256": "33c7fd353b4ff682d44d16eb6e71a2a3dc57bbfba8936424a9fcb60140d2a30f"
+    },
+    "regions": {
+      "manifest_sha256": "a51cb94d7bbaab4a38118830f9caa21aaa875753f11fada3a67f1f94822119cd",
+      "lock_digest": "ca3e746bbaae73e0655d775eb76772725ac1165a37cd715050435c900671e20b"
+    },
+    "view": {
+      "manifest_sha256": "bfeea02d2693d2bdbe6a3ff0382af8a801dc0582f6768ab11dda79ec9899a08b"
+    }
+  },
+  "selections": {
+    "C@source-fidelity": [
+      "view",
+      "align:visual_only"
+    ],
+    "D_regions@source-fidelity": [
+      "view",
+      "align:visual_only",
+      "regions"
+    ]
+  },
+  "sha256": "66b077dd28048f3f125c59470984504a90dc5e4d0a08062def4b5155017bb11e"
+}

@@ -1,0 +1,51 @@
+[
+  {
+    "tool_calls": [
+      {
+        "id": "c1",
+        "name": "fake_regions",
+        "arguments": {
+          "image": "raw:nope"
+        }
+      }
+    ],
+    "stop_reason": "tool_use"
+  },
+  {
+    "tool_calls": [
+      {
+        "id": "c_submit",
+        "name": "submit_verdict",
+        "arguments": {
+          "schema_version": 1,
+          "items": [
+            {
+              "id": "chk:ob:SF1@candidate",
+              "disposition": "held",
+              "confidence": "confident",
+              "reason": "scripted",
+              "allowed_by": null,
+              "location": null,
+              "evidence": []
+            },
+            {
+              "id": "chk:ob:SF2@candidate",
+              "disposition": "held",
+              "confidence": "confident",
+              "reason": "scripted",
+              "allowed_by": null,
+              "location": null,
+              "evidence": []
+            }
+          ],
+          "findings": [],
+          "opinion": {
+            "verdict": "pass",
+            "reason": "recorded"
+          }
+        }
+      }
+    ],
+    "stop_reason": "tool_use"
+  }
+]

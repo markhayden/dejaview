@@ -124,6 +124,13 @@ fn eval_run_completes_a_fake_matrix_and_resumes_without_redoing_it() {
             && doc.join("metrics.json").is_file()
             && doc.join("matrix.toml").is_file()
     );
+    // The published summary names decision directories relative to the evaluation directory.
+    let published: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(doc.join("summary.json")).unwrap()).unwrap();
+    for d in published["decisions"].as_array().unwrap() {
+        let dir = d["dir"].as_str().unwrap();
+        assert!(dir.starts_with("results/"), "{dir}");
+    }
     // A subset of sets prints to stdout and writes nothing; an unknown set is refused.
     let before = std::fs::metadata(out.join("report.md"))
         .unwrap()
@@ -498,4 +505,84 @@ fn eval_requalify_records_a_baseline_and_eval_canary_compares_against_it() {
     );
     assert_eq!(o.status.code(), Some(64));
     assert!(String::from_utf8_lossy(&o.stderr).contains("spend cap"));
+}
+
+#[test]
+fn a_relative_output_directory_still_gives_relative_decision_directories_and_the_doc_relativises_old_ones()
+ {
+    // The regions gate run was started with a relative --out and its summary carried absolute
+    // decision directories (the run makes them absolute for the packs). Both forms must end up
+    // relative: in the runner's summary, and in the published copy of an older summary.
+    let rel = format!("target/eval-run-cli-rel-{}", std::process::id());
+    let out = repo_root().join(&rel);
+    let _ = std::fs::remove_dir_all(&out);
+    let o = Command::new(env!("CARGO_BIN_EXE_dejaview"))
+        .current_dir(repo_root())
+        .args([
+            "eval",
+            "run",
+            "--matrix",
+            "fixtures/matrix/fake-a.toml",
+            "--out",
+            &rel,
+            "--evalsets-root",
+            "fixtures/evalsets",
+            "--provider-script",
+            "fixtures/scripts/held.json",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    let summary_path = out.join("summary.json");
+    let mut summary: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&summary_path).unwrap()).unwrap();
+    for d in summary["decisions"].as_array().unwrap() {
+        let dir = d["dir"].as_str().unwrap();
+        assert!(dir.starts_with("results/"), "{dir}");
+    }
+    // An older summary with absolute directories: the published copy is relative.
+    for d in summary["decisions"].as_array_mut().unwrap() {
+        let dir = d["dir"].as_str().unwrap().to_string();
+        d["dir"] = serde_json::Value::String(out.join(dir).display().to_string());
+    }
+    std::fs::write(
+        &summary_path,
+        serde_json::to_string_pretty(&summary).unwrap(),
+    )
+    .unwrap();
+    let doc = out.join("doc");
+    let o = Command::new("python3")
+        .current_dir(repo_root())
+        .args([
+            "-I",
+            "scripts/results-doc.py",
+            &rel,
+            "fixtures/matrix/fake-a.toml",
+            doc.to_str().unwrap(),
+            "--title",
+            "the scripted check",
+            "--bin",
+            env!("CARGO_BIN_EXE_dejaview"),
+        ])
+        .env("DEJAVIEW_EVALSETS_ROOT", "fixtures/evalsets")
+        .output()
+        .unwrap();
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    let published: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(doc.join("summary.json")).unwrap()).unwrap();
+    for d in published["decisions"].as_array().unwrap() {
+        let dir = d["dir"].as_str().unwrap();
+        assert!(dir.starts_with("results/"), "{dir}");
+    }
+    let _ = std::fs::remove_dir_all(&out);
 }

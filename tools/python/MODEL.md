@@ -2,9 +2,14 @@
 
 The pack's segmenter is an ONNX export made by this project from publicly licensed upstream
 weights (SPEC "Python tool pack", PLAN task 4.6, owner decision 11: nothing from the private
-prototype is used). This version of the pack (0.0.1) still ships no model and `dejaview-tools
-fetch` is a no-op; task 5.3 makes `fetch` download and verify the artifact recorded here, and the
-`segmenter`-marked parity tests run only once it has.
+prototype is used). The pack ships no model: `dejaview-tools fetch` downloads the artifact and
+goldens recorded here into `$XDG_CACHE_HOME/dejaview/models/segmenter-v1/`, hashing every byte
+against the record shipped inside the package (`src/dejaview_tools/models/segmenter-v1.json`) and
+keeping nothing that does not match (task 5.3; `--from <dir or URL prefix>` fetches from
+somewhere other than the release, `--models <dir>` into somewhere other than the cache). The
+`segmenter`-marked parity tests run only once it has, and say so when skipped. `fetch` is the
+point of verification: the segmenter checks the file's size when it loads, not its hash, since
+hashing 1.2 GB at every server start would cost more than it protects.
 
 ## Upstream
 
@@ -28,13 +33,15 @@ the upstream model, wraps its two heads as plain tensors, exports with `torch.on
 18, the TorchScript exporter, `batch` dynamic), checks the ONNX model, runs it beside the PyTorch
 model on four synthetic scenes generated in the script from a seed, writes `record.json` with
 everything below, and exits non-zero when the parity is outside the tolerance. The record of the
-recorded artifact is committed as `tools/python/segmenter-v1.record.json`.
+recorded artifact is committed inside the package as
+`tools/python/src/dejaview_tools/models/segmenter-v1.json`, where `fetch` and the segmenter read
+it.
 
 | | |
 |---|---|
 | Artifact | `eomt-large-ade20k-512.onnx`, 1,264,419,839 bytes |
 | SHA-256 | `184ad11695a51bf67f91d2cf474670894ab8b5c98fdcfcd88e9fce1e23491b85` |
-| Input | `pixel_values`, float32 `[batch, 3, 512, 512]`: square only. The processor resizes the shorter edge to 512 and the export fixes both spatial sizes, so a non-square image is cropped or padded to 512×512 by the tool before inference (task 5.4a decides which, and records it in the preprocessing version) |
+| Input | `pixel_values`, float32 `[batch, 3, 512, 512]`: square only. The processor resizes the shorter edge to 512 and the export fixes both spatial sizes, so the tools pad: the longer edge is resized to 512, the shorter padded to 512 with the image's mean colour, centred, and the semantic map is read back from the same placement (`segmenter.prepare`, preprocessing `1-pad`; task 5.4a) |
 | Outputs | `class_queries_logits` (per query, 150 ADE20K classes plus no-object), `masks_queries_logits` (per query, a mask at a quarter of the input) |
 | Preprocessing version | `1`: the image's shorter edge resized to 512 (bilinear), scaled to `[0, 1]`, normalised with mean `[0.485, 0.456, 0.406]` and std `[0.229, 0.224, 0.225]`; the semantic map is `softmax(class)[..., :-1]` combined with `sigmoid(masks)` and the argmax over classes |
 | Export versions | torch 2.15.0, transformers 5.21.0, onnx 1.23.2, Python 3.13.3, arm64 (macOS); pinned in the script and recorded on every run |
@@ -53,7 +60,9 @@ repository under the tag `segmenter-v1`. Once uploaded, the download URL is:
 https://github.com/markhayden/dejaview/releases/download/segmenter-v1/eomt-large-ade20k-512.onnx
 ```
 
-`fetch` (task 5.3) downloads from that URL, refuses any byte that does not hash to the value
-above, and is not implemented until the assets exist. Re-running the export script with the versions above reproduces the artifact's hash; a
+`fetch` downloads from that URL and the goldens beside it, and refuses any byte that does not
+hash to the values above. Until the assets are uploaded, `dejaview-tools fetch --from
+tools/python/dist/segmenter` fills the cache from the export's output, under the same checks.
+Re-running the export script with the versions above reproduces the artifact's hash; a
 different torch or transformers version is a new artifact with a new row here, never a silent
 replacement.

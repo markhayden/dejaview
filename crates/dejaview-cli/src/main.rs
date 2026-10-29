@@ -63,7 +63,8 @@ struct ToolsArgs {
 enum ToolsCommand {
     /// Print the manifests of the enabled tools as the model will see them.
     List(ToolsListArgs),
-    /// Install a tool pack's provisioning bundle: verify digests, unpack, `uv sync --frozen`.
+    /// Install a tool pack's provisioning bundle: verify digests, unpack, `uv sync --frozen`,
+    /// then the pack's `fetch` of its model artifacts.
     Setup(ToolsSetupArgs),
 }
 
@@ -75,6 +76,14 @@ struct ToolsSetupArgs {
     /// Where to install; defaults to `$XDG_DATA_HOME` or `~/.local/share`.
     #[arg(long)]
     data_home: Option<PathBuf>,
+    /// After the sync, have the pack fetch its model artifacts from this directory instead of
+    /// the release named in its record (the export's output, before publication).
+    #[arg(long, conflicts_with = "no_fetch")]
+    models_from: Option<PathBuf>,
+    /// Do not run the pack's `fetch` after the sync; tools that need an artifact report it
+    /// missing until `dejaview-tools fetch` has run.
+    #[arg(long)]
+    no_fetch: bool,
 }
 
 #[derive(clap::Args)]
@@ -717,17 +726,17 @@ fn build_tools(args: &CheckArgs, config: &Config) -> Result<ToolRegistry, String
         let _ = args;
         None
     };
-    tools_for_config(config, script, &SharedPacks::default()).map(|(registry, _)| registry)
+    tools_for_config(config, script, &SharedPacks::default())
 }
 
 /// The tool registry for a config: the configured packs, then the built-in (and in a testkit
-/// build the scripted) tools, enabled and ordered as the config says; with the lock digest of
-/// the installed pack each enabled pack tool came from (a pack run by `command` has none).
+/// build the scripted) tools, enabled and ordered as the config says; carrying the lock digest
+/// of the installed pack each enabled pack tool came from (a pack run by `command` has none).
 fn tools_for_config(
     config: &Config,
     tool_script: Option<&Path>,
     shared: &SharedPacks,
-) -> Result<(ToolRegistry, std::collections::BTreeMap<String, String>), String> {
+) -> Result<ToolRegistry, String> {
     // Packs first; a built-in or scripted tool of the same name yields to the pack's.
     let mut available: Vec<Box<dyn Tool>> = Vec::new();
     let mut digests = std::collections::BTreeMap::new();
@@ -750,11 +759,11 @@ fn tools_for_config(
     let registry = ToolRegistry::new(available, &config.tools.enabled, &config.tools.order)
         .map_err(|e| e.to_string())?;
     digests.retain(|name, _| config.tools.enabled.contains(name));
-    Ok((registry, digests))
+    Ok(registry.with_lock_digests(digests))
 }
 
 fn tools_setup(args: &ToolsSetupArgs) -> i32 {
-    use dejaview_tools::provision::{Bundle, data_home};
+    use dejaview_tools::provision::{Bundle, Fetch, data_home};
     let home = args.data_home.clone().unwrap_or_else(data_home);
     let bundle = match Bundle::load(&args.bundle) {
         Ok(b) => b,
@@ -763,7 +772,15 @@ fn tools_setup(args: &ToolsSetupArgs) -> i32 {
             return EXIT_USAGE;
         }
     };
-    match bundle.install(&home) {
+    let fetch = match (&args.models_from, args.no_fetch) {
+        (Some(dir), _) => Fetch::From {
+            dir: dir.clone(),
+            models: None,
+        },
+        (None, true) => Fetch::Skip,
+        (None, false) => Fetch::Release,
+    };
+    match bundle.install(&home, &fetch) {
         Ok(installed) => {
             println!(
                 "installed {} {} into {}",

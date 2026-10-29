@@ -156,13 +156,8 @@ fn parse_request(
         (None, 0) => {
             Err("give bbox for a crop, or yaw, pitch and fov for a perspective view".into())
         }
+        (None, _) if projection != Projection::Equirectangular => Err(FLAT_FRAME.into()),
         (None, 3) => {
-            if projection != Projection::Equirectangular {
-                return Err(
-                    "yaw, pitch and fov need an equirectangular frame; use bbox on a flat one"
-                        .into(),
-                );
-            }
             let (yaw, pitch, fov) = (yaw.unwrap_or(0.0), pitch.unwrap_or(0.0), fov.unwrap_or(0.0));
             if !(-180.0..180.0).contains(&yaw) {
                 return Err(format!("yaw {yaw} outside [-180, 180)"));
@@ -175,9 +170,15 @@ fn parse_request(
             }
             Ok(Request::Perspective(sphere::View { yaw, pitch, fov }))
         }
-        (None, _) => Err("yaw, pitch and fov go together".into()),
+        (None, _) => {
+            Err("yaw, pitch and fov go together: send all three for a perspective view".into())
+        }
     }
 }
+
+/// The refusal for angles on a flat frame: it says what to send instead, because a model told
+/// only that the angles go together sends the same call again.
+const FLAT_FRAME: &str = "this frame is flat: send bbox [left, top, right, bottom] as fractions of it; yaw, pitch and fov are for equirectangular panoramas";
 
 /// A pixel-aligned crop: the box snaps outward to whole pixels, the mapping records the box
 /// actually cut, and the result is scaled down to the long-edge cap when larger.

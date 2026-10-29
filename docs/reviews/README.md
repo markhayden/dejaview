@@ -32,6 +32,7 @@ the tasks that own them.
 | M2 | [m2-checkpoint.md](m2-checkpoint.md): code review and coverage findings, each fixed or recorded with its owning task; live smoke in [m2-live-smoke.md](m2-live-smoke.md) |
 | M3 | [m3-checkpoint.md](m3-checkpoint.md): code review and coverage findings, each fixed or recorded with its owning task |
 | M4 | [m4-checkpoint.md](m4-checkpoint.md): code review and coverage findings, each fixed or recorded in tasks/todo.md |
+| M5 | [m5-checkpoint.md](m5-checkpoint.md): code review and coverage findings, each fixed or recorded in tasks/todo.md |
 
 ## Release records
 

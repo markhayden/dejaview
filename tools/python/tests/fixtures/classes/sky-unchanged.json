@@ -1,0 +1,17 @@
+{
+ "bbox": [
+  0.3,
+  0.05,
+  0.7,
+  0.4
+ ],
+ "classes": {
+  "before": [
+   "sky"
+  ],
+  "after": [
+   "sky"
+  ]
+ },
+ "regions": []
+}

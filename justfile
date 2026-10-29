@@ -79,6 +79,11 @@ check-filter package *filters:
 python-check:
     cd tools/python && uv sync --frozen && uv run --frozen --offline --no-sync ruff check . && uv run --frozen --offline --no-sync ruff format --check . && uv run --frozen --offline --no-sync pytest -q
 
+# The Rust client against the real Python pack (needs uv and the synced environment above).
+pack-test: python-check
+    cargo test -p dejaview-tools --test python_pack -- --ignored
+    cargo test -p dejaview --test python_pack_manifests -- --ignored
+
 # The set-building toolkit (scripts/sets): lint, format check, tests, and the offline dry run
 # checked by the harness (needs uv; network on the first `uv sync`).
 sets-check:

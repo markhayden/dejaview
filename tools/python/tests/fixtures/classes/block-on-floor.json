@@ -1,0 +1,22 @@
+{
+ "bbox": [
+  0.19,
+  0.62,
+  0.62,
+  0.96
+ ],
+ "classes": {
+  "before": [
+   "wall",
+   "sand",
+   "floor"
+  ],
+  "after": [
+   "signboard",
+   "sand"
+  ]
+ },
+ "regions": [
+  "wall -> signboard"
+ ]
+}

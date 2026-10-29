@@ -4,7 +4,11 @@ version = "0.0.1"
 description = "dejaview Python tool pack: an MCP server of evidence tools"
 requires-python = ">=3.12"
 license = "Apache-2.0"
-dependencies = []
+dependencies = [
+    "numpy>=2.3,<3",
+    "onnxruntime>=1.31.1,<1.32",
+    "pillow>=11.3,<13",
+]
 
 [project.scripts]
 dejaview-tools = "dejaview_tools.cli:main"
@@ -22,3 +26,4 @@ target-version = "py312"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["segmenter: needs the fetched segmenter artifact and goldens"]

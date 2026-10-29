@@ -142,7 +142,9 @@ A built-in is a Rust type implementing `dejaview_core::tool::Tool` in
 1. **The manifest** is a TOML file embedded with `include_str!` and parsed once in `new()`. It
    names the tool, says in plain words what it does, when to use it and when not to, and what its
    output means; declares the cost tier; lists which arguments take image ids (`image_args`) and
-   frame ids (`frame_args`), so the harness resolves them and injects the pixels; bounds what the
+   frame ids (`frame_args`), so the harness resolves them and injects the pixels (an image
+   argument also takes the image's raw frame id, `raw:candidate` for `candidate`, since that is
+   how the prompt names the picture); bounds what the
    tool may return (`returns`); names the frames it makes (`frames_out`) and the projections it
    supports (`projections`); and gives the model schema (what the provider sees, closed, with a
    description per argument), the input schema (the model schema plus `_dejaview`) and the output
@@ -177,9 +179,52 @@ An MCP tool is the same contract over stdio: the manifest's fields travel in the
 
 ## The Python pack and its provisioning bundle
 
-`tools/python/` is a uv project (`dejaview-tools`, no runtime dependencies yet) whose
-`dejaview-tools serve` runs the stdio server; this version carries one tool, `echo_region`, a
-transport proof. `just python-check` lints and tests it.
+`tools/python/` is a uv project (`dejaview-tools`, on numpy, Pillow and onnxruntime) whose
+`dejaview-tools serve` runs the stdio server. `context.py` parses the `_dejaview` the harness
+injects into every call (the run and call ids, the images named by `image_args` and the frames
+named by `frame_args`, each with lossless pixels by path under the run directory or inline, and
+the rules' hints) and loads pixels as RGB arrays; a malformed context is a JSON-RPC error, which
+the harness records as a tool error, never an answer the model acts on. `envelope.py` builds
+result envelopes and returned images (lossless PNG named `crop:<call id>:<n>` or an aligned frame,
+with its mapping in the parent), and splits the images' bytes out of `structuredContent` into the
+MCP image blocks the client pairs with them by position and media type. A handler that cannot
+answer (the segmenter artifact missing, an image that will not decode) gets a JSON-RPC error with
+its words, which the harness records as a tool error, and the server goes on serving. The pack
+carries three tools: `echo_region`, the transport proof, which places the given box on the image
+as a region and returns the box cut from the named frame (or the image's raw frame) as its one
+image; and `regions` and `classes` below.
+`just python-check` lints and tests the pack offline; `just pack-test` also drives the real
+server from the Rust client (`crates/dejaview-tools/tests/python_pack.rs`: an image and an
+aligned frame by path in, a valid envelope with one image block out) and puts every manifest the
+pack lists through the three adapters' wire transformations beside `submit_verdict`
+(`crates/dejaview-cli/tests/python_pack_manifests.rs`).
+
+**`regions`** (`regions.py`, task 5.4a) is the first real tool: where an aligned pair differs, as
+high-recall pointers. It takes two frames in one grid, `frame` (usually the aligned candidate) and
+`against` (usually `raw:source`), and marks a pixel changed when either of two photometric views
+says so (the locally contrast-normalised luminance residual, which sees texture change through a
+lighting change, and the blurred colour difference, which sees a flat area replaced by another
+flat colour) or when the segmenter gives the two sides different classes and is confident on
+both. Photometric components become boxes first, then class disagreements no box already covers;
+each is labelled by the majority class on each side (`floor -> swimming pool`), scored by how
+strongly it changed, nudged by `hints.regions` (`preserve` classes up by a quarter, `ignore`
+classes halved, never dropped), and the strongest twelve are returned on `frame` with one image,
+the frame with the boxes drawn. Nothing changed is `measured_nothing`. The segmenter sees each
+frame as a 512×512 square: the longer edge resized to 512, the shorter padded with the image's
+mean colour, centred, and the quarter-resolution semantic map read back from the same placement
+(preprocessing `1-pad`, recorded in `MODEL.md`; an envelope's provenance holds only the fixed
+fields the harness knows). Its test plants separated
+colour blocks on synthetic scenes and requires every one found with IoU above 0.3 within the cap;
+it needs the fetched segmenter and says so when skipped.
+
+**`classes`** (`classes.py`, task 5.4b) names what the segmenter sees in one box of the same pair,
+before and after: the classes covering the box on each side with their shares (those under five
+per cent folded away, four at most) and the mean confidence there, as measurements
+(`before:floor 0.62`, `after:signboard 0.71`, `confidence_before`, `confidence_after`), plus one
+region of kind `class_difference` on the box when the dominant class differs. It decides nothing;
+the rules do. The two tools share one loaded segmenter per server process. Its test holds three
+named fixtures (small synthetic pairs under `tests/fixtures/classes/`) to the exact class lists
+recorded beside them.
 
 `scripts/build-bundle.sh` (`just bundle`) builds the wheel and assembles
 `tools/python/dist/bundle-<version>/`: the wheel, a provisioning project whose `pyproject.toml`
@@ -188,11 +233,18 @@ pins `dejaview-tools==<version>` by path to that wheel, its `uv.lock`, `MODEL.md
 
 `dejaview tools setup --bundle <dir>` verifies every digest (a mismatch or an unlisted file is
 `error: resolve` and nothing is installed), copies the bundle to
-`$XDG_DATA_HOME/dejaview/tools/<package>-<version>/`, verifies the copy, and runs
-`uv sync --frozen --no-dev --python <declared>` there. A pack configured by `package` and
+`$XDG_DATA_HOME/dejaview/tools/<package>-<version>/`, verifies the copy, runs
+`uv sync --frozen --no-dev --python <declared>` there, and then the installed pack's `fetch`, so
+the model artifacts are in `$XDG_CACHE_HOME/dejaview/models/` before the first run: from the
+release the pack's record names, or with `--models-from <dir>` from a directory (the export's
+output before publication); `--no-fetch` skips the step, and a tool that needs the artifact then
+reports it missing. A fetch the pack refuses (a hash mismatch, an unreachable source) fails the
+setup as `error: resolve` with the pack's own words. A pack configured by `package` and
 `version` is then launched as `<dir>/.venv/bin/dejaview-tools serve` with `UV_OFFLINE=1`,
 `UV_PYTHON_DOWNLOADS=never` and the lock digest in `DEJAVIEW_LOCK_DIGEST`, which the pack echoes
-in every envelope's provenance. Downloading a published bundle by name arrives with M5.
+in every envelope's provenance and the harness folds into the cache key (the same manifest from
+a pack whose lock differs is a different tool). Downloading a published bundle by name arrives
+with M6.
 
 **The segmenter artifact** (task 4.6, `tools/python/MODEL.md`). `scripts/export_segmenter.py`
 exports `tue-mps/ade20k_semantic_eomt_large_512` (EoMT-L on DINOv2, MIT weights and code) to ONNX
@@ -200,13 +252,20 @@ with inline dependencies of its own, checks the export against PyTorch on synthe
 generated from a seed, and writes `record.json`; `MODEL.md` records the licences, the procedure
 and versions, the artifact's SHA-256 (the script reproduces it), the preprocessing version, the
 runtime and execution provider, the parity measured and the tolerance the parity test holds, and
-the release URL the owner publishes the artifact and goldens at. Task 5.3's `fetch` downloads
-from it and refuses a hash mismatch.
+the release URL the owner publishes the artifact and goldens at. `dejaview-tools fetch` (task
+5.3) downloads the artifact and goldens from it into `$XDG_CACHE_HOME/dejaview/models/`, hashing
+every byte against the record shipped in the package and keeping nothing that does not match;
+`segmenter.py` loads the artifact with onnxruntime on the CPU and turns its two heads into the
+semantic map, and the `segmenter`-marked parity test holds it to the recorded tolerance on the
+goldens, skipping with the fetch command when they are absent. `dejaview tools setup` runs
+`fetch` after the sync in task 5.2.
 
 `just provisioning-test` builds the bundle and runs the ignored tests in
 `crates/dejaview-tools/tests/provisioning.rs`: a clean-directory install whose executable
-reports the version the lock pins, an `echo_region` call through MCP, and a tampered bundle
-refused. CI runs the same install and call inside `unshare -rn`, a namespace with no network, as
+reports the version the lock pins and lists `echo_region`, `regions` and `classes`, an
+`echo_region` call through MCP with its image block, a tampered bundle refused, and a setup that
+fetches the segmenter and goldens from the export's directory into a models cache and refuses a
+tampered copy. CI runs the install and call inside `unshare -rn`, a namespace with no network, as
 the proof that the launch needs none.
 
 ## Testing

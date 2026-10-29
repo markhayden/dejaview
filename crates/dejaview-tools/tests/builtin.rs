@@ -276,9 +276,15 @@ fn view_refuses_bad_arguments_as_the_models_mistake() {
             serde_json::json!({ "frame": "raw:pano", "yaw": 0.0, "pitch": 0.0, "fov": 130.0 }),
             "fov 130",
         ),
+        // Angles on a flat frame: the refusal says what to send instead, since a model that is
+        // told only that the three go together repeats the same call.
         (
             serde_json::json!({ "frame": "raw:candidate", "yaw": 0.0, "pitch": 0.0, "fov": 60.0 }),
-            "equirectangular",
+            "flat: send bbox",
+        ),
+        (
+            serde_json::json!({ "frame": "raw:candidate", "yaw": 0.0 }),
+            "flat: send bbox",
         ),
         (
             serde_json::json!({ "frame": "raw:pano", "yaw": 180.0, "pitch": 0.0, "fov": 60.0 }),

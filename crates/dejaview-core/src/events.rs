@@ -145,7 +145,9 @@ pub struct TurnExcluded {
 
 /// A call the model made. Executed calls carry a `call_id`; a call refused for the call budget or
 /// on the final turn carries the `reason` instead; a call with bad arguments carries
-/// `invalid_args` (and the envelope's status when the tool itself refused them).
+/// `invalid_args`. A call the tool itself refused has two lines under one `call_id`: the dispatch,
+/// then the refusal with `executed: true`, the envelope's status and the duration. The report
+/// folds them into one entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCalled {
     pub call_id: Option<String>,

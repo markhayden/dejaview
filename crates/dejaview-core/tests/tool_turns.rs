@@ -272,6 +272,64 @@ fn invalid_arguments_are_error_results_not_failures() {
 }
 
 #[test]
+fn an_image_argument_given_as_its_raw_frame_resolves_to_the_image() {
+    // The prompt introduces each image with its raw frame (`raw:candidate`), and models pass that
+    // where a tool wants the image id. The harness accepts it, hands the tool the image id, and
+    // journals what the model said.
+    let out = tempdir("raw-frame-arg");
+    let p = provider("raw-frame-image-arg.json");
+    let t = tools("measured-nothing.json");
+    let job = Job::load(&root().join("fixtures/jobs/pair.toml")).unwrap();
+    let o = block_on(run::check(
+        &config(&[]),
+        &job,
+        &root(),
+        &run::Services::new(&p, &t),
+        &out,
+        "test",
+    ))
+    .unwrap();
+    assert_eq!(o.exit_code, 0, "{:?}", o.error);
+    let r = report(&o.dir);
+    let calls = r["runs"][0]["tool_calls"].as_array().unwrap();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0]["executed"], true, "{:?}", calls[0]);
+    assert!(calls[0]["invalid_args"].is_null(), "{:?}", calls[0]);
+    assert_eq!(calls[0]["arguments"]["image"], "raw:candidate");
+    assert!(journal_events(&o.dir).contains(&"tool_returned".to_string()));
+}
+
+#[test]
+fn a_raw_frame_of_an_unknown_image_is_still_refused_in_the_models_words() {
+    // Only `raw:<image>` of a known image resolves; anything else is refused quoting what the
+    // model sent, and a frame argument is never rewritten.
+    let out = tempdir("raw-frame-unknown");
+    let p = provider("raw-frame-unknown.json");
+    let t = tools("measured-nothing.json");
+    let job = Job::load(&root().join("fixtures/jobs/pair.toml")).unwrap();
+    let o = block_on(run::check(
+        &config(&[]),
+        &job,
+        &root(),
+        &run::Services::new(&p, &t),
+        &out,
+        "test",
+    ))
+    .unwrap();
+    assert_eq!(o.exit_code, 0, "{:?}", o.error);
+    let r = report(&o.dir);
+    let calls = r["runs"][0]["tool_calls"].as_array().unwrap();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0]["executed"], false);
+    let refusal = calls[0]["invalid_args"].as_str().unwrap();
+    assert!(
+        refusal.contains("unknown image id \"raw:nope\""),
+        "{refusal}"
+    );
+    assert!(!journal_events(&o.dir).contains(&"tool_returned".to_string()));
+}
+
+#[test]
 fn a_tool_crash_is_an_operational_error() {
     let out = tempdir("crash");
     let p = provider("tool-crash.json");

@@ -11,3 +11,6 @@ and the summary JSON, plus `notes.md` on how the run went. Development-set resul
   tools, ten development sets, 2026-10-28.
 - [arm-c-2026-10](arm-c-2026-10/README.md): arms A and C paired (task 4.5), five models, `view`
   and `align` as pictures, ten development sets, 2026-10-28.
+- [gate-regions-initial-2026-10](gate-regions-initial-2026-10/README.md): the initial admission
+  gate of `regions` for source fidelity (task 5.6) on the blind set under gemini-4-argon, rejected
+  because the control already detected everything, 2026-10-29.

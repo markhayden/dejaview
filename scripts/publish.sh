@@ -21,5 +21,12 @@ if [ -z "$dry_run" ]; then
   fi
 fi
 scripts/check-packaging.sh
-cargo publish --workspace --locked ${dry_run:+--allow-dirty} $dry_run
+# Verification builds each tarball against the sibling crates staged in a temporary registry,
+# whose extracted sources carry fixed timestamps and are cached by name and version; a target
+# directory of this run's own and the cached extractions of our crates removed make it build the
+# sources as packaged now (the same stale-sibling trap scripts/registry-install-test.sh avoids).
+rm -rf "$HOME"/.cargo/registry/src/*/dejaview-*-"$version"
+scratch="$(mktemp -d)"
+trap 'rm -rf "$scratch"' EXIT
+CARGO_TARGET_DIR="$scratch/target" cargo publish --workspace --locked ${dry_run:+--allow-dirty} $dry_run
 echo "published${dry_run:+ (dry run)} dejaview $version"

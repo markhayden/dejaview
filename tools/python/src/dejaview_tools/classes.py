@@ -16,7 +16,6 @@ import numpy as np
 from . import segmenter
 from .context import Context
 from .envelope import bbox_location, envelope, invalid_args
-from .regions import upsample
 
 # Classes covering less of the box than this are folded into the remainder.
 MIN_SHARE = 0.05
@@ -100,9 +99,7 @@ MANIFEST = {
 }
 
 
-def composition(
-    labels: np.ndarray, confidence: np.ndarray, names: list[str]
-) -> list[tuple[str, float]]:
+def composition(labels: np.ndarray, names: list[str]) -> list[tuple[str, float]]:
     """The classes covering a map, largest share first, those under `MIN_SHARE` folded away."""
     counts = np.bincount(labels.ravel(), minlength=len(names)) / labels.size
     order = np.argsort(-counts)
@@ -115,13 +112,15 @@ def read(frame_rgb: np.ndarray, against_rgb: np.ndarray, bbox: list[float]) -> d
     seg = segmenter.shared()
     names = segmenter.class_names()
     (la, ca, pa), (lb, cb, pb) = seg.segment([frame_rgb, against_rgb])
-    h, w = frame_rgb.shape[:2]
     out: dict[str, Any] = {}
     for side, (labels, conf, place) in (("after", (la, ca, pa)), ("before", (lb, cb, pb))):
-        labels, conf = upsample(place.crop(labels), (h, w)), upsample(place.crop(conf), (h, w))
+        # The box is read at the map's own resolution: the part of the map that covers the
+        # image, then the box's cells within it, never the map blown up to the image.
+        labels, conf = place.crop(labels), place.crop(conf)
+        h, w = labels.shape
         y0, y1 = int(bbox[1] * h), max(int(bbox[1] * h) + 1, int(np.ceil(bbox[3] * h)))
         x0, x1 = int(bbox[0] * w), max(int(bbox[0] * w) + 1, int(np.ceil(bbox[2] * w)))
-        out[side] = composition(labels[y0:y1, x0:x1], conf[y0:y1, x0:x1], names)
+        out[side] = composition(labels[y0:y1, x0:x1], names)
         out[f"confidence_{side}"] = float(conf[y0:y1, x0:x1].mean())
     return out
 
@@ -170,26 +169,29 @@ def classes(args: dict[str, Any], ctx: Context) -> dict[str, Any]:
             "bbox must be [left, top, right, bottom] as fractions with left < right and top < bottom",
         )
     found = read(frame_px.load(), against_px.load(), bbox)
-    measurements = []
-    for side in ("before", "after"):
-        for name, share in found[side]:
-            measurements.append(
-                {
-                    "name": f"{side}:{name}",
-                    "value": round(share, 3),
-                    "unit": "ratio",
-                    "frame": frame_id,
-                }
-            )
-    for side in ("before", "after"):
-        measurements.append(
-            {
-                "name": f"confidence_{side}",
-                "value": round(found[f"confidence_{side}"], 3),
-                "unit": "ratio",
-                "frame": frame_id,
-            }
-        )
+    # The two confidences first, then the shares by rank across both sides: with four classes a
+    # side there are ten figures for a cap of eight, and the smallest shares are the ones to lose.
+    measurements = [
+        {
+            "name": f"confidence_{side}",
+            "value": round(found[f"confidence_{side}"], 3),
+            "unit": "ratio",
+            "frame": frame_id,
+        }
+        for side in ("before", "after")
+    ]
+    for rank in range(MAX_CLASSES):
+        for side in ("before", "after"):
+            if rank < len(found[side]):
+                name, share = found[side][rank]
+                measurements.append(
+                    {
+                        "name": f"{side}:{name}",
+                        "value": round(share, 3),
+                        "unit": "ratio",
+                        "frame": frame_id,
+                    }
+                )
     measurements = measurements[: RETURNS["max_measurements"]]
     describe = lambda side: ", ".join(f"{n} {s:.0%}" for n, s in found[side])
     before, after = found["before"][0][0], found["after"][0][0]
@@ -211,7 +213,13 @@ def classes(args: dict[str, Any], ctx: Context) -> dict[str, Any]:
         summary += f" The dominant class changed: {before} -> {after}."
     else:
         summary += f" The dominant class is {after} on both sides."
-    env = envelope("classes", "ok", summary, regions=regions, measurements=measurements)
+    env = envelope(
+        "classes",
+        "ok",
+        summary,
+        regions=regions,
+        measurements=measurements,
+        version=MANIFEST["version"],
+    )
     env["provenance"]["duration_ms"] = int((time.monotonic() - started) * 1000)
-    env["provenance"]["version"] = MANIFEST["version"]
     return env

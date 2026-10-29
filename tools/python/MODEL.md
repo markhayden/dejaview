@@ -7,7 +7,9 @@ goldens recorded here into `$XDG_CACHE_HOME/dejaview/models/segmenter-v1/`, hash
 against the record shipped inside the package (`src/dejaview_tools/models/segmenter-v1.json`) and
 keeping nothing that does not match (task 5.3; `--from <dir or URL prefix>` fetches from
 somewhere other than the release, `--models <dir>` into somewhere other than the cache). The
-`segmenter`-marked parity tests run only once it has, and say so when skipped.
+`segmenter`-marked parity tests run only once it has, and say so when skipped. `fetch` is the
+point of verification: the segmenter checks the file's size when it loads, not its hash, since
+hashing 1.2 GB at every server start would cost more than it protects.
 
 ## Upstream
 

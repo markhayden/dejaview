@@ -5,6 +5,7 @@ import base64
 import io
 import json
 import os
+import time
 from pathlib import Path
 
 import numpy as np
@@ -189,3 +190,124 @@ def test_the_server_lists_regions_with_its_dependencies():
     note = listed["regions"]["annotations"]["dejaview"]
     assert note["requires"] == ["align"] and note["frame_args"] == ["frame", "against"]
     assert note["accepts_hints"] == ["regions"] and note["returns"]["max_regions"] == 12
+
+
+class FakeSegmenter:
+    """Every pixel one class, so the photometric passes are tested on their own."""
+
+    def segment(self, images):
+        from dejaview_tools.segmenter import prepare
+
+        out = []
+        for rgb in images:
+            _, place = prepare(rgb)
+            out.append((np.zeros((128, 128), int), np.full((128, 128), 0.9), place))
+        return out
+
+
+def flat_pair(w=256, h=256, blocks=(), value=80):
+    """A flat grey candidate with white blocks planted, and the unchanged source."""
+    source = np.full((h, w, 3), value, np.uint8)
+    candidate = source.copy()
+    for x0, y0, x1, y1 in blocks:
+        candidate[y0:y1, x0:x1] = 230
+    return candidate, source
+
+
+def test_components_on_a_serpentine_mask_stay_fast_and_count_one():
+    mask = np.zeros((256, 256), bool)
+    for row in range(0, 256, 4):
+        mask[row, :] = True
+        if (row // 4) % 2 == 0:
+            mask[row : row + 4, 255] = True
+        else:
+            mask[row : row + 4, 0] = True
+    started = time.monotonic()
+    labels, n = regions.components(mask)
+    assert time.monotonic() - started < 1.0
+    assert n == 1 and (labels[mask] == 1).all() and (labels[~mask] == 0).all()
+
+
+def test_the_cap_keeps_the_strongest_twelve_renumbered_and_says_how_many_were_left(monkeypatch):
+    monkeypatch.setattr(regions.segmenter, "shared", lambda: FakeSegmenter())
+    monkeypatch.setattr(regions.segmenter, "class_names", lambda: ["thing"] * 150)
+    blocks = [(x, y, x + 28, y + 28) for x in range(8, 248, 60) for y in range(8, 248, 60)]
+    assert len(blocks) == 16
+    candidate, source = flat_pair(blocks=blocks)
+    env = regions.regions(
+        {"frame": "aligned:candidate:t1", "against": "raw:source"}, context(candidate, source)
+    )
+    assert env["status"] == "ok"
+    assert [r["id"] for r in env["regions"]] == [f"r{n}" for n in range(1, 13)]
+    candidates = next(m for m in env["measurements"] if m["name"] == "candidates")["value"]
+    assert candidates == 16
+    assert "4 weaker candidates were left out" in env["summary"]
+    assert all(r["label"] == "thing changed" for r in env["regions"])
+
+
+def test_specks_are_dropped_and_a_class_box_inside_a_photometric_box_is_not_counted_twice():
+    names = ["a", "b"] + ["x"] * 148
+    size = 256  # the working grid, so a planted speck keeps its size
+    candidate, source = flat_pair(size, size, blocks=[(40, 40, 160, 160)])
+    # A 2×2 speck is below MIN_AREA (and is opened away); the class maps disagree only inside
+    # the planted block, over a box whose IoU with it is above 0.3.
+    candidate[200:202, 200:202] = 230
+    la = np.zeros((size, size), int)
+    la[60:140, 60:140] = 1
+    lb = np.zeros((size, size), int)
+    conf = np.full((size, size), 0.9)
+    found, measured = regions.find(candidate, source, (la, conf), (lb, conf), None, names)
+    assert len(found) == 1, found
+    assert found[0]["label"] in ("b -> a", "a -> b", "a changed")
+    assert measured["candidates"] == 1
+
+
+def test_hints_move_scores_by_exactly_their_factors():
+    names = ["wall", "chair"] + ["x"] * 148
+    size = 64
+    candidate, source = flat_pair(size, size, blocks=[(8, 8, 40, 40)])
+    la = np.full((size, size), 1)
+    lb = np.full((size, size), 1)
+    conf = np.full((size, size), 0.9)
+    plain, _ = regions.find(candidate, source, (la, conf), (lb, conf), None, names)
+    ignored, _ = regions.find(
+        candidate, source, (la, conf), (lb, conf), {"ignore": ["chair"]}, names
+    )
+    preserved, _ = regions.find(
+        candidate, source, (la, conf), (lb, conf), {"preserve": ["chair"]}, names
+    )
+    base = plain[0]["score"]
+    assert ignored[0]["score"] == pytest.approx(round(base * 0.5, 3), abs=0.002)
+    assert preserved[0]["score"] == pytest.approx(min(1.0, round(base * 1.25, 3)), abs=0.002)
+    # Hints that are not an object are ignored rather than crashing.
+    assert regions.find(candidate, source, (la, conf), (lb, conf), ["chair"], names)[0]
+
+
+def test_the_overlay_is_capped_at_the_manifests_long_edge_and_a_projection_mismatch_is_refused(
+    monkeypatch,
+):
+    big = np.zeros((1000, 2000, 3), np.uint8)
+    out = regions.overlay(big, [{"id": "r1", "bbox": [0.1, 0.1, 0.5, 0.5]}])
+    assert max(out.shape[:2]) == 1024 and out.shape[1] == 1024
+    monkeypatch.setattr(regions.segmenter, "shared", lambda: FakeSegmenter())
+    candidate, source = flat_pair(64, 32)
+    ctx = Context.parse(
+        {
+            "run_id": "r",
+            "call_id": "c",
+            "images": {"source": {**handle(source), "projection": "equirectangular"}},
+            "frames": {
+                "aligned:candidate:t1": {
+                    "root": "candidate",
+                    "projection": "flat",
+                    "parent": "raw:source",
+                    "transform": None,
+                    "chain": [],
+                    "pixels": handle(candidate),
+                }
+            },
+            "hints": {},
+        }
+    )
+    env = regions.regions({"frame": "aligned:candidate:t1", "against": "raw:source"}, ctx)
+    assert env["status"] == "invalid_args" and "one grid" in env["summary"]

@@ -122,9 +122,10 @@ impl Bundle {
         }
         std::fs::copy(self.dir.join(BUNDLE_FILE), dir.join(BUNDLE_FILE))?;
         Bundle::load(&dir)?.verify()?;
-        uv_sync(&dir, &self.header.python)?;
+        let uv = std::env::var_os("UV").unwrap_or_else(|| "uv".into());
+        uv_sync(&dir, &self.header.python, Path::new(&uv), std::env::vars())?;
         let installed = Installed::locate(data_home, &self.header.package, &self.header.version)?;
-        installed.fetch(fetch)?;
+        installed.fetch(fetch, std::env::vars())?;
         Ok(installed)
     }
 }
@@ -232,13 +233,21 @@ pub fn data_home() -> PathBuf {
     PathBuf::from(home).join(".local").join("share")
 }
 
-fn uv_sync(dir: &Path, python: &str) -> Result<()> {
-    let uv = std::env::var_os("UV").unwrap_or_else(|| "uv".into());
-    let output = Command::new(&uv)
+/// Runs `uv sync` in the install directory with the environment the server launch would get:
+/// the allowlist (`PATH`, `HOME`, locale; never a credential) and nothing else from the caller.
+fn uv_sync<I, K, V>(dir: &Path, python: &str, uv: &Path, environment: I) -> Result<()>
+where
+    I: IntoIterator<Item = (K, V)>,
+    K: Into<String>,
+    V: Into<String>,
+{
+    let output = Command::new(uv)
         .args(["sync", "--frozen", "--no-dev", "--python", python])
         .current_dir(dir)
+        .env_clear()
+        .envs(dejaview_core::env::allowlist(&[], environment))
         .output()
-        .map_err(|e| resolve(format!("cannot run uv ({}): {e}", uv.to_string_lossy())))?;
+        .map_err(|e| resolve(format!("cannot run uv ({}): {e}", uv.display())))?;
     if !output.status.success() {
         return Err(resolve(format!(
             "uv sync failed in {}:\n{}",
@@ -283,17 +292,26 @@ impl Installed {
         })
     }
 
-    /// Runs the installed pack's `fetch` entry point as `fetch` says, with the same environment
-    /// the server gets. A refusal (a hash mismatch, an unreachable source) is `error: resolve`
-    /// carrying the pack's own words.
-    pub fn fetch(&self, fetch: &Fetch) -> Result<()> {
+    /// Runs the installed pack's `fetch` entry point as `fetch` says, with the environment the
+    /// server gets: the allowlist, never a credential, plus the harness's own variables. A
+    /// refusal (a hash mismatch, an unreachable source) is `error: resolve` carrying the pack's
+    /// own words.
+    pub fn fetch<I, K, V>(&self, fetch: &Fetch, environment: I) -> Result<()>
+    where
+        I: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: Into<String>,
+    {
         let Some(args) = fetch.args() else {
             return Ok(());
         };
         let spawn = self.spawn(vec![]);
+        let mut env = dejaview_core::env::allowlist(&[], environment);
+        env.extend(spawn.extra_env.iter().cloned());
         let output = Command::new(&self.executable)
             .args(&args)
-            .envs(spawn.extra_env.iter().cloned())
+            .env_clear()
+            .envs(&env)
             .output()
             .map_err(|e| {
                 resolve(format!(
@@ -330,6 +348,95 @@ impl Installed {
 
 #[cfg(test)]
 mod tests {
+    /// An installed pack whose executable is the given script, for tests of the subprocesses.
+    fn installed_with(script: &str, tag: &str) -> super::Installed {
+        let dir =
+            std::env::temp_dir().join(format!("dejaview-provision-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let exe = dir.join("pack.sh");
+        std::fs::write(&exe, script).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        super::Installed {
+            dir: dir.clone(),
+            executable: exe,
+            lock_digest: "digest".into(),
+            header: super::BundleHeader {
+                package: "fake-pack".into(),
+                version: "0.0.1".into(),
+                python: ">=3.12".into(),
+                executable: "pack.sh".into(),
+                files: std::collections::BTreeMap::from([(
+                    super::LOCK_FILE.to_string(),
+                    "digest".to_string(),
+                )]),
+            },
+        }
+    }
+
+    #[test]
+    fn a_failed_fetch_is_resolve_with_the_packs_words_and_skip_never_runs_it() {
+        let installed = installed_with(
+            "#!/bin/sh\necho \"model.onnx: sha256 abc is not the recorded def\" >&2\nexit 1\n",
+            "fetch-fails",
+        );
+        let err = installed
+            .fetch(&super::Fetch::Release, std::env::vars())
+            .unwrap_err();
+        assert_eq!(err.class(), "resolve");
+        assert!(
+            err.to_string().contains("is not the recorded") && err.to_string().contains("fetch"),
+            "{err}"
+        );
+        let never = installed_with("#!/bin/sh\nexit 1\n", "fetch-skip");
+        never.fetch(&super::Fetch::Skip, std::env::vars()).unwrap();
+    }
+
+    #[test]
+    fn the_fetch_subprocess_sees_the_allowlist_and_the_harness_variables_and_no_credential() {
+        // The script fails when a credential-shaped variable reached it, and prints what it saw.
+        let installed = installed_with(
+            "#!/bin/sh\nif [ -n \"$DEJAVIEW_TEST_API_KEY\" ]; then echo leaked >&2; exit 1; fi\n\
+             [ -n \"$PATH\" ] || { echo no-path >&2; exit 1; }\n\
+             [ \"$UV_OFFLINE\" = 1 ] || { echo no-uv-offline >&2; exit 1; }\n\
+             [ \"$DEJAVIEW_LOCK_DIGEST\" = digest ] || { echo no-digest >&2; exit 1; }\n\
+             echo \"$1 $2 $3\"\nexit 0\n",
+            "fetch-env",
+        );
+        // Passed straight to the script, the credential is seen and the script fails.
+        let output = std::process::Command::new(&installed.executable)
+            .arg("fetch")
+            .env("DEJAVIEW_TEST_API_KEY", "SYNTHETIC")
+            .output()
+            .unwrap();
+        assert!(
+            !output.status.success(),
+            "the script detects a passed credential"
+        );
+        // Through `Installed::fetch` the same environment is filtered first: the credential is
+        // gone, the allowlisted PATH and the harness's own variables arrive.
+        let environment = vec![
+            ("DEJAVIEW_TEST_API_KEY".to_string(), "SYNTHETIC".to_string()),
+            (
+                "PATH".to_string(),
+                std::env::var("PATH").unwrap_or_default(),
+            ),
+        ];
+        installed
+            .fetch(
+                &super::Fetch::From {
+                    dir: "/exports".into(),
+                    models: None,
+                },
+                environment,
+            )
+            .unwrap();
+    }
+
     #[test]
     fn fetch_arguments_name_the_source_or_nothing_to_run() {
         use super::Fetch;

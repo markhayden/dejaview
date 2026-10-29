@@ -129,25 +129,47 @@ def normalised_luminance(rgb: np.ndarray, radius: int = 8) -> np.ndarray:
 
 
 def components(mask: np.ndarray) -> tuple[np.ndarray, int]:
-    """4-connected components of a boolean mask: labels (0 is background) and their count."""
+    """4-connected components of a boolean mask: labels (0 is background) and their count.
+
+    Two passes over the runs of each row with a union-find, so the work is proportional to the
+    number of runs, not to the length of any component's path: a thin serpentine outline costs
+    the same as a blob of the same run count.
+    """
     h, w = mask.shape
-    labels = np.where(mask, np.arange(1, h * w + 1, dtype=np.int32).reshape(h, w), 0)
-    while True:
-        before = labels.copy()
-        for shifted in (
-            np.pad(labels[1:, :], ((0, 1), (0, 0))),
-            np.pad(labels[:-1, :], ((1, 0), (0, 0))),
-            np.pad(labels[:, 1:], ((0, 0), (0, 1))),
-            np.pad(labels[:, :-1], ((0, 0), (1, 0))),
-        ):
-            neighbour = np.where(shifted > 0, shifted, labels)
-            labels = np.where(mask, np.minimum(labels, neighbour), 0)
-        if np.array_equal(labels, before):
-            break
-    ids = np.unique(labels[labels > 0])
-    relabel = np.zeros(h * w + 1, np.int32)
-    relabel[ids] = np.arange(1, len(ids) + 1)
-    return relabel[labels], len(ids)
+    parent: list[int] = [0]
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def union(a: int, b: int) -> None:
+        a, b = find(a), find(b)
+        if a != b:
+            parent[max(a, b)] = min(a, b)
+
+    runs: list[list[tuple[int, int, int]]] = []  # per row: (x0, x1, label)
+    for y in range(h):
+        row = mask[y]
+        edges = np.flatnonzero(np.diff(np.concatenate(([False], row, [False]))))
+        current = []
+        for x0, x1 in zip(edges[0::2], edges[1::2]):
+            label = len(parent)
+            parent.append(label)
+            if y > 0:
+                for px0, px1, plabel in runs[y - 1]:
+                    if px0 < x1 and x0 < px1:
+                        union(label, plabel)
+            current.append((int(x0), int(x1), label))
+        runs.append(current)
+    roots = {i: find(i) for i in range(1, len(parent))}
+    dense = {root: n for n, root in enumerate(sorted(set(roots.values())), 1)}
+    labels = np.zeros((h, w), np.int32)
+    for y, row_runs in enumerate(runs):
+        for x0, x1, label in row_runs:
+            labels[y, x0:x1] = dense[roots[label]]
+    return labels, len(dense)
 
 
 def upsample(grid: np.ndarray, size: tuple[int, int]) -> np.ndarray:
@@ -208,29 +230,49 @@ def find(
 
     photometric, disagree = clean(photometric), clean(disagree)
     changed = photometric | disagree
-    preserve = set((hints or {}).get("preserve") or [])
-    ignore = set((hints or {}).get("ignore") or [])
+    hints = hints if isinstance(hints, dict) else {}
+    preserve = set(hints.get("preserve") or [])
+    ignore = set(hints.get("ignore") or [])
     found: list[dict[str, Any]] = []
+    cells = size[0] * size[1]
     for source_mask, by_class in ((photometric, False), (disagree, True)):
         labels, n = components(source_mask)
-        for k in range(1, n + 1):
-            member = labels == k
-            area = float(member.mean())
-            if area < MIN_AREA:
-                continue
-            ys, xs = np.nonzero(member)
+        if n == 0:
+            continue
+        flat = labels.ravel()
+        # Every per-component figure in one pass over the grid: areas, boxes, residual and
+        # disagreement sums, and the majority class on each side.
+        area = np.bincount(flat, minlength=n + 1)[1:] / cells
+        ys, xs = np.divmod(np.arange(cells), size[1])
+        x_min = np.full(n + 1, size[1])
+        np.minimum.at(x_min, flat, xs)
+        x_max = np.zeros(n + 1, int)
+        np.maximum.at(x_max, flat, xs)
+        y_min = np.full(n + 1, size[0])
+        np.minimum.at(y_min, flat, ys)
+        y_max = np.zeros(n + 1, int)
+        np.maximum.at(y_max, flat, ys)
+        residual_sum = np.bincount(flat, weights=residual.ravel(), minlength=n + 1)
+        disagree_sum = np.bincount(flat, weights=disagree.ravel().astype(float), minlength=n + 1)
+        count = np.bincount(flat, minlength=n + 1).astype(float)
+        classes = len(names)
+        majority = {}
+        for side, side_labels in (("before", lb), ("after", la)):
+            joint = np.bincount(flat * classes + side_labels.ravel(), minlength=(n + 1) * classes)
+            majority[side] = joint.reshape(n + 1, classes).argmax(1)
+        for k in np.flatnonzero(area >= MIN_AREA) + 1:
             box = [
-                xs.min() / size[1],
-                ys.min() / size[0],
-                (xs.max() + 1) / size[1],
-                (ys.max() + 1) / size[0],
+                float(x_min[k] / size[1]),
+                float(y_min[k] / size[0]),
+                float((x_max[k] + 1) / size[1]),
+                float((y_max[k] + 1) / size[0]),
             ]
             if by_class and any(_iou(box, r["bbox"]) > 0.3 for r in found):
                 continue
-            strength = float(np.clip(residual[member].mean() / SATURATION, 0.0, 1.0))
-            share = float(disagree[member].mean())
-            before = names[int(np.bincount(lb[member], minlength=len(names)).argmax())]
-            after = names[int(np.bincount(la[member], minlength=len(names)).argmax())]
+            strength = float(np.clip(residual_sum[k] / count[k] / SATURATION, 0.0, 1.0))
+            share = float(disagree_sum[k] / count[k])
+            before = names[int(majority["before"][k])]
+            after = names[int(majority["after"][k])]
             score = min(1.0, 0.5 * strength + 0.5 * max(strength, share))
             if before in preserve or after in preserve:
                 score = min(1.0, score * 1.25)
@@ -238,7 +280,12 @@ def find(
                 score *= 0.5
             label = f"{before} -> {after}" if before != after else f"{after} changed"
             found.append(
-                {"bbox": box, "label": label[:120], "score": round(score, 3), "area": area}
+                {
+                    "bbox": box,
+                    "label": label[:120],
+                    "score": round(score, 3),
+                    "area": float(area[k - 1]),
+                }
             )
     found.sort(key=lambda r: (-r["score"], -r["area"]))
     measurements = {
@@ -346,7 +393,12 @@ def regions(args: dict[str, Any], ctx: Context) -> dict[str, Any]:
             f"({measured['changed_fraction']:.1%} of the frame marked, none large enough)."
         )
         env = envelope(
-            "regions", "measured_nothing", summary, measurements=measurements, images=images
+            "regions",
+            "measured_nothing",
+            summary,
+            measurements=measurements,
+            images=images,
+            version=MANIFEST["version"],
         )
     else:
         named = "; ".join(f"{r['id']} {r['label']} (score {r['score']:.2f})" for r in kept)
@@ -358,8 +410,13 @@ def regions(args: dict[str, Any], ctx: Context) -> dict[str, Any]:
             + " Each is a pointer, not a verdict; look with view before deciding."
         )
         env = envelope(
-            "regions", "ok", summary, regions=out_regions, measurements=measurements, images=images
+            "regions",
+            "ok",
+            summary,
+            regions=out_regions,
+            measurements=measurements,
+            images=images,
+            version=MANIFEST["version"],
         )
     env["provenance"]["duration_ms"] = int((time.monotonic() - started) * 1000)
-    env["provenance"]["version"] = MANIFEST["version"]
     return env

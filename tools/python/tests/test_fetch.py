@@ -70,3 +70,46 @@ def test_the_models_directory_follows_xdg(monkeypatch, tmp_path):
     assert models.models_dir() == tmp_path / "dejaview" / "models"
     record = models.Record("fake-v1", json.loads('{"artifact": "m.onnx", "sha256": "0"}'))
     assert models.artifact_path(record) == tmp_path / "dejaview" / "models" / "fake-v1" / "m.onnx"
+
+
+def test_a_source_that_is_neither_a_directory_nor_a_url_is_refused_and_nothing_is_left(tmp_path):
+    _, record = fake_record(tmp_path, {"model.onnx": b"weights"})
+    with pytest.raises(models.FetchError, match="neither a directory nor an http"):
+        models.fetch(record, tmp_path / "models", str(tmp_path / "missing"))
+    assert list((tmp_path / "models" / "fake-v1").iterdir()) == []
+
+
+def test_a_stream_that_breaks_mid_way_leaves_no_temp_file(tmp_path, monkeypatch):
+    source, record = fake_record(tmp_path, {"model.onnx": b"weights" * 1000})
+
+    class Breaks:
+        def __init__(self):
+            self.n = 0
+
+        def read(self, size):
+            self.n += 1
+            if self.n == 1:
+                return b"weig"
+            raise OSError("connection reset")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(models, "_open", lambda source, file: Breaks())
+    with pytest.raises(models.FetchError, match="cannot fetch"):
+        models.fetch(record, tmp_path / "models", str(source))
+    assert list((tmp_path / "models" / "fake-v1").iterdir()) == []
+
+
+def test_model_md_agrees_with_the_shipped_record():
+    from pathlib import Path
+
+    text = (Path(__file__).parent.parent / "MODEL.md").read_text()
+    record = models.Record.load()
+    assert record.data["sha256"] in text
+    for golden in record.data["goldens"]:
+        assert golden["sha256"] in text, golden["file"]
+    assert f"{record.data['size_bytes']:,}" in text

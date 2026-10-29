@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import json
 import sys
+from contextlib import suppress
 from typing import Any, TextIO
 
-from . import __version__, tools
+from . import __version__, segmenter, tools
 from .context import Context, ContextError
 from .envelope import invalid_args, split_images
+from .segmenter import SegmenterUnavailable
 
 PROTOCOL_VERSION = "2025-11-25"
 
@@ -53,6 +55,11 @@ class Server:
         request_id = message.get("id")
         params = message.get("params") or {}
         if method == "initialize":
+            # The segmenter is loaded once here when its artifact is present, so the first
+            # `regions` call does not pay the load inside its own timeout; when it is absent the
+            # tools that need it answer each call with an error and the rest serve.
+            with suppress(SegmenterUnavailable):
+                segmenter.shared()
             self.result(
                 request_id,
                 {
@@ -92,7 +99,14 @@ class Server:
                 self.error(request_id, -32602, str(e))
                 return
             model_args = {k: v for k, v in arguments.items() if k != "_dejaview"}
-            envelope = handler(model_args, context)
+            try:
+                envelope = handler(model_args, context)
+            except (SegmenterUnavailable, OSError, ValueError) as e:
+                # The artifact `fetch` places is not there, or a handle's pixels cannot be read
+                # (a corrupt file, a decompression bomb, bad base64): the harness records the
+                # call as a tool error with these words, and the server goes on serving.
+                self.error(request_id, -32603, f"{name}: {type(e).__name__}: {e}")
+                return
         # The images' bytes travel as content blocks, in the envelope's order (SPEC "Results").
         structured, blocks = split_images(envelope)
         self.result(

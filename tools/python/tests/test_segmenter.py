@@ -17,13 +17,10 @@ MODELS = Path(os.environ["DEJAVIEW_MODELS"]) if os.environ.get("DEJAVIEW_MODELS"
 RECORD = models.Record.load()
 PRESENT = all((models.artifact_path(RECORD, MODELS).parent / f).is_file() for f in RECORD.files)
 
-pytestmark = [
-    pytest.mark.segmenter,
-    pytest.mark.skipif(
-        not PRESENT,
-        reason=f"the segmenter and its goldens are not under {models.artifact_path(RECORD, MODELS).parent}: run `dejaview-tools fetch`",
-    ),
-]
+needs_model = pytest.mark.skipif(
+    not PRESENT,
+    reason=f"the segmenter and its goldens are not under {models.artifact_path(RECORD, MODELS).parent}: run `dejaview-tools fetch`",
+)
 
 
 def test_the_semantic_map_matches_the_export_scripts_definition():
@@ -35,6 +32,8 @@ def test_the_semantic_map_matches_the_export_scripts_definition():
     assert (segmenter.semantic_map(c, m) == expected).all()
 
 
+@needs_model
+@pytest.mark.segmenter
 def test_the_artifact_reproduces_every_golden_within_the_recorded_tolerance():
     seg = segmenter.Segmenter(MODELS)
     tol = RECORD.data["tolerance"]

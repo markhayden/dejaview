@@ -63,14 +63,15 @@ def main() -> None:
     # The published summary keeps every decision's error class but not the error text, which
     # may quote a provider's response body.
     published = json.loads(json.dumps(summary))
-    eval_abs = str(a.eval_dir.resolve())
+    eval_abs = str(a.eval_dir.resolve()) + os.sep
     for d in published["decisions"]:
         if d.get("error"):
             d["error"] = f"[{d['error_class']}: text withheld from the published copy]"
-        # A decision directory recorded as an absolute path (the run makes it absolute for the
-        # tools) is published relative to the evaluation directory: no local path leaves here.
+        # Summaries written before the runner relativised them carry the decision directory as an
+        # absolute path (the run makes it absolute for the tools); the published copy is relative
+        # to the evaluation directory, so no local path leaves here.
         if d["dir"].startswith(eval_abs):
-            d["dir"] = d["dir"][len(eval_abs):].lstrip("/")
+            d["dir"] = d["dir"][len(eval_abs):]
     (a.out / "summary.json").write_text(json.dumps(published, indent=2) + "\n")
     shutil.copy(a.eval_dir / "metrics.json", a.out / "metrics.json")
     shutil.copy(a.eval_dir / "descriptor.json", a.out / "descriptor.json")

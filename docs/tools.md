@@ -179,7 +179,7 @@ An MCP tool is the same contract over stdio: the manifest's fields travel in the
 
 ## The Python pack and its provisioning bundle
 
-`tools/python/` is a uv project (`dejaview-tools`, on numpy and Pillow) whose
+`tools/python/` is a uv project (`dejaview-tools`, on numpy, Pillow and onnxruntime) whose
 `dejaview-tools serve` runs the stdio server. `context.py` parses the `_dejaview` the harness
 injects into every call (the run and call ids, the images named by `image_args` and the frames
 named by `frame_args`, each with lossless pixels by path under the run directory or inline, and
@@ -187,9 +187,12 @@ the rules' hints) and loads pixels as RGB arrays; a malformed context is a JSON-
 the harness records as a tool error, never an answer the model acts on. `envelope.py` builds
 result envelopes and returned images (lossless PNG named `crop:<call id>:<n>` or an aligned frame,
 with its mapping in the parent), and splits the images' bytes out of `structuredContent` into the
-MCP image blocks the client pairs with them by position and media type. This version carries one
-tool, `echo_region`, the transport proof: it places the given box on the image as a region and
-returns the box cut from the named frame (or the image's raw frame) as its one image.
+MCP image blocks the client pairs with them by position and media type. A handler that cannot
+answer (the segmenter artifact missing, an image that will not decode) gets a JSON-RPC error with
+its words, which the harness records as a tool error, and the server goes on serving. The pack
+carries three tools: `echo_region`, the transport proof, which places the given box on the image
+as a region and returns the box cut from the named frame (or the image's raw frame) as its one
+image; and `regions` and `classes` below.
 `just python-check` lints and tests the pack offline; `just pack-test` also drives the real
 server from the Rust client (`crates/dejaview-tools/tests/python_pack.rs`: an image and an
 aligned frame by path in, a valid envelope with one image block out) and puts every manifest the

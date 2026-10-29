@@ -73,10 +73,12 @@ def sha256_of(path: Path) -> str:
 
 
 def _open(source: str, file: str):
-    """A readable stream for one file of the source: a directory or a URL prefix."""
+    """A readable stream for one file of the source: a directory or an http(s) URL prefix."""
     base = Path(source)
     if base.is_dir():
         return (base / file).open("rb")
+    if not source.startswith(("https://", "http://")):
+        raise FetchError(f"{source!r} is neither a directory nor an http(s) URL")
     return urllib.request.urlopen(f"{source.rstrip('/')}/{file}")
 
 
@@ -108,13 +110,17 @@ def fetch(
                     for chunk in iter(lambda: stream.read(1 << 20), b""):
                         h.update(chunk)
                         tmp.write(chunk)
-            except OSError as e:
-                tmp.close()
+                got = h.hexdigest()
+                if got != want:
+                    raise FetchError(
+                        f"{file}: sha256 {got} is not the recorded {want}; nothing kept"
+                    )
+            except FetchError:
+                os.unlink(tmp.name)
+                raise
+            except (OSError, ValueError) as e:
+                # Whatever broke the stream, or an address urllib cannot open: nothing is kept.
                 os.unlink(tmp.name)
                 raise FetchError(f"{file}: cannot fetch: {e}") from e
-        got = h.hexdigest()
-        if got != want:
-            os.unlink(tmp.name)
-            raise FetchError(f"{file}: sha256 {got} is not the recorded {want}; nothing kept")
         shutil.move(tmp.name, dest)
     return target

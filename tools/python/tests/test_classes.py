@@ -1,5 +1,9 @@
 """`classes`: the named fixtures return exactly the recorded class lists (needs the fetched
-segmenter), and the manifest and argument checks hold without it."""
+segmenter), and the manifest and argument checks hold without it.
+
+The fixtures' class lists were recorded from this code on the real segmenter, so that test pins
+behaviour against regression; the correctness evidence for the segmenter is the parity test and
+the planted-change test of `regions`."""
 
 import base64
 import io
@@ -61,12 +65,92 @@ def context(name: str) -> Context:
 def test_composition_orders_by_share_and_folds_the_small_away():
     names = ["a", "b", "c", "d"]
     labels = np.array([[0] * 60 + [1] * 30 + [2] * 9 + [3] * 1])
-    assert classes.composition(labels, np.ones_like(labels, float), names) == [
-        ("a", 0.6),
-        ("b", 0.3),
-        ("c", 0.09),
+    assert classes.composition(labels, names) == [("a", 0.6), ("b", 0.3), ("c", 0.09)]
+    assert classes.composition(np.array([[3]]), names) == [("d", 1.0)]
+    # Five classes above the share floor fold to the four largest.
+    five = np.array([[0] * 24 + [1] * 22 + [2] * 20 + [3] * 18 + [4] * 16])
+    assert [n for n, _ in classes.composition(five, ["a", "b", "c", "d", "e"])] == [
+        "a",
+        "b",
+        "c",
+        "d",
     ]
-    assert classes.composition(np.array([[3]]), np.ones((1, 1)), names) == [("d", 1.0)]
+
+
+class FakeSegmenter:
+    """Segments by brightness: four bands of the padded square map to classes 0 to 3, so a test
+    can plan what each side says without the model."""
+
+    def __init__(self, bands=4):
+        self.bands = bands
+
+    def segment(self, images):
+        from dejaview_tools.segmenter import prepare, semantic_map  # noqa: F401
+
+        out = []
+        for rgb in images:
+            pv, place = prepare(rgb)
+            gray = (
+                pv * np.array([0.229, 0.224, 0.225])[:, None, None]
+                + np.array([0.485, 0.456, 0.406])[:, None, None]
+            ).mean(0)
+            quarter = gray[::4, ::4]
+            labels = np.clip((quarter * self.bands).astype(int), 0, self.bands - 1)
+            out.append((labels, np.full(labels.shape, 0.9), place))
+        return out
+
+
+def test_four_classes_a_side_keep_both_confidences_under_the_measurement_cap(monkeypatch):
+    monkeypatch.setattr(classes.segmenter, "shared", lambda: FakeSegmenter())
+    monkeypatch.setattr(
+        classes.segmenter, "class_names", lambda: ["dark", "dim", "light", "bright"] + ["x"] * 146
+    )
+    # Four vertical stripes of brightness on each side, so every side has four classes.
+    stripes = np.zeros((64, 64, 3), np.uint8)
+    for n, v in enumerate((20, 90, 160, 235)):
+        stripes[:, n * 16 : (n + 1) * 16] = v
+    ctx = Context.parse(
+        {
+            "run_id": "r",
+            "call_id": "c",
+            "images": {"source": _handle(stripes[:, ::-1])},
+            "frames": {
+                "aligned:candidate:t1": {
+                    "root": "candidate",
+                    "projection": "flat",
+                    "parent": "raw:source",
+                    "transform": None,
+                    "chain": [],
+                    "pixels": _handle(stripes),
+                }
+            },
+            "hints": {},
+        }
+    )
+    env = classes.classes(
+        {"frame": "aligned:candidate:t1", "against": "raw:source", "bbox": [0.0, 0.0, 1.0, 1.0]},
+        ctx,
+    )
+    names = [m["name"] for m in env["measurements"]]
+    assert len(names) == classes.RETURNS["max_measurements"]
+    assert "confidence_before" in names and "confidence_after" in names
+    assert (
+        sum(n.startswith("before:") for n in names) == 3
+        and sum(n.startswith("after:") for n in names) == 3
+    )
+    assert env["provenance"]["version"] == classes.MANIFEST["version"]
+
+
+def _handle(rgb):
+    buf = io.BytesIO()
+    Image.fromarray(rgb).save(buf, format="PNG")
+    return {
+        "media_type": "image/png",
+        "width": rgb.shape[1],
+        "height": rgb.shape[0],
+        "projection": "flat",
+        "base64": base64.b64encode(buf.getvalue()).decode("ascii"),
+    }
 
 
 @needs_model

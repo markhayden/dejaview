@@ -247,3 +247,100 @@ def test_reset_acknowledges_and_unknown_methods_are_not_found():
     assert responses[0]["result"] == {}
     assert responses[1]["error"]["code"] == -32601
     assert len(responses) == 2
+
+
+def test_a_missing_segmenter_is_an_error_reply_and_the_server_goes_on(monkeypatch):
+    from dejaview_tools import regions, segmenter
+
+    def unavailable():
+        raise segmenter.SegmenterUnavailable("the artifact is missing; run `dejaview-tools fetch`")
+
+    monkeypatch.setattr(regions.segmenter, "shared", unavailable)
+    monkeypatch.setattr(server.segmenter, "shared", unavailable)
+    img = handle(20, 10, base64=base64.b64encode(png(20, 10)).decode("ascii"))
+    ctx = {
+        "run_id": "run-1",
+        "call_id": "call:1",
+        "images": {"source": img},
+        "frames": {
+            "aligned:candidate:t1": {
+                "root": "candidate",
+                "projection": "flat",
+                "parent": "raw:source",
+                "transform": None,
+                "chain": [],
+                "pixels": img,
+            }
+        },
+        "hints": {},
+    }
+    failed, later, init = run(
+        [
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "regions",
+                    "arguments": {
+                        "frame": "aligned:candidate:t1",
+                        "against": "raw:source",
+                        "_dejaview": ctx,
+                    },
+                },
+            },
+            {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": {
+                    "name": "echo_region",
+                    "arguments": {
+                        "image": "candidate",
+                        "bbox": [0, 0, 0.5, 0.5],
+                        "_dejaview": context(),
+                    },
+                },
+            },
+            {
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "initialize",
+                "params": {"protocolVersion": "2025-11-25"},
+            },
+        ]
+    )
+    assert failed["error"]["code"] == -32603 and "fetch" in failed["error"]["message"]
+    assert later["result"]["structuredContent"]["status"] == "ok"
+    assert init["result"]["protocolVersion"] == "2025-11-25"
+
+
+def test_unreadable_pixels_are_an_error_reply_not_a_crash():
+    bad = handle(20, 10, base64=base64.b64encode(b"not a png").decode("ascii"))
+    [reply] = run(
+        [
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {
+                    "name": "echo_region",
+                    "arguments": {
+                        "image": "candidate",
+                        "bbox": [0, 0, 0.5, 0.5],
+                        "_dejaview": {**context(), "images": {"candidate": bad}},
+                    },
+                },
+            }
+        ]
+    )
+    assert reply["error"]["code"] == -32603 and "echo_region" in reply["error"]["message"]
+
+
+def test_an_unknown_tool_is_a_method_error_and_the_cli_reports_version_and_unknown_commands(capsys):
+    from dejaview_tools import cli
+
+    [reply] = run([{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "nope"}}])
+    assert reply["error"]["code"] == -32602
+    assert cli.main(["--version"]) == 0 and capsys.readouterr().out.strip() == __version__
+    assert cli.main(["bogus"]) == 2 and "unknown command" in capsys.readouterr().err

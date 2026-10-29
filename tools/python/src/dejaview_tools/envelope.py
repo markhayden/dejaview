@@ -14,10 +14,11 @@ from PIL import Image
 from . import __version__
 
 
-def provenance(tool: str, duration_ms: int = 0) -> dict[str, Any]:
+def provenance(tool: str, duration_ms: int = 0, version: str = __version__) -> dict[str, Any]:
+    """The pack's version by default; a tool with a manifest version of its own passes it."""
     return {
         "tool": tool,
-        "version": __version__,
+        "version": version,
         "duration_ms": duration_ms,
         "lock_digest": os.environ.get("DEJAVIEW_LOCK_DIGEST"),
     }
@@ -32,6 +33,7 @@ def envelope(
     measurements: list[dict[str, Any]] | None = None,
     images: list[dict[str, Any]] | None = None,
     transforms: list[dict[str, Any]] | None = None,
+    version: str = __version__,
 ) -> dict[str, Any]:
     return {
         "envelope_version": 1,
@@ -41,7 +43,7 @@ def envelope(
         "regions": regions or [],
         "images": images or [],
         "transforms": transforms or [],
-        "provenance": provenance(tool),
+        "provenance": provenance(tool, version=version),
     }
 
 

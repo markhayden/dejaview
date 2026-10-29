@@ -594,3 +594,77 @@ fn the_published_sets_are_consistent_at_the_manifest_level() {
         }
     }
 }
+
+#[test]
+fn every_published_seal_holds_and_every_receipt_agrees_with_its_set() {
+    // The gate's publication (task 5.6) leaves a set, its seal, the published labels, a receipt
+    // under evalsets/receipts and a copy of the receipt beside the results document. They must
+    // tell one story: the seal verifies, the receipt's seal and label hashes are the set's, a
+    // set that was blind carries the owner's attestation, and the two receipt copies are equal.
+    use dejaview_eval::gate::Receipt;
+    use dejaview_eval::sets::Seal;
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../evalsets");
+    for dir in dejaview_eval::sets::discover(&root).unwrap() {
+        dejaview_eval::sets::verify_seal(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display()));
+    }
+    let receipts = Receipt::load_all(&root).unwrap();
+    assert!(!receipts.is_empty(), "the regions gate left a receipt");
+    for (id, receipt) in &receipts {
+        let r = &receipt.receipt;
+        let set = root.join(&r.set);
+        assert!(set.join("set.toml").is_file(), "{id}: {} exists", r.set);
+        let seal: Seal =
+            toml::from_str(&std::fs::read_to_string(set.join("seal.toml")).unwrap()).unwrap();
+        assert_eq!(
+            seal.seal.sha256, r.seal_sha256,
+            "{id}: the seal is the set's"
+        );
+        assert!(
+            !seal.seal.attestation.trim().is_empty(),
+            "{id}: the owner's attestation is recorded in the seal"
+        );
+        let labels = std::fs::read(set.join("labels.toml")).unwrap();
+        let labels_sha256: String = <sha2::Sha256 as sha2::Digest>::digest(&labels)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        assert_eq!(
+            labels_sha256, r.labels_sha256,
+            "{id}: the published labels are the scored ones"
+        );
+        assert_eq!(
+            seal.seal.components.labels, r.labels_sha256,
+            "{id}: and the seal's labels component"
+        );
+        let copies: Vec<PathBuf> = glob_receipts(&root.join("../docs/results"), id);
+        assert!(
+            !copies.is_empty(),
+            "{id}: a copy sits beside a results document"
+        );
+        let original = std::fs::read(root.join("receipts").join(format!("{id}.toml"))).unwrap();
+        for copy in copies {
+            assert_eq!(
+                std::fs::read(&copy).unwrap(),
+                original,
+                "{}",
+                copy.display()
+            );
+        }
+    }
+}
+
+/// Every `receipt.toml` under the results documents whose id matches.
+fn glob_receipts(results: &Path, id: &str) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(results).unwrap().flatten() {
+        let candidate = entry.path().join("receipt.toml");
+        if candidate.is_file()
+            && std::fs::read_to_string(&candidate)
+                .unwrap()
+                .contains(&format!("id = \"{id}\""))
+        {
+            out.push(candidate);
+        }
+    }
+    out
+}

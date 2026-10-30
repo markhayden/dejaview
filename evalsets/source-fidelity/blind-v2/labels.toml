@@ -1,0 +1,327 @@
+# Answer labels adjudicated by the owner from the construction record.
+[[label]]
+item = "market-square-1"
+expected = "fail"
+failure_types = ["church tower clock face-changed"]
+words = "the church tower clock face is changed in the candidate"
+obligation_ids = ["SF1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "church tower clock face-changed"
+obligation_ids = ["SF1"]
+bbox = [0.5176, 0.209, 0.5732, 0.2764]
+
+[[label]]
+item = "market-square-2"
+expected = "fail"
+failure_types = ["third market stall-changed"]
+words = "the third market stall is gone from the candidate; the generator also changed 1 other area(s), check them"
+obligation_ids = ["SF1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "third market stall-changed"
+obligation_ids = ["SF1"]
+bbox = [0.1953, 0.5498, 0.2402, 0.7012]
+
+[[label]]
+item = "market-square-3"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (change the scene to a wet evening with the stalls lit by warm string lights); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label]]
+item = "market-square-4"
+expected = "pass"
+failure_types = []
+words = "a mild colour grade (warmth +0.11); structure and subjects unchanged"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label]]
+item = "market-square-5"
+expected = "fail"
+failure_types = ["iron lamp post-changed"]
+words = "the iron lamp post is gone from the candidate"
+obligation_ids = ["SF1", "RQ3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "iron lamp post-changed"
+obligation_ids = ["SF1", "RQ3"]
+bbox = [0.6992, 0.1172, 0.8125, 0.8906]
+
+[[label]]
+item = "terraced-street-1"
+expected = "pass"
+failure_types = []
+words = "a mild colour grade (warmth -0.10); structure and subjects unchanged"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label]]
+item = "terraced-street-2"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (change the season to winter with snow on the roofs and pavement); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label]]
+item = "terraced-street-3"
+expected = "fail"
+failure_types = ["parked green car-changed"]
+words = "the parked green car is gone from the candidate"
+obligation_ids = ["SF1", "RQ4"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "parked green car-changed"
+obligation_ids = ["SF1", "RQ4"]
+bbox = [0.0, 0.1016, 1.0, 1.0]
+
+[[label]]
+item = "terraced-street-4"
+expected = "fail"
+failure_types = ["one chimney stack-changed"]
+words = "the one chimney stack is gone from the candidate"
+obligation_ids = ["SF1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "one chimney stack-changed"
+obligation_ids = ["SF1"]
+bbox = [0.0, 0.0957, 0.5703, 0.2734]
+
+[[label]]
+item = "terraced-street-5"
+expected = "fail"
+failure_types = ["red post box-changed"]
+words = "the red post box is gone from the candidate; the generator also changed 2 other area(s), check them"
+obligation_ids = ["SF1", "RQ3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "red post box-changed"
+obligation_ids = ["SF1", "RQ3"]
+bbox = [0.6064, 0.6094, 0.6943, 0.7637]
+
+[[label]]
+item = "alpine-hut-1"
+expected = "pass"
+failure_types = []
+words = "a mild colour grade (warmth -0.00); structure and subjects unchanged"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label]]
+item = "alpine-hut-2"
+expected = "fail"
+failure_types = ["flagpole and flag-changed"]
+words = "the flagpole and flag is gone from the candidate"
+obligation_ids = ["SF1", "RQ3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "flagpole and flag-changed"
+obligation_ids = ["SF1", "RQ3"]
+
+[[label]]
+item = "alpine-hut-3"
+expected = "fail"
+failure_types = ["right picnic table-changed"]
+words = "the right picnic table is gone from the candidate"
+obligation_ids = ["SF1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "right picnic table-changed"
+obligation_ids = ["SF1"]
+bbox = [0.0, 0.3906, 1.0, 1.0]
+
+[[label]]
+item = "alpine-hut-4"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (change the light to golden sunset with long shadows); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label]]
+item = "alpine-hut-5"
+expected = "fail"
+failure_types = ["wooden signpost-changed"]
+words = "the wooden signpost is gone from the candidate; the generator also changed 1 other area(s), check them"
+obligation_ids = ["SF1", "RQ4"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "wooden signpost-changed"
+obligation_ids = ["SF1", "RQ4"]
+bbox = [0.0, 0.3672, 1.0, 1.0]
+
+[[label]]
+item = "boatyard-1"
+expected = "fail"
+failure_types = ["second rowing boat-changed"]
+words = "the second rowing boat is gone from the candidate"
+obligation_ids = ["SF1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "second rowing boat-changed"
+obligation_ids = ["SF1"]
+bbox = [0.0234, 0.4639, 0.4531, 0.8203]
+
+[[label]]
+item = "boatyard-2"
+expected = "pass"
+failure_types = []
+words = "a mild colour grade (warmth +0.04); structure and subjects unchanged"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label]]
+item = "boatyard-3"
+expected = "fail"
+failure_types = ["yellow crane-changed"]
+words = "the yellow crane is gone from the candidate"
+obligation_ids = ["SF1", "RQ2"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "yellow crane-changed"
+obligation_ids = ["SF1", "RQ2"]
+
+[[label]]
+item = "boatyard-4"
+expected = "fail"
+failure_types = ["anchor on its plinth-changed"]
+words = "the anchor on its plinth is gone from the candidate"
+obligation_ids = ["SF1", "RQ4"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "anchor on its plinth-changed"
+obligation_ids = ["SF1", "RQ4"]
+bbox = [0.6875, 0.4004, 0.9893, 0.8203]
+
+[[label]]
+item = "boatyard-5"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (change the light to dusk with the workshop lights on); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label]]
+item = "seaside-promenade-1"
+expected = "fail"
+failure_types = ["bench-changed"]
+words = "the bench is gone from the candidate"
+obligation_ids = ["SF1", "RQ4"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "whole_image"
+defect = "bench-changed"
+obligation_ids = ["SF1", "RQ4"]
+
+[[label]]
+item = "seaside-promenade-2"
+expected = "pass"
+failure_types = []
+words = "a mild colour grade (warmth -0.12); structure and subjects unchanged"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label]]
+item = "seaside-promenade-3"
+expected = "pass"
+failure_types = []
+words = "a permitted restyle (change the weather to a grey overcast day with choppy sea); structure and every protected subject must be unchanged, confirm against the source"
+obligation_ids = []
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label]]
+item = "seaside-promenade-4"
+expected = "fail"
+failure_types = ["bandstand roof-changed"]
+words = "the bandstand roof is changed in the candidate"
+obligation_ids = ["SF1"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "bandstand roof-changed"
+obligation_ids = ["SF1"]
+bbox = [0.2939, 0.2812, 0.5469, 0.46]
+
+[[label]]
+item = "seaside-promenade-5"
+expected = "fail"
+failure_types = ["coin telescope-changed"]
+words = "the coin telescope is gone from the candidate"
+obligation_ids = ["SF1", "RQ3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+
+[[label.regions]]
+frame = "raw:candidate"
+kind = "bbox"
+defect = "coin telescope-changed"
+obligation_ids = ["SF1", "RQ3"]
+bbox = [0.5352, 0.4941, 0.709, 0.835]

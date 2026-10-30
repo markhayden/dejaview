@@ -171,3 +171,46 @@ detection differs. **Outcome: rejected.** Admission is unchanged.
 
 **Next.** M5 closes with its checkpoint. Before the confirmation stage, a harder source-fidelity set
 of at least 50 items in new families, built with the opaque-id plan and the owner's review.
+
+## 2026-10-30: the second admission gate, regions on a harder blind set ([gate-regions-initial-2-2026-10](gate-regions-initial-2-2026-10/README.md))
+
+**Question.** ADR 0017: was the first rejection only a set the control saturated? blind-v2 was
+built to be hard for the control: 25 items in 5 new scene families, 15 planted failures of four
+harder kinds (a small object removed, one of several alike removed, part of an object altered, a
+removal under a strong restyle), opaque ids, the same model and judging configuration, scored at
+two hypotheses so the earlier attempt counts.
+
+**Headline (receipt `be41ae402334a394`).**
+
+| Arm | Detected failures | Missed | False rejects | Unsure | Errors | Cost | Localisation hits (spurious) |
+|---|---|---|---|---|---|---|---|
+| C (view, align) | 15/15 | 0 | 1/10 | 0 | 0 | $0.70 | 8 of 15 (25 of 33) |
+| D_regions (C plus regions) | 15/15 | 0 | 1/10 | 0 | 0 | $0.97 | 8 of 15 (45 of 53) |
+
+Paired bootstrap of the detected-failure difference at 0.0125 and 0.9875: point 0, interval 0 to
+0; no family differs. **Outcome: rejected.** Admission is unchanged.
+
+**What stood out.**
+
+- Harder was not hard enough. gemini-4-argon with zoom and alignment caught every planted
+  failure: one lamp post, one chimney of five, one rowing boat of four, a clock face, a bandstand
+  roof, a crane under a dusk restyle. Removal-shaped failures that a generator can plant cleanly
+  are at ceiling for this model, so a detection gate cannot separate any tool from it here.
+- This time the tool changed nothing at all: no item flipped either way, the same localisation
+  hits, nearly twice the spurious boxes, 1.39 times the cost and a third slower. On blind-v1 it
+  took back one false reject; here there was nothing for it to take back.
+- Both arms rejected the same pass item (`boatyard-5`, a dusk restyle) for the same reason, a
+  roller door raised far higher than in the source. Two arms agreeing on a specific structural
+  change suggests the generator moved the door and the label is wrong; the owner checks it.
+- 50 decisions, $1.67, no errors, no unsure answers. The set's build cost a few dollars more.
+
+**What changed because of it.**
+
+- The set consistency test knows a sealed blind set (labels only by hash), and the set docs build
+  into owner storage as the publish script expects; the first build went into the repository by
+  following the old docs.
+
+**Next.** An owner decision on what a tool has to do to earn a place when the control is this
+strong (see the reply to the owner of 2026-10-30): a gate under a cheaper model, where the control
+misses more and a tool could close the gap to a stronger model; a gate on false rejects and
+localisation (ADR 0017 option 2); or leave `regions` out of source fidelity and move on (option 3).

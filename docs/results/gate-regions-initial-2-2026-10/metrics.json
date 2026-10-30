@@ -1,0 +1,197 @@
+{
+  "metrics_version": 1,
+  "policy": {
+    "on_unsure": "review",
+    "on_error": "review"
+  },
+  "cells": [
+    {
+      "cell": "google-ai-studio:gemini-4-argon/C",
+      "counts": {
+        "items": 25,
+        "expected_fail": 15,
+        "expected_pass": 10,
+        "detected": 15,
+        "missed": 0,
+        "false_rejects": 1,
+        "unsure": 0,
+        "errors": 0
+      },
+      "confusion": {
+        "expected_fail": [
+          0,
+          15,
+          0,
+          0
+        ],
+        "expected_pass": [
+          9,
+          1,
+          0,
+          0
+        ]
+      },
+      "rates": {
+        "missed": {
+          "count": 0,
+          "total": 15,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.20388330103584862
+        },
+        "detected": {
+          "count": 15,
+          "total": 15,
+          "value": 1.0,
+          "low": 0.7961166989641515,
+          "high": 1.0
+        },
+        "false_rejects": {
+          "count": 1,
+          "total": 10,
+          "value": 0.1,
+          "low": 0.017876213095072896,
+          "high": 0.4041500267952385
+        },
+        "unsure": {
+          "count": 0,
+          "total": 25,
+          "value": 0.0,
+          "low": 1.3877787807814457e-17,
+          "high": 0.13319225093904846
+        },
+        "errors": {
+          "count": 0,
+          "total": 25,
+          "value": 0.0,
+          "low": 1.3877787807814457e-17,
+          "high": 0.13319225093904846
+        }
+      },
+      "localisation": {
+        "labelled_regions": 15,
+        "hits": 8,
+        "predictions": 33,
+        "spurious": 25
+      },
+      "cost": {
+        "total_usd": 0.7005554999999999,
+        "median_usd": 0.0266599
+      },
+      "wall": {
+        "total_ms": 943010,
+        "median_ms": 36067
+      },
+      "repetitions": {
+        "count": 1
+      }
+    },
+    {
+      "cell": "google-ai-studio:gemini-4-argon/D_regions",
+      "counts": {
+        "items": 25,
+        "expected_fail": 15,
+        "expected_pass": 10,
+        "detected": 15,
+        "missed": 0,
+        "false_rejects": 1,
+        "unsure": 0,
+        "errors": 0
+      },
+      "confusion": {
+        "expected_fail": [
+          0,
+          15,
+          0,
+          0
+        ],
+        "expected_pass": [
+          9,
+          1,
+          0,
+          0
+        ]
+      },
+      "rates": {
+        "missed": {
+          "count": 0,
+          "total": 15,
+          "value": 0.0,
+          "low": 0.0,
+          "high": 0.20388330103584862
+        },
+        "detected": {
+          "count": 15,
+          "total": 15,
+          "value": 1.0,
+          "low": 0.7961166989641515,
+          "high": 1.0
+        },
+        "false_rejects": {
+          "count": 1,
+          "total": 10,
+          "value": 0.1,
+          "low": 0.017876213095072896,
+          "high": 0.4041500267952385
+        },
+        "unsure": {
+          "count": 0,
+          "total": 25,
+          "value": 0.0,
+          "low": 1.3877787807814457e-17,
+          "high": 0.13319225093904846
+        },
+        "errors": {
+          "count": 0,
+          "total": 25,
+          "value": 0.0,
+          "low": 1.3877787807814457e-17,
+          "high": 0.13319225093904846
+        }
+      },
+      "localisation": {
+        "labelled_regions": 15,
+        "hits": 8,
+        "predictions": 53,
+        "spurious": 45
+      },
+      "cost": {
+        "total_usd": 0.9739966,
+        "median_usd": 0.036345
+      },
+      "wall": {
+        "total_ms": 1304638,
+        "median_ms": 48178
+      },
+      "repetitions": {
+        "count": 1
+      }
+    }
+  ],
+  "paired": [
+    {
+      "model": "google-ai-studio:gemini-4-argon",
+      "control": "google-ai-studio:gemini-4-argon/C",
+      "treatment": "google-ai-studio:gemini-4-argon/D_regions",
+      "items": 25,
+      "detected_gained": 0,
+      "detected_lost": 0,
+      "false_rejects_gained": 0,
+      "false_rejects_lost": 0,
+      "differing_families": 0,
+      "flips": [],
+      "bootstrap": {
+        "seed": 20261030,
+        "resamples": 10000,
+        "hypotheses": 2,
+        "families": 5,
+        "lower_percentile": 0.0125,
+        "upper_percentile": 0.9875,
+        "point": 0.0,
+        "lower": 0.0,
+        "upper": 0.0,
+        "insufficient_tail": false
+      }
+    }
+  ]
+}

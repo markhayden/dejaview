@@ -115,7 +115,9 @@ tag.
 
 ## M6 Confirmation
 - [x] Owner decision on ADR 0017 (2026-10-30): option 1, a harder blind set and a second initial gate of `regions` at `gate.hypotheses = 2`; PLAN task 6.0
-- [ ] Task 6.0: blind-v2 planned (seed 20261030), built, owner-confirmed (25 of 25) and sealed 2026-10-30; next: the gate matrix at `gate.hypotheses = 2` with the 5.6 configuration, then score the second initial gate of `regions`
+- [x] Task 6.0 (2026-10-30): blind-v2 built (seed 20261030), owner-confirmed 25 of 25, sealed, and scored as the second initial gate of `regions` at two hypotheses: **rejected** (both arms 15/15, receipt `be41ae402334a394`); results in docs/results/gate-regions-initial-2-2026-10
+- [ ] Owner: check `boatyard-5` (labelled pass, a dusk restyle); both arms rejected it for a raised roller door; correct the label if the generator moved the door
+- [ ] Owner decision after the second rejection: a gate under a cheaper model, a gate on false rejects and localisation (ADR 0017 option 2), or `regions` out of source fidelity (option 3); M6 6.1 and 6.2 stay blocked
 - [ ] 6.1 Confirmation set (50+, two batches of 25)
 - [ ] 6.2 Confirmation gate and admission record
 - [ ] Checkpoint M6 → tag `m6`

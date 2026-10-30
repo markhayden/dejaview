@@ -530,9 +530,8 @@ fn the_published_sets_are_consistent_at_the_manifest_level() {
             format!("`{id}`")
         };
         assert!(readme.contains(&row), "README.md lists {id}");
-        // blind-v2 (ADR 0017) is sealed for the second initial gate of regions.
-        if id == "source-fidelity/blind-v2" {
-            assert_eq!(manifest.set.split, Split::Blind, "{id}");
+        // A sealed blind set carries only its labels' hash until its gate publishes them.
+        if manifest.set.split == Split::Blind {
             assert!(
                 manifest.set.labels.is_none(),
                 "{id}: no labels beside a blind set"
@@ -544,14 +543,19 @@ fn the_published_sets_are_consistent_at_the_manifest_level() {
             );
             continue;
         }
+        // The two gated blind sets became heldout when their gates published the labels
+        // (receipts 8e0c8307a72475ac and be41ae402334a394); every other published set is a dev set.
+        let gated = ["source-fidelity/blind-v1", "source-fidelity/blind-v2"];
         assert_eq!(
             manifest.item.len(),
-            if adversarial { 2 } else { 20 },
+            match id.as_str() {
+                _ if adversarial => 2,
+                "source-fidelity/blind-v2" => 25,
+                _ => 20,
+            },
             "{id}"
         );
-        // The one blind set became heldout when its gate published the labels (receipt
-        // 8e0c8307a72475ac); every other published set is a dev set.
-        let expected_split = if id == "source-fidelity/blind-v1" {
+        let expected_split = if gated.contains(&id.as_str()) {
             Split::Heldout
         } else {
             Split::Dev
@@ -604,7 +608,8 @@ fn the_published_sets_are_consistent_at_the_manifest_level() {
                 .count();
             assert!(
                 (5..=15).contains(&fails),
-                "{id}: {fails} expected fails of 20"
+                "{id}: {fails} expected fails of {}",
+                manifest.item.len()
             );
         }
     }

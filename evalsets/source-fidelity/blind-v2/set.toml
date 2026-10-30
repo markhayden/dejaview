@@ -2,11 +2,11 @@
 [set]
 id = "source-fidelity/blind-v2"
 use_case = "source-fidelity"
-split = "blind"
+split = "heldout"
 licence = "CC-BY-4.0"
 images_repo = "github.com/markhayden/squint-evalsets"
 images_rev = "c1c41c216338594b7e201ef313003bfe8a0f0b0f"
-labels_sha256 = "1a1f205f29079fd5499013ce9719b62ada3e7ae3b5404e97b408f36e41af0ba1"
+labels = "labels.toml"
 families = "families.toml"
 rules = { base = "source-fidelity", version = 1 }
 

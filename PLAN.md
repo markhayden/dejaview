@@ -26,10 +26,12 @@ called admitted.
 | M4 Built-in tools | alignment spike, Tool registry, `view`/`align`/`resize`/`edge_similarity`/`change_map`, full MCP client, arm C, MODEL.md | `m4` |
 | M5 First ML tool | Python pack, provisioning bundle, `regions` and `classes`, sealed blind set, initial gate | `m5` |
 | M6 Confirmation | a harder sealed initial set and a second initial gate (ADR 0017); then, only after an admission, a distinct sealed set of at least 50 items, confirmation gate, admission record | `m6` |
+| M7 Contract conformance | `squint serve`, `describe --json`, `run.json`, contract locations and image references, shared exit codes, `squint playground` (ADR 0018, SPEC "External interface"); tasks written once `waffle-tools-contract` v0.1 is tagged; independent of M6 | `m7` |
 
-Deferred past M6 with their own ADRs: server mode, Bedrock and Vertex profiles, the ChatGPT-plan
-OAuth scheme, `squint tools serve`, scheduled canaries in CI, Vercel and Cloudflare profiles if
-their fixtures do not pass during M2.
+Deferred past M7 with their own ADRs: an HTTP transport for `squint serve`, the mask handoff
+from rascal (region-scoped `allowed` obligations), Bedrock and Vertex profiles, the ChatGPT-plan
+OAuth scheme, scheduled canaries in CI, Vercel and Cloudflare profiles if their fixtures do not
+pass during M2.
 
 ## Crate dependency graph
 
@@ -103,8 +105,9 @@ and `git check-ignore docs/brief.md` is the test.
 **Branches.** `main` holds only reviewed checkpoints. Each milestone is one branch `mN-<name>`
 from the previous checkpoint tag. Tasks are committed on the milestone branch, or on short task
 branches `mN/<task>` merged into the milestone branch when two tasks are in flight. Code work on
-a later milestone never starts before the earlier milestone merges; owner labelling happens
-outside git and may overlap. A milestone merges into `main` with a merge commit (no squash) after
+a later milestone never starts before the earlier milestone merges, with one exception: M7 does
+not depend on M6 and branches from `main` while M6 waits on an owner decision (ADR 0018); owner
+labelling happens outside git and may overlap. A milestone merges into `main` with a merge commit (no squash) after
 the owner's review and the checkpoint checklist passes. Nothing is pushed by the agent; the owner
 pushes. The owner's preference (2026-10-26): branches stay on the owner's machine and `main` is
 pushed only at tagged checkpoints, so the public repository shows reviewed, working states; CI is
@@ -1352,7 +1355,7 @@ and 1.3 after 1.1; 1.4a after 1.3 alongside 1.5a; 1.15 at any time after 0.1; 1.
 after 1.12. In M2, 2.6a and 2.7a after 2.5a; recordings after their implementations. In M3, 3.6
 alongside 3.4 and 3.5; owner adjudication of 3.3a to 3.3e outside git while 3.4 and 3.5 are
 built. In M4, 4.0 alongside 4.1; 4.4a after 4.1 alongside 4.2a. No code work on a later milestone
-begins before the earlier milestone merges.
+begins before the earlier milestone merges, except M7, which is independent of M6.
 
 ## Owner decision points (from 0.4)
 

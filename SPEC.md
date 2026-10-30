@@ -113,7 +113,8 @@ environment variable.
 
 Sub-decisions:
 
-- Images are accepted by path and by base64 in every input position, and by URL in server mode.
+- Images are accepted by path and by base64 in every input position. Over a later HTTP transport
+  paths are refused ("External interface").
 - A job has one candidate and any number of references; tools refer to images and frames by id,
   never path.
 - The Python tool pack is published as a versioned provisioning bundle, installed once by
@@ -622,7 +623,8 @@ written and fsynced before the event is appended. Artifacts in `artifacts/` by c
 - every image sent to the model, exactly as sent, and every image a tool returned;
 - every structured tool result in full.
 
-SIGINT or SIGTERM during a run appends `cancelled` with the state reached and exits 3.
+SIGINT or SIGTERM during a run appends `cancelled` with the state reached and exits 3 (130 and
+143 from M7, "External interface").
 
 A decision directory (`decision-<unix ms>-<pid>/`) holds `decision.json` (the header: everything
 the report needs that no run journal carries, including the planned envelope; written before the
@@ -1121,7 +1123,6 @@ report records the projection on every call that ran under one.
     any call timed out or was cancelled is never reused: cancellation is a notification the
     server may not honour, so quiescence cannot be proven; the process is shut down before the
     next lease. Packs that do not implement reset are restarted per run.
-- The binary can later expose its built-ins as an MCP server (`squint tools serve`).
 
 ### Python tool pack
 
@@ -1378,14 +1379,66 @@ state is `confirmed`. A rejected tool may be scored again for the same use case 
 blind set and only under an ADR that counts every earlier initial attempt in the matrix's
 `gate.hypotheses` (ADR 0017).
 
+## External interface
+
+From M7 (ADR 0018). squint is one tool in a chain an agent drives: generate an image, check it
+with squint, mask what squint found with rascal, paint inside the mask, check again. Every tool in
+the chain presents the same external interface, defined by the **waffle tools contract**, a
+neutral repository (`waffle-tools-contract`) holding the specification, the JSON Schemas (the
+source of truth), test vectors, a fixture per tool and a Rust crate of serde types. squint pins a
+tagged release, keeps a hash-checked copy of its schemas under `schemas/contract/`, and warns in CI
+when a newer tag exists. Field names and schemas are the contract's; this section says what squint
+does with them. Until contract v0.1 is tagged the summary below is the agreed shape, not the wire.
+
+- **Image reference**: `file_sha256`, width and height of the caller's file (enforced), projection
+  and topology, an optional `pixel_sha256` in the contract's canonical form. squint computes the
+  reference for every image it is given and verifies one the caller supplies; a mismatch is
+  `invalid` with code `input`.
+- **Location out**: every finding's location is mapped to the raw frame of its root image through
+  the registry (as for the viewer) and written in the contract's form: fractions from the top-left
+  measuring edges, quarter-pixel precision, a list of parts with `straddles_wrap` (a view's
+  footprint cut at the seam becomes two parts), kinds `bbox`, `polygon`, `whole_image`, `absent`,
+  with the finding's words as the label, its disposition and confidence, its evidence kind and its
+  source (`squint`, version, run id, item id). Crop, view and aligned frames never leave squint.
+- **`squint serve`**: an MCP server over stdio at revision `2025-11-25`, under the contract's
+  server conventions. Tools: `check` (one decision; images by path or inline bytes in any slot;
+  paths only inside the client's MCP roots narrowed by config; inline bytes bounded), `estimate`
+  (worst-case cost of a check and the session budget left), and `describe`, `rules`, `tools`,
+  `catalog` (read-only). Each image out carries its reference and the locator the call asked for
+  (path, inline, resource URI); image blocks only when asked. Calls are serial by default
+  (`[serve] concurrency`). Spend: the per-call cap from config, which a call may lower and never
+  raise, and a per-session budget (`[serve] session_budget_usd`) across the server's lifetime.
+- **Progress and cancellation**: `check` is a plain `tools/call`. With a progress token, squint
+  sends a notification on every journal event and every ten seconds while waiting (elapsed, spend
+  so far); the first one names the run resource. `notifications/cancelled` stops the provider
+  call; the run resource then holds the partial journal with status `cancelled` and spend to date,
+  and no result is returned. An identical retry within the cache policy is answered from the
+  decision cache and says so.
+- **Runs as resources**: `squint://run/<id>/run.json`, `…/report.json` and `…/journal` for every
+  decision the server ran, readable after a timeout or a dropped connection.
+- **`run.json`**: written last into every decision directory by `check` on every surface: the
+  contract's header (status, error code with `retryable` and a reason, run id, tool and version,
+  timestamps and duration, input identity, measured spend, cache hit, image references and
+  locations with roles, notes for repairs and tool refusals) and squint's body (verdict, policy
+  outcome, findings, the report's path). A failed image is `completed` with verdict `fail`.
+- **`squint describe --json`**: the contract's description document: one action per use case
+  with its inputs and parameters as JSON Schemas, the renders (`report view`, `report export`),
+  the cost notice and the variable it needs, the expected duration and the inline limits.
+- **Exit codes** across commands: 0 success, 3 error, 64 usage, 130 on SIGINT and 143 on SIGTERM;
+  1 fail and 2 unsure remain `check`'s.
+- **`squint playground`** finds the shared playground program, offers to install it and starts it;
+  it carries no UI.
+- **Later** (its own milestone): a `mask` location in, from rascal, as the region where change was
+  intended, which needs `allowed` obligations that take a region; the contract's cross-tool
+  acceptance test is its definition of done.
+
 ## Tech stack
 
 - Rust stable (edition 2024), `tokio`, `reqwest` with `rustls`, `serde`, `serde_json`, `toml`,
   `schemars`, `jsonschema`, `image`, `clap`, `sha2`, `thiserror`, `tracing`. Dependencies beyond
   this list need an ADR.
-- Rust MCP client: the official `rmcp` crate if it supports revision 2025-11-25 with the
-  pagination, cancellation, structured content and image-content behaviour above at M4,
-  otherwise a small in-house JSON-RPC client; decided by ADR at M4.
+- Rust MCP: the pack client is in-house JSON-RPC (ADR 0015); `squint serve` uses `rmcp`
+  pinned `=3.8.0` as `rascal serve` does (ADR 0018), and M7 decides whether the client follows.
 - Python 3.12, `uv`, `pytest`, `ruff`, the MCP Python SDK, `onnxruntime`, `numpy`, `pillow`.
 - Static HTML and vanilla JavaScript for the viewer.
 - GitHub Actions for CI; `cargo-dist` or a hand-written release workflow for binaries.
@@ -1611,7 +1664,7 @@ explicit commands.
    keyword lists per model were read from the providers' documentation on the catalog's
    `verified` dates and re-verified by the recordings; what the documentation did not state is
    listed in docs/provider-data.md with the recording that confirmed or corrected it.
-2. Whether `rmcp` meets the MCP needs listed under Transports; ADR at M4.
+2. Closed 2026-10-28 (ADR 0015): the pack client stays in-house; the server uses `rmcp` (ADR 0018).
 3. Which image models generate the public sets and under which licence; decided with the first
    set in M3 and recorded per item.
 4. Whether Vercel's response carries upstream provenance the harness can read, and how; verified

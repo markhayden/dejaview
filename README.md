@@ -101,6 +101,16 @@ What has been measured so far, every number with its interval under
   already detected all ten planted failures. The tool took back the one false reject and lifted
   localisation to 10 of 10, neither of which the frozen gate scores. The sets need to be harder
   before a detection gate can separate tools.
+- **Second gate (M6).** The same comparison on a harder sealed set of 25 items in five new
+  scenes, counted as a second attempt: **rejected** again. Both arms caught all 15 planted
+  failures (16 once the owner corrected one label), and the tool changed no verdict. Removals a
+  generator can plant cleanly are at ceiling for this model; what a tool must do to earn a place
+  is an open owner decision.
+
+Next: squint is one tool in a chain an agent drives (generate, check with squint, mask with
+[rascal](https://github.com/markhayden/rascal), paint, check again), so it is gaining the same
+external interface as its siblings: an MCP server, a self-description and a run summary defined
+in a shared contract (ADR 0018, SPEC "External interface", milestone M7).
 
 Plan: [`PLAN.md`](PLAN.md). Decisions: [`docs/adr/`](docs/adr/). Reviews of the spec, the plan and
 each milestone: [`docs/reviews/`](docs/reviews/). Developer setup: [`docs/bootstrap.md`](docs/bootstrap.md).

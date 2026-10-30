@@ -71,8 +71,21 @@ jobs:
       - if: steps.pack.outputs.present == 'true'
         run: uv run --frozen --offline --no-sync ruff check . && uv run --frozen --offline --no-sync ruff format --check .
         working-directory: tools/python
+      # The segmenter-marked tests (parity on the goldens, the planted changes `regions` must find,
+      # the `classes` fixtures) need the 1.2 GB export: fetched once from the segmenter-v1 release,
+      # every byte checked against the record in the pack, and cached under the record's hash.
+      # Under act there is no cache and the download is skipped; those tests then skip.
+      - if: steps.pack.outputs.present == 'true' && !env.ACT
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/squint/models
+          key: segmenter-${{ hashFiles('tools/python/src/squint_tools/models/segmenter-v1.json') }}
+      - if: steps.pack.outputs.present == 'true' && !env.ACT
+        name: Fetch the segmenter (verified against the shipped record)
+        run: uv run --frozen --no-sync squint-tools fetch
+        working-directory: tools/python
       - if: steps.pack.outputs.present == 'true'
-        run: uv run --frozen --offline --no-sync pytest
+        run: uv run --frozen --offline --no-sync pytest -rs
         working-directory: tools/python
       # The set-building toolkit (scripts/sets): lint, tests, and the offline dry run checked by
       # the harness, which needs the Rust toolchain installed below; it runs after that step.

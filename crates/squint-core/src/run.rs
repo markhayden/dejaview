@@ -1230,7 +1230,8 @@ async fn send_turn(
 struct ReadyCall {
     call: ToolCall,
     /// The arguments the tool receives: the model's, with an image named by its raw frame
-    /// (`raw:candidate`) replaced by the image id (`candidate`).
+    /// (`raw:candidate`) replaced by the image id (`candidate`), and a frame named by a bare
+    /// image id replaced by its raw frame.
     arguments: serde_json::Value,
     call_id: String,
     started: Instant,
@@ -1338,15 +1339,25 @@ fn prepare_call(
         );
     }
     for arg in &manifest.frame_args {
-        let Some(id) = call.arguments.get(arg).and_then(|v| v.as_str()) else {
+        let Some(given) = call.arguments.get(arg).and_then(|v| v.as_str()) else {
             continue;
         };
+        // The mirror of the image arguments above: a bare image id stands for its raw frame,
+        // and the tool gets the frame id.
+        let raw = format!("raw:{given}");
+        let id =
+            if state.registry.get(given).is_none() && state.images.iter().any(|i| i.id == given) {
+                arguments[arg] = serde_json::Value::String(raw.clone());
+                raw.as_str()
+            } else {
+                given
+            };
         let Some((root, projection, frame)) = state
             .registry
             .get(id)
             .map(|f| (f.root().to_string(), f.projection(), f.frame().clone()))
         else {
-            reject!(format!("{arg}: unknown frame id {id:?}"));
+            reject!(format!("{arg}: unknown frame id {given:?}"));
         };
         let path = match state.frame_file(id) {
             Ok(p) => p,

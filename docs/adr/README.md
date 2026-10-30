@@ -21,3 +21,4 @@ decision's shape without reversing it. Format: Context, Decision, Alternatives, 
 | 0014 | Alignment by direct registration on locally normalised pyramids | accepted 2026-10-28 |
 | 0015 | The MCP client stays in-house | accepted 2026-10-28 |
 | 0016 | Random numbers for the statistics contract: pinned ChaCha20, canonical order | accepted 2026-10-26 |
+| 0017 | After a rejected initial gate: a harder blind set under adjusted multiplicity (recommended), a new estimand, or moving on | proposed 2026-10-29 |

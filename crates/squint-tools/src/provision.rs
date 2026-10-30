@@ -330,23 +330,45 @@ impl Installed {
         let spawn = self.spawn(vec![]);
         let mut env = provisioning_env(environment);
         env.extend(spawn.extra_env.iter().cloned());
-        let output = Command::new(&self.executable)
+        // The pack reports each file on stderr as it goes; a release fetch is 1.2 GB, so those
+        // lines are passed on as they come rather than after minutes of silence, and the last
+        // of them carry a refusal into the error.
+        let mut child = Command::new(&self.executable)
             .args(&args)
             .env_clear()
             .envs(&env)
-            .output()
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
             .map_err(|e| {
                 resolve(format!(
                     "cannot run {} fetch: {e}",
                     self.executable.display()
                 ))
             })?;
-        if !output.status.success() {
+        let mut tail: std::collections::VecDeque<String> = std::collections::VecDeque::new();
+        if let Some(stderr) = child.stderr.take() {
+            use std::io::BufRead;
+            for line in std::io::BufReader::new(stderr)
+                .lines()
+                .map_while(std::io::Result::ok)
+            {
+                eprintln!("  {line}");
+                if tail.len() == 40 {
+                    tail.pop_front();
+                }
+                tail.push_back(line);
+            }
+        }
+        let status = child
+            .wait()
+            .map_err(|e| resolve(format!("{} fetch did not finish: {e}", self.header.package)))?;
+        if !status.success() {
             return Err(resolve(format!(
                 "{} {} failed:\n{}",
                 self.header.package,
                 args.join(" "),
-                String::from_utf8_lossy(&output.stderr).trim()
+                Vec::from(tail).join("\n")
             )));
         }
         Ok(())

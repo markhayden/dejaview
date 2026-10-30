@@ -58,3 +58,23 @@ fn arm_membership_follows_the_spec_and_the_admission_record() {
     let err = tools_for(&Arm::DX("view".into()), &a, "source-fidelity").unwrap_err();
     assert!(err.to_string().contains("view"), "{err}");
 }
+
+#[test]
+fn with_no_admission_record_arm_d_is_the_control() {
+    // The evalsets root carries no admissions.toml until a gate admits something, and the runner
+    // then reads an empty record: arm D is exactly arm C, view and align with align projected.
+    let none = squint_eval::admissions::Admissions::default();
+    for use_case in ["source-fidelity", "reality-checks"] {
+        assert_eq!(
+            tools_for(&Arm::D, &none, use_case).unwrap(),
+            tools_for(&Arm::C, &none, use_case).unwrap(),
+            "{use_case}"
+        );
+    }
+    assert!(
+        !std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../evalsets/admissions.toml")
+            .exists(),
+        "nothing is admitted yet: the regions gate was rejected (receipt 8e0c8307a72475ac)"
+    );
+}

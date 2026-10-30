@@ -594,3 +594,90 @@ projection = "equirectangular"
         "centre ({cx}, {cy}) of {poly:?}"
     );
 }
+
+#[test]
+fn a_frame_argument_given_as_an_image_id_resolves_to_its_raw_frame() {
+    // The mirror of the image-argument fix: a model that sends `candidate` where a tool wants a
+    // frame gets the image's raw frame, and the journal keeps what it sent.
+    let out = tempdir("frame-arg");
+    let world = tempdir("frame-arg-world");
+    let scene = Scene::random(6, 220, 0.75);
+    scene
+        .render(256, 192)
+        .save(world.join("candidate.png"))
+        .unwrap();
+    scene
+        .render(256, 192)
+        .save(world.join("source.png"))
+        .unwrap();
+    std::fs::write(
+        world.join("job.toml"),
+        r#"[job]
+use_case = "source-fidelity"
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "candidate.png" }
+
+[[job.images]]
+id = "source"
+role = "source"
+source = { path = "source.png" }
+"#,
+    )
+    .unwrap();
+    let script = serde_json::json!([
+        {
+            "tool_calls": [{ "id": "c1", "name": "view", "arguments": { "frame": "candidate", "bbox": [0.1, 0.1, 0.6, 0.6] } }],
+            "stop_reason": "tool_use"
+        },
+        {
+            "tool_calls": [{ "id": "c_submit", "name": "submit_verdict", "arguments": {
+                "schema_version": 1,
+                "items": [
+                    { "id": "chk:ob:SF1@candidate", "disposition": "held", "confidence": "confident", "reason": "scripted", "allowed_by": null, "location": null, "evidence": [] },
+                    { "id": "chk:ob:SF2@candidate", "disposition": "held", "confidence": "confident", "reason": "scripted", "allowed_by": null, "location": null, "evidence": [] }
+                ],
+                "findings": [],
+                "opinion": { "verdict": "pass", "reason": "r" }
+            } }],
+            "stop_reason": "tool_use"
+        }
+    ]);
+    let provider = ScriptedProvider::new(serde_json::from_value(script).unwrap());
+    let registry = ToolRegistry::new(builtin::all(), &["view".into()], &[]).unwrap();
+    let config = Config::parse(
+        &std::fs::read_to_string(root().join("fixtures/config/view.toml"))
+            .unwrap()
+            .replace("enabled = [\"view\", \"resize\"]", "enabled = [\"view\"]"),
+        &["budget.spend_cap_usd=100".into()],
+        &|_| None,
+    )
+    .unwrap();
+    let job = Job::load(&world.join("job.toml")).unwrap();
+    let o = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(run::check(
+            &config,
+            &job,
+            &world,
+            &run::Services::new(&provider, &registry),
+            &out,
+            "test",
+        ))
+        .unwrap();
+    assert_eq!(o.exit_code, 0, "{:?}", o.error);
+    let r: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(o.dir.join("report.json")).unwrap()).unwrap();
+    let call = &r["runs"][0]["tool_calls"][0];
+    assert_eq!(call["status"], "ok", "{call}");
+    assert!(call["invalid_args"].is_null(), "{call}");
+    assert_eq!(call["arguments"]["frame"], "candidate");
+    assert_eq!(
+        r["runs"][0]["frames"]["crop:call:1:0"]["parent"],
+        "raw:candidate"
+    );
+}

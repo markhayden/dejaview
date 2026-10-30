@@ -201,11 +201,16 @@ Paired bootstrap of the detected-failure difference at 0.0125 and 0.9875: point 
   took back one false reject; here there was nothing for it to take back.
 - Both arms rejected the same pass item (`boatyard-5`, a dusk restyle) for the same reason, a
   roller door raised far higher than in the source. Two arms agreeing on a specific structural
-  change suggests the generator moved the door and the label is wrong; the owner checks it.
+  change suggests the generator moved the door and the label is wrong. The owner confirmed it:
+  the door moved, so both arms were right, 16 of 16 detected and no false reject. A label written
+  from the construction record alone can be wrong when the generator changes more than it was
+  asked to; the contact-sheet review missed a raised door at thumbnail size.
 - 50 decisions, $1.67, no errors, no unsure answers. The set's build cost a few dollars more.
 
 **What changed because of it.**
 
+- A set can carry `corrections.toml`: owner corrections found after scoring, kept beside the
+  sealed labels so the seal and the receipt still bind what was scored. `boatyard-5` is the first.
 - The set consistency test knows a sealed blind set (labels only by hash), and the set docs build
   into owner storage as the publish script expects; the first build went into the repository by
   following the old docs.

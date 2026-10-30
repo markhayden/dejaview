@@ -15,6 +15,8 @@ evalsets/<use-case>/<set>/        the set's id is <use-case>/<set>
   labels.toml                     [[label]] per item; absent on a blind set, whose manifest
                                   carries labels_sha256 instead
   seal.toml                       written by `sets seal`
+  corrections.toml                optional: [[correction]] per label the owner corrected after
+                                  scoring; outside the seal (see below)
   items/<item>/job.toml           a full job; image paths relative to the set directory, each
                                   pinned by sha256
   items/<item>/*.png              the images, fetched by hash (see below)
@@ -57,6 +59,12 @@ tests mutate.
   hash, so re-sealing unchanged content reproduces it.
 - `squint sets verify-seal --set <id or path>` recomputes every component and names the ones
   that changed. Exit 0, or 1 with the components on stderr.
+
+A label found wrong after a set was scored is not edited in place: `labels.toml` stays as sealed,
+because the seal and any gate receipt bind its hash. The owner records the fix in
+`corrections.toml` beside it, one `[[correction]]` per item with the label fields, the label it
+replaces (`was`) and how it was found (`found_by`); the results that scored the set note the
+corrected reading. Scoring does not read corrections yet.
 
 The seal records the owner's attestation; prior exposure of the items to a judge or tool cannot
 be proven by code, and gate scoring treats journal searches as supporting evidence only.

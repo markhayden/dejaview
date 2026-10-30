@@ -38,8 +38,11 @@ were held by the owner until the gate scored; receipt `be41ae402334a394`.
   Cost was 1.39 times C ($0.97 against $0.70) and the median decision 34% slower.
 - **The one false reject.** Both arms rejected `boatyard-5`, labelled pass (a dusk restyle), with
   the same reason: the workshop's roller door is raised far higher than in the source. If the
-  generator moved the door during the restyle the label is wrong and both arms were right; the
-  owner checks the item, and a label correction is recorded with the set.
+  generator moved the door during the restyle the label is wrong and both arms were right. The
+  owner checked it the same day: the door moved, so the label is wrong and
+  `evalsets/source-fidelity/blind-v2/corrections.toml` records it as fail (RQ3). Read with the
+  correction, both arms detected 16 of 16 with no false reject of 9; the verdict is unchanged,
+  and the numbers below stay as scored against the sealed labels.
 - **How the model used the tools.** Under C, `align` on all 25 items (21 registered, 4 not
   applicable) and `view` on 17 (23 calls). Under D_regions it added `regions` on 16 items (15
   answered with regions, one measured nothing) and never called `classes`. Turns rose from 57 to

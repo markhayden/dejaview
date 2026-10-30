@@ -1,0 +1,13 @@
+# Owner corrections to labels.toml found after the gate scored the set. labels.toml stays as
+# sealed and scored (receipt be41ae402334a394 binds its hash); a correction here supersedes the
+# label of the item it names for any later reading of the set.
+[[correction]]
+item = "boatyard-5"
+was = "pass"
+expected = "fail"
+failure_types = ["workshop roller door-changed"]
+words = "the workshop's roller door is raised far higher than in the source; the generator moved it during the dusk restyle"
+obligation_ids = ["RQ3"]
+adjudicated_by = "owner"
+adjudicated_on = "2026-10-30"
+found_by = "both arms of gate-regions-initial-2-2026-10 rejected the item for the raised door; the owner confirmed it against the source"

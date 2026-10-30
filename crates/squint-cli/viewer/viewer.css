@@ -10,6 +10,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; font: 14px/1.45 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
 header { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+#print { float: right; font: inherit; font-size: 13px; padding: 4px 12px; cursor: pointer; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; }
 header h1 { font-size: 18px; margin: 0 0 4px; }
 #status { margin: 0; color: var(--muted); }
 main { padding: 0 16px 32px; max-width: 1400px; }
@@ -51,3 +52,15 @@ table.timeline .bar.not_run, table.timeline .bar.pending { background: var(--obs
 table.timeline .bar.measured_nothing, table.timeline .bar.not_applicable { background: var(--region); }
 table.timeline td.status.failed { color: var(--fail); } table.timeline td.status.invalid_args { color: var(--unsure); }
 table.timeline td.detail { font-size: 12px; color: var(--muted); word-break: break-word; }
+@media print {
+  :root { --bg: #ffffff; --fg: #1a1a1a; --muted: #555; --line: #ccc; --panel: #f4f4f4; }
+  #print { display: none; }
+  main { max-width: none; padding: 0; }
+  header { padding: 0 0 8px; }
+  * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  section { break-inside: auto; }
+  h2, h3 { break-after: avoid; }
+  figure, tr, .facts div { break-inside: avoid; }
+  .frames { grid-template-columns: repeat(2, 1fr); }
+  pre { white-space: pre-wrap; word-break: break-word; }
+}

@@ -259,6 +259,15 @@ fn report_view_serves_the_viewer_the_report_and_only_the_run_artifacts() {
             "{asset} is inlined, not referenced"
         );
     }
+    // Save as PDF: a button that prints, and print styles that keep the page whole on paper.
+    assert!(
+        exported.contains(r#"<button id="print""#),
+        "the page offers Save as PDF"
+    );
+    assert!(
+        exported.contains("@media print"),
+        "the page carries print styles"
+    );
     let start =
         exported.find("globalThis.SQUINT_BUNDLE = ").unwrap() + "globalThis.SQUINT_BUNDLE = ".len();
     let end = start + exported[start..].find(";</script>").unwrap();

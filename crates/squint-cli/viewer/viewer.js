@@ -205,14 +205,33 @@ function header(r) {
   return sec;
 }
 
+/// The colour class of a judged location: a violation is red whether it answers a checklist item
+/// or is a finding of its own; what was observed or allowed is grey; anything else is blue.
+function judgedClass(disposition) {
+  if (disposition === 'violation') return 'finding';
+  if (disposition === 'observed' || disposition === 'allowed_change') return 'observed';
+  return 'item';
+}
+
 /// Every location of a run with where it came from: checklist items, findings, tool regions.
+/// Items that put the same box on the same frame (one defect answering several obligations) are
+/// drawn once, with every item named in its hover text.
 async function locations(run) {
   const out = [];
+  const same = new Map();
+  const judged = (loc, cls, title, root) => {
+    const key = `${cls} ${JSON.stringify(loc)}`;
+    const seen = same.get(key);
+    if (seen) { seen.title += `\n${title}`; return; }
+    const entry = { loc, cls, title, root };
+    same.set(key, entry);
+    out.push(entry);
+  };
   for (const item of run.items || []) {
-    if (item.location) out.push({ loc: item.location, cls: item.disposition === 'observed' ? 'observed' : 'item', title: `${item.id}: ${item.disposition} (${item.confidence})`, root: item.root });
+    if (item.location) judged(item.location, judgedClass(item.disposition), `${item.id}: ${item.disposition} (${item.confidence})`, item.root);
   }
   for (const f of run.findings || []) {
-    out.push({ loc: f.location, cls: f.disposition === 'violation' ? 'finding' : 'observed', title: `finding ${(f.obligation_ids || []).join(',')}: ${f.disposition}`, root: f.root });
+    judged(f.location, judgedClass(f.disposition), `finding ${(f.obligation_ids || []).join(',')}: ${f.disposition}`, f.root);
   }
   for (const call of run.tool_calls || []) {
     if (!call.envelope) continue;
@@ -233,10 +252,10 @@ function imagesSection(run, locs) {
   const frames = run.frames || {};
   const sec = el('section', null, el('h2', { text: `Run ${run.run}: images the model saw` }));
   sec.append(el('p', { class: 'legend' },
-    el('span', null, el('i', { style: 'background: var(--item)' }), 'checklist item'),
-    el('span', null, el('i', { style: 'background: var(--finding)' }), 'finding (violation)'),
-    el('span', null, el('i', { style: 'background: var(--region)' }), 'tool region'),
+    el('span', null, el('i', { style: 'background: var(--finding)' }), 'violation'),
+    el('span', null, el('i', { style: 'background: var(--item)' }), 'other answer (held, hidden, can\'t tell)'),
     el('span', null, el('i', { style: 'background: var(--observed)' }), 'observed / allowed'),
+    el('span', null, el('i', { style: 'background: var(--region)' }), 'tool region (segmenter)'),
     el('span', { text: 'dashed: absent; dotted: clipped at the parent' })));
   const grid = el('div', { class: 'frames' });
   const frameIds = Object.keys(run.images_sent || {}).sort((a, b) => (a.startsWith('raw:') ? 0 : 1) - (b.startsWith('raw:') ? 0 : 1) || a.localeCompare(b));
@@ -374,6 +393,10 @@ async function timelineSection(run) {
   sec.append(t);
   return sec;
 }
+
+// Save as PDF goes through the browser's print dialog. The PDF holds what the page shows: a
+// collapsed section (rules, job, config) is printed collapsed unless it is opened first.
+document.getElementById('print').addEventListener('click', () => window.print());
 
 async function main() {
   let report;

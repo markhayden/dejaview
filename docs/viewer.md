@@ -50,6 +50,10 @@ envelope) carried in a `SQUINT_BUNDLE` object the viewer reads instead of the se
 of the arm C run is about 5 MB; the page grows with the images a run saw. It is the page to keep
 beside a result or to send to someone.
 
+Both forms carry a **Save as PDF** button that opens the browser's print dialog. Print styles keep
+figures and table rows whole and light on paper; the PDF holds what the page shows, so a collapsed
+section (rules, job, config as resolved) prints collapsed unless it is opened first.
+
 Both forms open each run with a **timeline**: the funnel of the run as a waterfall from its
 journal, one row per step in order (resolve, prepare, reserve, each model turn with its stop
 reason and cost, each tool call with its outcome, a repair, the submission, the verdict), each
@@ -76,9 +80,11 @@ every version 1 report; an older binary refuses a newer report rather than misre
   crop maps by the sphere geometry in `geometry.js`, the same maths as the harness's
   `frames::sphere`: a box or polygon drawn in the view becomes the polygon of its footprint on the
   panorama, cut at the seam and marked clipped when it straddles it, a full-width box when the
-  view holds a pole. A `view` location is drawn as the footprint of the view it names. Checklist
-  items, findings (violations in red, observed and allowed findings grey) and tool regions (from
-  each call's envelope) have their own colours; `whole_image` is a border, `absent` a dashed
+  view holds a pole. A `view` location is drawn as the footprint of the view it names. A judged
+  location is coloured by its disposition, whether it answers a checklist item or is a finding:
+  violations red, observed and allowed changes grey, any other answer blue; tool regions (from
+  each call's envelope) are orange. Items that put the same box on the same frame (one defect
+  answering several obligations) are drawn once, every item named in the hover text; `whole_image` is a border, `absent` a dashed
   border, a location clipped at its parent is dotted.
 - **Tool results**: every call with status, duration, arguments, the items it added or dropped,
   the envelope's summary and region count, and a link to the envelope.

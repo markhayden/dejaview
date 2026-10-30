@@ -20,6 +20,9 @@ pub struct ReportArgs {
 pub enum ReportCommand {
     /// Serve a decision directory to the static viewer on loopback and print the URL.
     View(ViewArgs),
+    /// Write a decision directory as one self-contained HTML page: the viewer with a timeline of
+    /// every step, and every image, request and result embedded, to open from disk.
+    Export(ExportArgs),
     /// Rebuild `report.json` from the decision header and the run journals, complete or partial.
     Rebuild(RebuildArgs),
     /// Remove decision directories at least this old (`30d`, `12h`, `15m`, `0s`).
@@ -34,6 +37,18 @@ pub struct ViewArgs {
     #[arg(long, default_value_t = 0)]
     pub port: u16,
     /// Open the URL in the system browser.
+    #[arg(long)]
+    pub open: bool,
+}
+
+#[derive(clap::Args)]
+pub struct ExportArgs {
+    /// A decision directory (`.../decision-<ms>-<pid>`) holding `report.json`.
+    pub dir: PathBuf,
+    /// Where to write the page; `<dir>/report.html` by default.
+    #[arg(long)]
+    pub out: Option<PathBuf>,
+    /// Open the page in the system browser.
     #[arg(long)]
     pub open: bool,
 }
@@ -60,8 +75,45 @@ pub struct PruneArgs {
 pub fn run(args: &ReportArgs) -> i32 {
     match &args.command {
         ReportCommand::View(a) => view(a),
+        ReportCommand::Export(a) => export(a),
         ReportCommand::Rebuild(a) => rebuild(a),
         ReportCommand::Prune(a) => prune(a),
+    }
+}
+
+fn export(args: &ExportArgs) -> i32 {
+    if !args.dir.join(report::REPORT_FILE).is_file() {
+        eprintln!(
+            "squint: {} holds no {}; run `squint report rebuild` first",
+            args.dir.display(),
+            report::REPORT_FILE
+        );
+        return EXIT_USAGE;
+    }
+    let out = args
+        .out
+        .clone()
+        .unwrap_or_else(|| args.dir.join("report.html"));
+    match crate::viewer::export(&args.dir, &out) {
+        Ok(bytes) => {
+            println!(
+                "wrote {} ({:.1} MB)",
+                out.display(),
+                bytes as f64 / 1_000_000.0
+            );
+            if args.open {
+                let url = match std::path::absolute(&out) {
+                    Ok(p) => format!("file://{}", p.display()),
+                    Err(_) => out.display().to_string(),
+                };
+                crate::viewer::open_in_browser(&url);
+            }
+            0
+        }
+        Err(e) => {
+            eprintln!("squint: cannot export {}: {e}", args.dir.display());
+            squint_core::run::EXIT_ERROR
+        }
     }
 }
 

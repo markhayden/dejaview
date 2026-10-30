@@ -1,9 +1,14 @@
 //! `squint report view`: serves a decision directory and the static viewer on loopback. The
 //! viewer assets are embedded, so the installed binary needs nothing else; the server answers
-//! only `GET` and `HEAD` for the page, its script and stylesheet, `report.json`, and the run
-//! artifacts, named strictly (`run-<n>/artifacts/<sha256>`), so nothing outside the directory can
-//! be read; a request whose `Host` is not this server's loopback address is refused, and the
-//! page's policy keeps it from loading anything from elsewhere.
+//! only `GET` and `HEAD` for the page, its scripts and stylesheet, `report.json`, the run
+//! journals and the run artifacts, named strictly (`run-<n>/journal.jsonl`,
+//! `run-<n>/artifacts/<sha256>`), so nothing outside the directory can be read; a request whose
+//! `Host` is not this server's loopback address is refused, and the page's policy keeps it from
+//! loading anything from elsewhere.
+//!
+//! `squint report export` writes the same page as one self-contained HTML file: the assets
+//! inlined, and `report.json`, the journals and every artifact carried in `SQUINT_BUNDLE`, so the
+//! page opens from disk with no server.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
@@ -13,6 +18,7 @@ const INDEX_HTML: &str = include_str!("../viewer/index.html");
 const VIEWER_JS: &str = include_str!("../viewer/viewer.js");
 const GEOMETRY_JS: &str = include_str!("../viewer/geometry.js");
 const VIEWER_CSS: &str = include_str!("../viewer/viewer.css");
+const TIMELINE_JS: &str = include_str!("../viewer/timeline.js");
 
 /// The largest request head the server reads.
 const MAX_HEAD_BYTES: usize = 8 * 1024;
@@ -139,6 +145,7 @@ fn route(dir: &Path, path: &str) -> Response {
         "/viewer.js" => Response::text(200, "text/javascript; charset=utf-8", VIEWER_JS),
         "/geometry.js" => Response::text(200, "text/javascript; charset=utf-8", GEOMETRY_JS),
         "/viewer.css" => Response::text(200, "text/css; charset=utf-8", VIEWER_CSS),
+        "/timeline.js" => Response::text(200, "text/javascript; charset=utf-8", TIMELINE_JS),
         "/report.json" => match std::fs::read(dir.join("report.json")) {
             Ok(body) => Response {
                 status: 200,
@@ -147,7 +154,7 @@ fn route(dir: &Path, path: &str) -> Response {
             },
             Err(_) => Response::not_found(),
         },
-        other => match artifact_path(other) {
+        other => match artifact_path(other).or_else(|| journal_path(other)) {
             Some(rel) => match std::fs::read(dir.join(rel)) {
                 Ok(body) => Response {
                     status: 200,
@@ -177,6 +184,104 @@ fn artifact_path(path: &str) -> Option<PathBuf> {
             .join("artifacts")
             .join(sha),
     )
+}
+
+/// `/run-<n>/journal.jsonl` and nothing else, as a relative path.
+fn journal_path(path: &str) -> Option<PathBuf> {
+    let rest = path.strip_prefix("/run-")?;
+    let n = rest.strip_suffix("/journal.jsonl")?;
+    if n.is_empty() || !n.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    Some(PathBuf::from(format!("run-{n}")).join("journal.jsonl"))
+}
+
+/// Writes the self-contained page for a decision directory and returns its size in bytes.
+pub fn export(dir: &Path, out: &Path) -> std::io::Result<u64> {
+    let mut files = serde_json::Map::new();
+    let mut add = |rel: String, body: Vec<u8>| {
+        let kind = if rel.ends_with(".jsonl") {
+            "application/x-ndjson"
+        } else {
+            sniff(&body)
+        };
+        let entry = match String::from_utf8(body) {
+            Ok(text) if !kind.starts_with("image/") => {
+                serde_json::json!({ "type": kind, "text": text })
+            }
+            Ok(text) => serde_json::json!({
+                "type": kind,
+                "base64": squint_core::image::base64_encode(text.as_bytes())
+            }),
+            Err(e) => serde_json::json!({
+                "type": kind,
+                "base64": squint_core::image::base64_encode(e.as_bytes())
+            }),
+        };
+        files.insert(rel, entry);
+    };
+    add(
+        "report.json".to_string(),
+        std::fs::read(dir.join("report.json"))?,
+    );
+    let mut runs: Vec<PathBuf> = std::fs::read_dir(dir)?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| {
+            p.is_dir()
+                && p.file_name()
+                    .and_then(|n| n.to_str())
+                    .and_then(|n| n.strip_prefix("run-"))
+                    .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+        })
+        .collect();
+    runs.sort();
+    for run in runs {
+        let name = run
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default()
+            .to_string();
+        if let Ok(body) = std::fs::read(run.join("journal.jsonl")) {
+            add(format!("{name}/journal.jsonl"), body);
+        }
+        let mut artifacts: Vec<PathBuf> = std::fs::read_dir(run.join("artifacts"))
+            .map(|d| d.flatten().map(|e| e.path()).collect())
+            .unwrap_or_default();
+        artifacts.sort();
+        for a in artifacts {
+            let Some(sha) = a.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            if artifact_path(&format!("/{name}/artifacts/{sha}")).is_some() {
+                add(format!("{name}/artifacts/{sha}"), std::fs::read(&a)?);
+            }
+        }
+    }
+    let bundle = serde_json::json!({ "version": 1, "files": files });
+    // `</` inside a script element would end it early; JSON allows the escaped slash.
+    let bundle = serde_json::to_string(&bundle)?.replace("</", "<\\/");
+    let page = INDEX_HTML
+        .replace(
+            r#"<link rel="stylesheet" href="viewer.css">"#,
+            &format!("<style>\n{VIEWER_CSS}</style>"),
+        )
+        .replace(
+            r#"<script src="geometry.js"></script>"#,
+            &format!(
+                "<script>globalThis.SQUINT_BUNDLE = {bundle};</script>\n<script>\n{GEOMETRY_JS}</script>"
+            ),
+        )
+        .replace(
+            r#"<script src="timeline.js"></script>"#,
+            &format!("<script>\n{TIMELINE_JS}</script>"),
+        )
+        .replace(
+            r#"<script src="viewer.js"></script>"#,
+            &format!("<script>\n{VIEWER_JS}</script>"),
+        );
+    std::fs::write(out, page.as_bytes())?;
+    Ok(page.len() as u64)
 }
 
 /// Artifacts carry no type of their own; images and JSON are told apart by their first bytes.

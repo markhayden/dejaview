@@ -119,6 +119,11 @@ fn report_view_serves_the_viewer_the_report_and_only_the_run_artifacts() {
     assert!(head.contains("text/javascript"), "{head}");
     let geometry = String::from_utf8_lossy(&geometry).to_string();
     assert!(geometry.contains("squintGeometry"));
+    let (status, head, timeline) = get(&url, "/timeline.js");
+    assert_eq!(status, 200);
+    assert!(head.contains("text/javascript"), "{head}");
+    let timeline = String::from_utf8_lossy(&timeline).to_string();
+    assert!(timeline.contains("squintTimeline"));
     let (status, _, css) = get(&url, "/viewer.css");
     assert_eq!(status, 200);
     // Nothing in the page reaches off the server that served it: no absolute URL anywhere but
@@ -129,6 +134,7 @@ fn report_view_serves_the_viewer_the_report_and_only_the_run_artifacts() {
         ("index.html", &page),
         ("viewer.js", &js),
         ("geometry.js", &geometry),
+        ("timeline.js", &timeline),
         ("viewer.css", &css),
     ] {
         for (i, _) in text.match_indices("http") {
@@ -165,10 +171,20 @@ fn report_view_serves_the_viewer_the_report_and_only_the_run_artifacts() {
     assert_eq!(status, 200);
     assert!(head.contains("application/json"), "{head}");
 
+    // The run's journal, for the timeline.
+    let (status, _, body) = get(&url, "/run-1/journal.jsonl");
+    assert_eq!(status, 200);
+    assert_eq!(
+        body,
+        std::fs::read(dir.join("run-1/journal.jsonl")).unwrap()
+    );
+
     // Nothing else: traversal, other files of the directory, unknown artifacts, other methods.
     for path in [
         "/run-1/artifacts/../../report.json",
-        "/run-1/journal.jsonl",
+        "/run-1/../journal.jsonl",
+        "/run-x/journal.jsonl",
+        "/run-1/journal.jsonl.bak",
         "/run-1/frames/raw_candidate.png",
         "/decision.json",
         "/../Cargo.toml",
@@ -217,4 +233,81 @@ fn report_view_serves_the_viewer_the_report_and_only_the_run_artifacts() {
         .output()
         .unwrap();
     assert_eq!(o.status.code(), Some(64));
+
+    // The export: one page carrying the same files, nothing loaded from anywhere.
+    let page_path = out.join("exported.html");
+    let o = Command::new(env!("CARGO_BIN_EXE_squint"))
+        .args([
+            "report",
+            "export",
+            dir.to_str().unwrap(),
+            "--out",
+            page_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(
+        o.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    let exported = std::fs::read_to_string(&page_path).unwrap();
+    for asset in ["viewer.js", "geometry.js", "timeline.js", "viewer.css"] {
+        assert!(
+            !exported.contains(&format!("\"{asset}\"")),
+            "{asset} is inlined, not referenced"
+        );
+    }
+    let start =
+        exported.find("globalThis.SQUINT_BUNDLE = ").unwrap() + "globalThis.SQUINT_BUNDLE = ".len();
+    let end = start + exported[start..].find(";</script>").unwrap();
+    let bundle: serde_json::Value = serde_json::from_str(&exported[start..end]).unwrap();
+    let files = bundle["files"].as_object().unwrap();
+    assert_eq!(
+        files["report.json"]["text"].as_str().unwrap().as_bytes(),
+        report.as_slice()
+    );
+    assert!(files.contains_key("run-1/journal.jsonl"));
+    assert_eq!(
+        files[&format!("run-1/artifacts/{candidate}")]["type"]
+            .as_str()
+            .unwrap()
+            .split('/')
+            .next(),
+        Some("image")
+    );
+    let image = squint_core::image::base64_decode(
+        files[&format!("run-1/artifacts/{candidate}")]["base64"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        image,
+        std::fs::read(dir.join("run-1/artifacts").join(candidate)).unwrap()
+    );
+    let artifacts = std::fs::read_dir(dir.join("run-1/artifacts"))
+        .unwrap()
+        .count();
+    assert_eq!(
+        files
+            .keys()
+            .filter(|k| k.starts_with("run-1/artifacts/"))
+            .count(),
+        artifacts,
+        "every artifact is embedded"
+    );
+    // The default destination is report.html in the decision directory.
+    let o = Command::new(env!("CARGO_BIN_EXE_squint"))
+        .args(["report", "export", dir.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert_eq!(o.status.code(), Some(0));
+    assert!(dir.join("report.html").is_file());
+    let o = Command::new(env!("CARGO_BIN_EXE_squint"))
+        .args(["report", "export", out.to_str().unwrap()])
+        .output()
+        .unwrap();
+    assert_eq!(o.status.code(), Some(64), "no report.json is a usage error");
 }

@@ -42,3 +42,12 @@ figcaption { font-size: 12px; color: var(--muted); margin-top: 6px; }
 .warn { color: var(--unsure); }
 .err { color: var(--fail); }
 details summary { cursor: pointer; color: var(--muted); }
+table.timeline td.num { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+table.timeline td.track { width: 40%; min-width: 160px; position: relative; padding: 0; }
+table.timeline .bar { position: absolute; top: 6px; bottom: 6px; border-radius: 2px; background: var(--item); }
+table.timeline .bar.ok { background: var(--pass); } table.timeline .bar.failed { background: var(--fail); }
+table.timeline .bar.invalid_args, table.timeline .bar.warn { background: var(--unsure); }
+table.timeline .bar.not_run, table.timeline .bar.pending { background: var(--observed); }
+table.timeline .bar.measured_nothing, table.timeline .bar.not_applicable { background: var(--region); }
+table.timeline td.status.failed { color: var(--fail); } table.timeline td.status.invalid_args { color: var(--unsure); }
+table.timeline td.detail { font-size: 12px; color: var(--muted); word-break: break-word; }

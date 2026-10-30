@@ -57,4 +57,6 @@ done
 [ -n "$url" ] || { echo "report view printed no URL: $(cat view.log)" >&2; exit 1; }
 curl -fsS "$url" | grep -q '<title>squint report</title>' || { echo "report view did not serve the viewer at $url" >&2; exit 1; }
 curl -fsS "${url}report.json" | grep -q '"report_version":1' || { echo "report view did not serve report.json" >&2; exit 1; }
+"$bin" report export view-dir --out view-dir/page.html > /dev/null
+grep -q 'globalThis.SQUINT_BUNDLE = ' view-dir/page.html || { echo "report export wrote no self-contained page" >&2; exit 1; }
 echo "offline smoke ok: $version"

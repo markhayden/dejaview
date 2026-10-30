@@ -56,14 +56,14 @@ rm -rf "$probe"
 
 # check-packaging: the shipped assets are listed as embedded by the crates that own them.
 out="$(scripts/check-packaging.sh 2>&1)"
-for want in "squint-core: embeds .*prompts/v1.md" "squint-core: embeds .*rules/source-fidelity.toml" "squint-providers: embeds catalog.toml" "squint-cli: embeds viewer/geometry.js, viewer/index.html, viewer/viewer.css, viewer/viewer.js"; do
+for want in "squint-core: embeds .*prompts/v1.md" "squint-core: embeds .*rules/source-fidelity.toml" "squint-providers: embeds catalog.toml" "squint-cli: embeds viewer/geometry.js, viewer/index.html, viewer/timeline.js, viewer/viewer.css, viewer/viewer.js"; do
   if grep -Eq "$want" <<< "$out"; then pass=$((pass+1));
   else echo "FAIL: check-packaging did not list '$want': $out" >&2; fail=$((fail+1)); fi
 done
 
 # offline-smoke: a binary that answers every command but exits 3 instead of 64 on the missing
-# credential must fail, one that prints no SF1 from `rules show` must fail, and one whose
-# `report view` serves nothing must fail.
+# credential must fail, one that prints no SF1 from `rules show` must fail, one whose
+# `report view` serves nothing must fail, and one whose `report export` writes no bundle must fail.
 probe="$(mktemp -d)"
 cat > "$probe/squint" <<'STUB'
 #!/usr/bin/env bash
@@ -73,6 +73,11 @@ case "$1" in
   rules) echo "${STUB_RULES-SF1 must_hold candidate}" ;;
   check) echo "auth: set ANTHROPIC_API_KEY" >&2; exit "${STUB_CHECK_EXIT-64}" ;;
   report)
+    # `report export <dir> --out <page>`: write a page carrying the bundle, as the binary does.
+    if [ "$2" = export ]; then
+      [ "${STUB_EXPORT-bundle}" = bundle ] && echo 'globalThis.SQUINT_BUNDLE = {};' > "$5"
+      exit 0
+    fi
     # `report view <dir> --port 0`: serve the directory on loopback and print a URL line, as the
     # binary does; python's server prints its own URL in the same shape.
     [ "${STUB_VIEW-serve}" = serve ] || exit 0
@@ -92,6 +97,9 @@ else echo "FAIL: offline-smoke accepted a rules show without SF1: $out" >&2; fai
 out="$(STUB_VIEW=none scripts/offline-smoke.sh "$probe/squint" 2>&1 || true)"
 if grep -q 'printed no URL' <<< "$out"; then pass=$((pass+1));
 else echo "FAIL: offline-smoke accepted a report view that serves nothing: $out" >&2; fail=$((fail+1)); fi
+out="$(STUB_EXPORT=none scripts/offline-smoke.sh "$probe/squint" 2>&1 || true)"
+if grep -q 'wrote no self-contained page' <<< "$out"; then pass=$((pass+1));
+else echo "FAIL: offline-smoke accepted a report export that wrote no bundle: $out" >&2; fail=$((fail+1)); fi
 rm -rf "$probe"
 
 # check-attribution: a file with an assistant trailer or a "Generated with" line fails; a plain

@@ -1,8 +1,9 @@
 # Report viewer
 
-The static viewer under `crates/squint-cli/viewer/` (`index.html`, `viewer.js`, `geometry.js`, `viewer.css`):
-plain HTML and vanilla JavaScript, no build step, embedded in the binary so an installed
-`squint` carries it. Equirectangular overlays arrive in task 4.2b.
+The static viewer under `crates/squint-cli/viewer/` (`index.html`, `viewer.js`, `geometry.js`,
+`timeline.js`, `viewer.css`): plain HTML and vanilla JavaScript, no build step, embedded in the
+binary so an installed `squint` carries it. It is served live by `report view`, or written as one
+self-contained page by `report export`.
 
 ## Serving a run
 
@@ -18,8 +19,9 @@ The server answers `GET` and `HEAD` only, for exactly these paths:
 
 | Path | Content |
 |---|---|
-| `/`, `/viewer.js`, `/geometry.js`, `/viewer.css` | the embedded viewer |
+| `/`, `/viewer.js`, `/geometry.js`, `/timeline.js`, `/viewer.css` | the embedded viewer |
 | `/report.json` | the decision's report, byte for byte |
+| `/run-<n>/journal.jsonl` | a run's journal, for the timeline |
 | `/run-<n>/artifacts/<sha256>` | a run artifact: an image the model saw, a request or response body, a tool envelope; typed by its first bytes |
 
 Everything else is `404`, so nothing outside the decision directory (and nothing in it beyond the
@@ -34,6 +36,27 @@ The geometry is held to the Rust reference by `viewer_geometry` in the CLI tests
 footprints in `fixtures/render/view-footprints.json` are computed by `frames::sphere` and
 recomputed by `geometry.js` under `node` when it is on the path (the comparison is reported as
 skipped otherwise).
+
+## Exporting a run: the diagnostics page
+
+```
+squint report export <decision dir> [--out <file>] [--open]
+```
+
+Writes one HTML file (`<decision dir>/report.html` by default) that opens from disk with no
+server: the viewer's scripts and stylesheet inlined, and `report.json`, every run's journal and
+every run artifact (the images the model saw, each request and response body, each tool
+envelope) carried in a `SQUINT_BUNDLE` object the viewer reads instead of the server. A decision
+of the arm C run is about 5 MB; the page grows with the images a run saw. It is the page to keep
+beside a result or to send to someone.
+
+Both forms open each run with a **timeline**: the funnel of the run as a waterfall from its
+journal, one row per step in order (resolve, prepare, reserve, each model turn with its stop
+reason and cost, each tool call with its outcome, a repair, the submission, the verdict), each
+with its start, duration and status, and a bar on one time axis. A turn spans its send to its
+receipt (or the failed attempt), a tool call its dispatch to its return; a call the harness
+refused is a point, and a call the tool refused closes with its words. `timeline.js` builds the
+rows and is held to a fixed journal by `viewer_timeline` in the CLI tests under `node`.
 
 ## What it shows
 

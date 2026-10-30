@@ -2,9 +2,25 @@
 // from, shows every image the model saw with every location overlaid in raw coordinates of its
 // root image through the frame tree, every tool result, the checklist, the aggregation rows and
 // the decision table. No build step; requests go only to the server that served this page.
+// An exported page (`squint report export`) carries the same files in `SQUINT_BUNDLE` and needs
+// no server at all.
 'use strict';
 
 const SUPPORTED_REPORT_VERSIONS = [1];
+
+/// The decision directory's files: from the export's bundle when there is one, else the server.
+const BUNDLE = globalThis.SQUINT_BUNDLE || null;
+
+async function getText(path) {
+  if (BUNDLE) {
+    const f = BUNDLE.files[path];
+    if (!f) throw new Error(`${path} is not in this export`);
+    return f.text !== undefined ? f.text : atob(f.base64);
+  }
+  const resp = await fetch(path, { cache: 'no-store' });
+  if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
+  return resp.text();
+}
 
 const $app = document.getElementById('app');
 const $status = document.getElementById('status');
@@ -65,8 +81,18 @@ function money(x) {
   return x === null || x === undefined ? '—' : `$${Number(x).toFixed(4)}`;
 }
 
-function artifactUrl(run, ref) {
+function artifactPath(run, ref) {
   return ref ? `run-${run}/artifacts/${ref.sha256}` : null;
+}
+
+function artifactUrl(run, ref) {
+  const path = artifactPath(run, ref);
+  if (!path || !BUNDLE) return path;
+  const f = BUNDLE.files[path];
+  if (!f) return null;
+  return f.text !== undefined
+    ? `data:${f.type};charset=utf-8,${encodeURIComponent(f.text)}`
+    : `data:${f.type};base64,${f.base64}`;
 }
 
 function artifactLink(run, ref, text) {
@@ -191,9 +217,7 @@ async function locations(run) {
   for (const call of run.tool_calls || []) {
     if (!call.envelope) continue;
     try {
-      const resp = await fetch(artifactUrl(run.run, call.envelope));
-      if (!resp.ok) continue;
-      const env = await resp.json();
+      const env = JSON.parse(await getText(artifactPath(run.run, call.envelope)));
       call._envelope = env;
       for (const region of env.regions || []) {
         if (region.location) out.push({ loc: region.location, cls: 'region', title: `${call.tool} ${region.id}: ${region.label || ''}` });
@@ -311,12 +335,50 @@ function turnsSection(run) {
   return sec;
 }
 
+// ---- timeline -----------------------------------------------------------------------------
+
+/// The run's funnel as a waterfall from its journal: every step with its start, duration,
+/// outcome and, for a model turn, its cost (`timeline.js` builds the rows).
+async function timelineSection(run) {
+  const sec = el('section', null, el('h2', { text: `Run ${run.run}: timeline` }));
+  let events;
+  try {
+    events = squintTimeline.parse(await getText(`run-${run.run}/journal.jsonl`));
+  } catch (e) {
+    sec.append(el('p', { class: 'mono', text: `no journal: ${e.message}` }));
+    return sec;
+  }
+  const rows = squintTimeline.rows(events);
+  const total = Math.max(1, ...rows.map(r => r.start_ms + r.duration_ms));
+  const turnsCost = rows.filter(r => r.step === 'turn').reduce((s, r) => s + (r.cost_usd || 0), 0);
+  sec.append(el('div', { class: 'facts' },
+    fact('wall time', `${(total / 1000).toFixed(1)} s`),
+    fact('model turns', rows.filter(r => r.step === 'turn').length),
+    fact('tool calls', rows.filter(r => r.step === 'tool').length),
+    fact('turn cost', money(turnsCost))));
+  const t = el('table', { class: 'timeline' });
+  t.append(el('thead', null, el('tr', null, ...['step', 'status', 'start', 'duration', 'cost', '', 'detail'].map(c => el('th', { text: c })))));
+  const body = el('tbody');
+  for (const r of rows) {
+    const bar = el('div', { class: `bar ${r.status}`, style: `left:${(100 * r.start_ms / total).toFixed(3)}%;width:${Math.max(0.3, 100 * r.duration_ms / total).toFixed(3)}%`, title: `${r.duration_ms} ms` });
+    body.append(el('tr', null,
+      el('td', { text: r.label }),
+      el('td', { class: `status ${r.status}`, text: r.status }),
+      el('td', { class: 'num', text: `${(r.start_ms / 1000).toFixed(2)} s` }),
+      el('td', { class: 'num', text: `${r.duration_ms} ms` }),
+      el('td', { class: 'num', text: r.cost_usd === undefined || r.cost_usd === null ? '' : money(r.cost_usd) }),
+      el('td', { class: 'track' }, bar),
+      el('td', { class: 'detail', text: r.detail })));
+  }
+  t.append(body);
+  sec.append(t);
+  return sec;
+}
+
 async function main() {
   let report;
   try {
-    const resp = await fetch('report.json', { cache: 'no-store' });
-    if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
-    report = await resp.json();
+    report = JSON.parse(await getText('report.json'));
   } catch (e) {
     $status.textContent = `cannot load report.json: ${e.message}`;
     $status.className = 'err';
@@ -331,6 +393,7 @@ async function main() {
   $status.textContent = `${report.use_case} · ${(report.runs || []).length} run(s) · report_version ${report.report_version}`;
   $app.append(header(report));
   for (const run of report.runs || []) {
+    $app.append(await timelineSection(run));
     const locs = await locations(run);
     $app.append(imagesSection(run, locs));
     $app.append(toolsSection(run));

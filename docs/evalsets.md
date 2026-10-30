@@ -104,11 +104,10 @@ offline self-test with the fake generator); the sets themselves are under `evals
 
 ```
 cd scripts/sets
-uv run squint-sets build --plan <plan.toml> --out evalsets/<use-case>/<set> --owner <owner storage>
+uv run squint-sets build --plan <plan.toml> --out <owner storage>/build/evalsets/<set id> --owner <owner storage>
 # review <owner storage>/<set id>/contact-<family>.png and labels-draft.toml:
-# set each label's status to "confirmed" or "struck", fill adjudicated_on
-uv run squint-sets promote --draft <owner storage>/<set id>/labels-draft.toml --set evalsets/<use-case>/<set>
-squint sets check evalsets/
+# set each label's status to "confirmed" or "struck"
+cd ../.. && scripts/sets-publish.sh <set id> "<attestation>"
 ```
 
 `rebuild --item <id> [--seed-offset N]` regenerates one item from the family's images already on

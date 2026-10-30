@@ -1,0 +1,136 @@
+# Built by squint-sets; labels confirmed by the owner.
+[set]
+id = "source-fidelity/blind-v2"
+use_case = "source-fidelity"
+split = "blind"
+licence = "CC-BY-4.0"
+images_repo = "github.com/markhayden/squint-evalsets"
+images_rev = "c1c41c216338594b7e201ef313003bfe8a0f0b0f"
+labels_sha256 = "1a1f205f29079fd5499013ce9719b62ada3e7ae3b5404e97b408f36e41af0ba1"
+families = "families.toml"
+rules = { base = "source-fidelity", version = 1 }
+
+[[item]]
+id = "market-square-1"
+family = "market-square"
+job = "items/market-square-1/job.toml"
+
+[[item]]
+id = "market-square-2"
+family = "market-square"
+job = "items/market-square-2/job.toml"
+
+[[item]]
+id = "market-square-3"
+family = "market-square"
+job = "items/market-square-3/job.toml"
+
+[[item]]
+id = "market-square-4"
+family = "market-square"
+job = "items/market-square-4/job.toml"
+
+[[item]]
+id = "market-square-5"
+family = "market-square"
+job = "items/market-square-5/job.toml"
+
+[[item]]
+id = "terraced-street-1"
+family = "terraced-street"
+job = "items/terraced-street-1/job.toml"
+
+[[item]]
+id = "terraced-street-2"
+family = "terraced-street"
+job = "items/terraced-street-2/job.toml"
+
+[[item]]
+id = "terraced-street-3"
+family = "terraced-street"
+job = "items/terraced-street-3/job.toml"
+
+[[item]]
+id = "terraced-street-4"
+family = "terraced-street"
+job = "items/terraced-street-4/job.toml"
+
+[[item]]
+id = "terraced-street-5"
+family = "terraced-street"
+job = "items/terraced-street-5/job.toml"
+
+[[item]]
+id = "alpine-hut-1"
+family = "alpine-hut"
+job = "items/alpine-hut-1/job.toml"
+
+[[item]]
+id = "alpine-hut-2"
+family = "alpine-hut"
+job = "items/alpine-hut-2/job.toml"
+
+[[item]]
+id = "alpine-hut-3"
+family = "alpine-hut"
+job = "items/alpine-hut-3/job.toml"
+
+[[item]]
+id = "alpine-hut-4"
+family = "alpine-hut"
+job = "items/alpine-hut-4/job.toml"
+
+[[item]]
+id = "alpine-hut-5"
+family = "alpine-hut"
+job = "items/alpine-hut-5/job.toml"
+
+[[item]]
+id = "boatyard-1"
+family = "boatyard"
+job = "items/boatyard-1/job.toml"
+
+[[item]]
+id = "boatyard-2"
+family = "boatyard"
+job = "items/boatyard-2/job.toml"
+
+[[item]]
+id = "boatyard-3"
+family = "boatyard"
+job = "items/boatyard-3/job.toml"
+
+[[item]]
+id = "boatyard-4"
+family = "boatyard"
+job = "items/boatyard-4/job.toml"
+
+[[item]]
+id = "boatyard-5"
+family = "boatyard"
+job = "items/boatyard-5/job.toml"
+
+[[item]]
+id = "seaside-promenade-1"
+family = "seaside-promenade"
+job = "items/seaside-promenade-1/job.toml"
+
+[[item]]
+id = "seaside-promenade-2"
+family = "seaside-promenade"
+job = "items/seaside-promenade-2/job.toml"
+
+[[item]]
+id = "seaside-promenade-3"
+family = "seaside-promenade"
+job = "items/seaside-promenade-3/job.toml"
+
+[[item]]
+id = "seaside-promenade-4"
+family = "seaside-promenade"
+job = "items/seaside-promenade-4/job.toml"
+
+[[item]]
+id = "seaside-promenade-5"
+family = "seaside-promenade"
+job = "items/seaside-promenade-5/job.toml"

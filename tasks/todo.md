@@ -115,7 +115,7 @@ tag.
 
 ## M6 Confirmation
 - [x] Owner decision on ADR 0017 (2026-10-30): option 1, a harder blind set and a second initial gate of `regions` at `gate.hypotheses = 2`; PLAN task 6.0
-- [ ] Task 6.0: plan blind-v2 (25+ items, 5+ new families, hard for the control, opaque ids) in owner storage; owner builds and adjudicates; seal; score the second initial gate
+- [ ] Task 6.0: blind-v2 planned (seed 20261030), built, owner-confirmed (25 of 25) and sealed 2026-10-30; next: the gate matrix at `gate.hypotheses = 2` with the 5.6 configuration, then score the second initial gate of `regions`
 - [ ] 6.1 Confirmation set (50+, two batches of 25)
 - [ ] 6.2 Confirmation gate and admission record
 - [ ] Checkpoint M6 → tag `m6`

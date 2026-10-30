@@ -1,0 +1,20 @@
+# Subject or scene families; a family never appears in more than one split.
+[[family]]
+id = "market-square"
+description = "a cobbled town square with six market stalls under striped canopies, a stone fountain, a single iron lamp post and a church tower with a clock"
+
+[[family]]
+id = "terraced-street"
+description = "a row of five terraced houses with coloured front doors and five chimney stacks, a red post box, a street lamp and a parked green car"
+
+[[family]]
+id = "alpine-hut"
+description = "a mountain hut with a stone base and wooden upper storey with a balcony, three picnic tables in front, a flagpole with a flag and a wooden signpost"
+
+[[family]]
+id = "boatyard"
+description = "a boatyard slipway with four upturned rowing boats in a row, a yellow crane, a workshop with a roller door and an old anchor on display"
+
+[[family]]
+id = "seaside-promenade"
+description = "a seaside promenade with five beach huts in a row, a bandstand, a coin telescope on the railing and a bench"

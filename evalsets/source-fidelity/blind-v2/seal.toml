@@ -1,0 +1,12 @@
+[seal]
+sha256 = "649ea5f166405a90e989bb737e3fbdf352f2484f437e564958de619a5831f38d"
+created = "2026-10-30T18:11:09Z"
+attestation = "Owner reviewed all 25 contact-sheet items on 2026-10-30; every draft label matches its construction; no judge, tool or agent has seen the items."
+
+[seal.components]
+items = "1ce560bc73a8eb23940bf9a06b04954cc2ec9f4c39bfbb384e9e668807e61016"
+families = "7c0f911b63f1ee51a33c1123cab521ceca351c855ba661e2145673b85a285854"
+jobs = "71d88b0891b8abf4171c7885a24592ad3f83abbb50e46099026f13ed1dd8d9bc"
+images = "634428f22a162db1cb8f130878c7135702e89204704f71ced846a1e59a565d51"
+rules = "5c89a8178b5d389648013f543b02f2933be306ff72f7b27de3168ca47288ec56"
+labels = "1a1f205f29079fd5499013ce9719b62ada3e7ae3b5404e97b408f36e41af0ba1"

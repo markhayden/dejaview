@@ -1,0 +1,23 @@
+# The second initial gate of the `regions` tool for source fidelity (PLAN.md task 6.0, ADR 0017):
+# the first, on blind-v1, was rejected because arm C detected every planted failure. Same frozen
+# judging configuration, model, arms, decision runs and bootstrap as the first gate, on the harder
+# sealed set blind-v2. Two hypotheses: the earlier rejected attempt counts, so the interval uses the
+# Bonferroni-adjusted percentiles 0.0125 and 0.9875. Frozen here before the labels are unsealed.
+[matrix]
+name = "gate-regions-initial-2-2026-10"
+config = "evalsets/matrix/gate-regions-config.toml"
+sets = ["source-fidelity/blind-v2"]
+arms = ["C", "D_regions"]
+decision_runs = 1
+repetitions = 1
+spend_cap_usd = 25.0
+
+[matrix.gate]
+seed = 20261030
+resamples = 10000
+hypotheses = 2
+
+[[matrix.models]]
+profile = "google-ai-studio"
+model = "gemini-4-argon"
+account = "google:${SQUINT_GOOGLE_ACCOUNT}"

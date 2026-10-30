@@ -1,0 +1,42 @@
+# Item of source-fidelity/blind-v2; built by construction, see the owner's record.
+[job]
+use_case = "source-fidelity"
+brief = "Restyle the scene; keep the structure and every named subject, including how many there are."
+
+[[job.requirements]]
+id = "RQ1"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+text = "The five beach huts keeps its identity, shape, position and extent relative to the source."
+
+[[job.requirements]]
+id = "RQ2"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+text = "The bandstand keeps its identity, shape, position and extent relative to the source."
+
+[[job.requirements]]
+id = "RQ3"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+text = "The coin telescope keeps its identity, shape, position and extent relative to the source."
+
+[[job.requirements]]
+id = "RQ4"
+kind = "must_hold"
+scope = ["candidate"]
+evidence = ["source"]
+text = "The bench keeps its identity, shape, position and extent relative to the source."
+
+[[job.images]]
+id = "candidate"
+role = "candidate"
+source = { path = "items/seaside-promenade-2/candidate.png", sha256 = "8d1040c144e9870fd2e19cd33ea1d168fabaec01cdc5ff877b3526ed5b243530" }
+
+[[job.images]]
+id = "source"
+role = "source"
+source = { path = "families/seaside-promenade/source.png", sha256 = "304a77b1527ed79eb1becb320860aa097e0dc4d46374f8039afc2a0b19f8dcfb" }

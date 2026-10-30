@@ -506,13 +506,14 @@ fn github_image_urls_name_the_pinned_revision() {
 fn the_published_sets_are_consistent_at_the_manifest_level() {
     // Offline: the images live in the other repository, so only manifests, families and labels
     // are read here. Every published set is labelled in full, sized as its split demands, and no
-    // family of a use case appears in two splits; the README lists each one.
+    // family of a use case appears in two splits; the README lists each one. A sealed blind set
+    // carries only its labels' hash, the labels being in owner storage until its gate.
     use squint_eval::sets::{Families, Labels, Manifest, Split};
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../evalsets");
     squint_eval::sets::check_families(&root).unwrap();
     let readme = std::fs::read_to_string(root.join("README.md")).unwrap();
     let dirs = squint_eval::sets::discover(&root).unwrap();
-    assert_eq!(dirs.len(), 11, "{dirs:?}");
+    assert_eq!(dirs.len(), 12, "{dirs:?}");
     for dir in dirs {
         let manifest: Manifest =
             toml::from_str(&std::fs::read_to_string(dir.join("set.toml")).unwrap()).unwrap();
@@ -529,6 +530,20 @@ fn the_published_sets_are_consistent_at_the_manifest_level() {
             format!("`{id}`")
         };
         assert!(readme.contains(&row), "README.md lists {id}");
+        // blind-v2 (ADR 0017) is sealed for the second initial gate of regions.
+        if id == "source-fidelity/blind-v2" {
+            assert_eq!(manifest.set.split, Split::Blind, "{id}");
+            assert!(
+                manifest.set.labels.is_none(),
+                "{id}: no labels beside a blind set"
+            );
+            assert!(manifest.set.labels_sha256.is_some(), "{id}: labels hash");
+            assert!(
+                manifest.item.len() >= 20,
+                "{id}: an initial set holds at least 20"
+            );
+            continue;
+        }
         assert_eq!(
             manifest.item.len(),
             if adversarial { 2 } else { 20 },

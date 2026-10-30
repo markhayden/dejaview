@@ -25,7 +25,7 @@ called admitted.
 | M3 Sets and baseline | set tooling, five public dev sets plus five adversarial sets, eval runner with execution descriptor and durable ledger, metrics, gate lifecycle, viewer, arm A baseline | `m3` |
 | M4 Built-in tools | alignment spike, Tool registry, `view`/`align`/`resize`/`edge_similarity`/`change_map`, full MCP client, arm C, MODEL.md | `m4` |
 | M5 First ML tool | Python pack, provisioning bundle, `regions` and `classes`, sealed blind set, initial gate | `m5` |
-| M6 Confirmation | a distinct sealed set of at least 50 items, confirmation gate, admission record | `m6` |
+| M6 Confirmation | a harder sealed initial set and a second initial gate (ADR 0017); then, only after an admission, a distinct sealed set of at least 50 items, confirmation gate, admission record | `m6` |
 
 Deferred past M6 with their own ADRs: server mode, Bedrock and Vertex profiles, the ChatGPT-plan
 OAuth scheme, `squint tools serve`, scheduled canaries in CI, Vercel and Cloudflare profiles if
@@ -88,7 +88,7 @@ M4  4.0 ← 1.2, 0.4    4.1 ← 1.5a, 1.7a 4.2a ← 4.1, 1.2   4.2b ← 4.2a, 3.
     4.4a ← 1.13, 4.1  4.4b ← 4.4a      4.5 ← 4.2a, 4.3b, 4.3c, 3.8        4.6 ← 0.4
 M5  5.1 ← 4.4b, 1.14  5.3 ← 4.6, 5.1   5.4a ← 5.3        5.4b ← 5.3
     5.2 ← 5.3, 5.4a, 5.4b               5.5 ← 3.2a, 3.1   5.6 ← 5.4a, 5.5, 4.5, 3.5b, 5.2
-M6  6.1 ← 5.6, 0.4    6.2 ← 6.1
+M6  6.0 ← 5.6, ADR 0017    6.1 ← 6.0 (admitted), 0.4    6.2 ← 6.1
 ```
 
 Every M1 task names a CLI scenario that demonstrates its behaviour through the binary using only
@@ -1280,6 +1280,24 @@ split files); the owner reviews and commits the publication; publish
 
 ## Milestone M6: Confirmation
 
+### Task 6.0: Harder initial set and second initial gate (ADR 0017)
+
+**Description.** The first initial gate of `regions` was rejected because the control detected
+every planted failure. Build `source-fidelity/blind-v2`: at least 25 items in at least 5 families
+new to every earlier set, designed so the control sometimes misses (small removals, one subject
+among several alike, partial changes, removals under a strong restyle, changes near panorama
+edges), from a seeded plan in owner storage with opaque item ids, owner-adjudicated, labels
+external, sealed before any run. Score a second initial gate of `regions` with the configuration
+frozen for 5.6 and `gate.hypotheses = 2`; the receipt names ADR 0017. Publish the result whatever
+the outcome; 6.1 and 6.2 proceed only on `admitted (provisional)`.
+
+**Acceptance.** `sets check` and `verify-seal` pass; family disjointness verified by a test; the
+agent never views the blind items; the receipt records two hypotheses and ADR 0017; results and
+findings committed; spend under cap.
+
+**Dependencies.** 5.6, ADR 0017. **Files.** owner storage plan, `evalsets/source-fidelity/blind-v2/`,
+`docs/results/`. **Size.** M; owner time; real money.
+
 ### Task 6.1: Confirmation set
 
 **Description.** At least 50 source-fidelity items, families disjoint from every earlier set,
@@ -1289,12 +1307,12 @@ external, sealed before any run.
 **Acceptance.** `sets check` and `verify-seal` pass; family disjointness against every published
 set verified by a test; owner attestation recorded.
 
-**Dependencies.** 5.6, 0.4 (M6 funding). **Files.** `evalsets/source-fidelity/confirm-v1/`.
+**Dependencies.** 6.0 admitted, 0.4 (M6 funding). **Files.** `evalsets/source-fidelity/confirm-v1/`.
 **Size.** M per batch; owner time.
 
 ### Task 6.2: Confirmation gate and admission record
 
-**Description.** Same frozen configuration as 5.6, referencing its receipt; run C and D_regions;
+**Description.** Same frozen configuration as 6.0, referencing its receipt; run C and D_regions;
 `eval gate --stage confirmation`; owner reviews and commits publication; publish
 `docs/results/gate-regions-confirmation-<date>.md`; `admissions.toml` becomes `confirmed` only if
 both stages are admitted, and arm D then includes `regions`; otherwise the outcome is recorded and

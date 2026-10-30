@@ -1,6 +1,6 @@
 # ADR 0017: After a rejected initial gate
 
-Date: 2026-10-29. Status: proposed (owner decision pending).
+Date: 2026-10-29. Status: accepted 2026-10-30 (option 1; owner decision).
 
 ## Context
 
@@ -41,6 +41,10 @@ A detection gate can only separate arms on items the control sometimes misses.
    it stands (done), and spend the next milestone on another tool or use case where the control is
    weaker, such as reality checks (anatomy, text, shadows), where the baseline showed the most
    variation between models.
+
+## Decision
+
+The owner chose option 1 on 2026-10-30, as recommended below.
 
 ## Recommendation
 

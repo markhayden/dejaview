@@ -1374,7 +1374,9 @@ results hash, stage, outcome, bootstrap seed and interval), and writes the label
 split change as files for the owner to review and commit; it never commits. An interrupted
 scoring resumes from the receipt without rescoring. Admission state lives in
 `evalsets/admissions.toml` (tool, use case, stage, receipt id), and arm D includes only tools whose
-state is `confirmed`.
+state is `confirmed`. A rejected tool may be scored again for the same use case only on a new sealed
+blind set and only under an ADR that counts every earlier initial attempt in the matrix's
+`gate.hypotheses` (ADR 0017).
 
 ## Tech stack
 

@@ -114,7 +114,8 @@ tag.
 - [x] Checkpoint M5 → tag `m5` (2026-10-29: review and coverage passes done, findings fixed or recorded in `docs/reviews/m5-checkpoint.md` with the spec success criteria checked one by one; the two test passes take about three minutes each; README "How it is built" carries the measured results; final artifacts rebuilt: staged-registry install smoke, this machine's release archive and its smoke, the Python bundle's clean install; published to crates.io as squint 0.1.0 on 2026-10-29 after the rename from dejaview (six crates, the `squint-cli` binary crate last under the new-crate rate limit), and `cargo install squint-cli --version 0.1.0 --locked` from outside the repository installs a binary that passes the offline smoke; `m5-ml-tool` merged into `main`)
 
 ## M6 Confirmation
-- [ ] Owner decision on ADR 0017 (2026-10-29): `regions` was rejected at the initial gate, so the confirmation stage cannot run as planned; the ADR proposes a harder blind set and a second initial gate counted at two hypotheses, with a new estimand or moving to another tool as the alternatives
+- [x] Owner decision on ADR 0017 (2026-10-30): option 1, a harder blind set and a second initial gate of `regions` at `gate.hypotheses = 2`; PLAN task 6.0
+- [ ] Task 6.0: plan blind-v2 (25+ items, 5+ new families, hard for the control, opaque ids) in owner storage; owner builds and adjudicates; seal; score the second initial gate
 - [ ] 6.1 Confirmation set (50+, two batches of 25)
 - [ ] 6.2 Confirmation gate and admission record
 - [ ] Checkpoint M6 → tag `m6`

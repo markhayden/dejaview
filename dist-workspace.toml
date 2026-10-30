@@ -24,3 +24,6 @@ publish-jobs = ["./archive-smoke"]
 github-custom-job-permissions = { "archive-smoke" = { contents = "read" } }
 publish-prereleases = true
 github-release = "announce"
+# GitHub retires the macos-14 image dist defaults to on 2026-11-02; the macOS archive builds on
+# macos-15, the same image as the package and archive-smoke workflows.
+github-custom-runners = { "aarch64-apple-darwin" = "macos-15" }

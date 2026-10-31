@@ -26,7 +26,7 @@ called admitted.
 | M4 Built-in tools | alignment spike, Tool registry, `view`/`align`/`resize`/`edge_similarity`/`change_map`, full MCP client, arm C, MODEL.md | `m4` |
 | M5 First ML tool | Python pack, provisioning bundle, `regions` and `classes`, sealed blind set, initial gate | `m5` |
 | M6 Confirmation | a harder sealed initial set and a second initial gate (ADR 0017); then, only after an admission, a distinct sealed set of at least 50 items, confirmation gate, admission record | `m6` |
-| M7 Contract conformance | `squint serve`, `describe --json`, `run.json`, contract locations and image references, shared exit codes, `squint playground` (ADR 0018, SPEC "External interface"); tasks written once `waffle-tools-contract` v0.1 is tagged; independent of M6 | `m7` |
+| M7 Contract conformance | `squint serve`, `describe --json`, `run.json`, contract locations and image references, shared exit codes, `squint playground` (ADR 0018, SPEC "External interface"); tasks written once `table-manners` v0.1 is tagged; independent of M6 | `m7` |
 
 Deferred past M7 with their own ADRs: an HTTP transport for `squint serve`, the mask handoff
 from rascal (region-scoped `allowed` obligations), Bedrock and Vertex profiles, the ChatGPT-plan

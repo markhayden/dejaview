@@ -125,7 +125,7 @@ tag.
 
 ## M7: contract conformance (ADR 0018)
 
-- [x] ADR 0018 and SPEC "External interface" (2026-10-30): the waffle tools contract decisions recorded on squint's side
-- [ ] `waffle-tools-contract` v0.1 drafted from rascal's seed section (one window owns the text; rascal reviews by diff), with the server conventions lifted from `rascal serve`, and tagged
+- [x] ADR 0018 and SPEC "External interface" (2026-10-30): the table-manners contract decisions recorded on squint's side
+- [ ] `table-manners` v0.1 drafted from rascal's seed section (one window owns the text; rascal reviews by diff), with the server conventions lifted from `rascal serve`, and tagged
 - [ ] M7 task list in PLAN.md, written against the v0.1 field names
 - [ ] Contract v0.2 from what M7 finds, before rascal's conformance merges

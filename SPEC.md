@@ -1383,9 +1383,11 @@ blind set and only under an ADR that counts every earlier initial attempt in the
 
 From M7 (ADR 0018). squint is one tool in a chain an agent drives: generate an image, check it
 with squint, mask what squint found with rascal, paint inside the mask, check again. Every tool in
-the chain presents the same external interface, defined by the **waffle tools contract**, a
-neutral repository (`waffle-tools-contract`) holding the specification, the JSON Schemas (the
-source of truth), test vectors, a fixture per tool and a Rust crate of serde types. squint pins a
+the chain presents the same external interface, defined by **table-manners**, the shared contract
+of the waffle tools: a neutral repository (`table-manners`) holding the specification, the JSON
+Schemas (the source of truth), test vectors, a fixture per tool and a Rust crate of serde types.
+The contract has a core every tool follows and profiles a kind of tool adds; squint implements the
+core and the images profile, and lists `images` in its description's `profiles`. squint pins a
 tagged release, keeps a hash-checked copy of its schemas under `schemas/contract/`, and warns in CI
 when a newer tag exists. Field names and schemas are the contract's; this section says what squint
 does with them. Until contract v0.1 is tagged the summary below is the agreed shape, not the wire.

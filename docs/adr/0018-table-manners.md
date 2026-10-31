@@ -1,4 +1,4 @@
-# ADR 0018: squint conforms to the waffle tools contract
+# ADR 0018: squint conforms to table-manners, the shared tool contract
 
 Date: 2026-10-30. Status: accepted (owner decisions of 2026-10-30; the contract text is pending
 its v0.1 tag).
@@ -28,12 +28,14 @@ with the owner on 2026-10-30, refined by review from rascal's side.
 ## Decision
 
 **A neutral contract.** The external interface lives in its own repository,
-`waffle-tools-contract`: a written specification, JSON Schemas (the source of truth, because the
+`table-manners`: a written specification, JSON Schemas (the source of truth, because the
 Python packs read them), test vectors, a fixture per tool, and a Rust leaf crate of serde types
 with no logic, published to crates.io (squint-cli is, so its dependencies must be). The contract
 tags releases. squint pins a release, keeps a hash-checked copy of the schemas, and warns in CI
 when a newer tag exists; an update is a deliberate commit. No tool takes a code dependency on
-another tool. v0.1 is the minimum the chain needs; squint's conformance is expected to find what
+another tool. The contract has a core every tool follows (results, self-description, long runs,
+the MCP server, exit codes) and profiles a kind of tool adds; v0.1 has one, images, and squint
+implements the core and the images profile. v0.1 is the minimum the chain needs; squint's conformance is expected to find what
 it gets wrong about long paid runs, and v0.2 follows before rascal's conformance merges.
 
 **What crosses between tools.**

@@ -22,4 +22,4 @@ decision's shape without reversing it. Format: Context, Decision, Alternatives, 
 | 0015 | The MCP client stays in-house | accepted 2026-10-28 |
 | 0016 | Random numbers for the statistics contract: pinned ChaCha20, canonical order | accepted 2026-10-26 |
 | 0017 | After a rejected initial gate: a harder blind set and a second initial gate counted at two hypotheses | accepted 2026-10-30 |
-| 0018 | squint conforms to the waffle tools contract: `serve`, `describe`, `run.json`, shared locations and exit codes | accepted 2026-10-30 |
+| 0018 | squint conforms to table-manners, the shared tool contract: `serve`, `describe`, `run.json`, shared locations and exit codes | accepted 2026-10-30 |
